@@ -15,9 +15,11 @@ tsdev is a framework implementing a **contracts-first** approach to application 
 ## Key Features
 
 - 🎯 **Contracts-first**: single source of truth for all interfaces
-- 🔄 **Transport-agnostic**: one handler works via HTTP, CLI, SDK, agents
-- 📝 **Self-describing**: automatic introspection and documentation generation
-- 📊 **Telemetry by design**: OpenTelemetry built into the domain model level
+- 🔄 **Transport-agnostic**: one handler works via RPC, REST, CLI, SDK, agents
+- 🌐 **Auto REST API**: RESTful endpoints auto-generated from contracts ⭐
+- 📄 **Auto OpenAPI**: OpenAPI 3.0 spec + Swagger UI auto-generated ⭐
+- 📝 **Self-describing**: automatic introspection and documentation
+- 📊 **Telemetry by design**: OpenTelemetry built into the domain model
 - 🧩 **Composable**: extensibility through function composition, not framework magic
 - 📐 **Convention-driven**: code structure determines automation
 
@@ -30,31 +32,42 @@ npm install
 # Run the HTTP server
 npm run dev:http
 
-# In another terminal, try the HTTP API
+# 📚 View Swagger UI docs
+open http://localhost:3000/docs
+
+# 🌐 Try REST API (auto-generated!)
+curl -X POST http://localhost:3000/users \
+  -d '{"name": "Alice", "email": "alice@example.com"}'
+
+# 🔧 Or use RPC style
 curl -X POST http://localhost:3000/rpc/users.create \
-  -H "Content-Type: application/json" \
-  -d '{"name": "John Doe", "email": "john@example.com"}'
+  -d '{"name": "Bob", "email": "bob@example.com"}'
 
-# Or use the CLI
-npm run cli -- users.create --name "Jane Doe" --email "jane@example.com"
+# 💻 Or use CLI
+npm run cli -- users.create --name "Charlie" --email "charlie@example.com"
 
-# List all available procedures
-npm run cli -- --list
+# 📄 Get OpenAPI spec
+curl http://localhost:3000/openapi.json
 ```
 
 ## Documentation
 
 **📌 Start Here:**
-- [PROJECT_STATUS.md](./PROJECT_STATUS.md) - **Current status and quick guide**
-- [OVERVIEW.md](./OVERVIEW.md) - Visual overview and comparison
+- [FEATURE_SHOWCASE.md](./FEATURE_SHOWCASE.md) - **See all 14+ features in action** ⭐
 - [REST_AND_OPENAPI.md](./REST_AND_OPENAPI.md) - **REST API & OpenAPI generation** ⭐
+- [OVERVIEW.md](./OVERVIEW.md) - Visual overview and comparison
 
 **📚 Deep Dive:**
 - [PHILOSOPHY.md](./PHILOSOPHY.md) - Framework philosophy and principles
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - Internal architecture and design
 - [EXAMPLES.md](./EXAMPLES.md) - Usage examples and tutorials
-- [PROTOTYPE_SUMMARY.md](./PROTOTYPE_SUMMARY.md) - Prototype implementation details
-- [DELIVERABLES.md](./DELIVERABLES.md) - Complete deliverables checklist
+
+**📋 Reference:**
+- [DX_COMPARISON.md](./DX_COMPARISON.md) - **DX comparison vs oRPC/tRPC** ⚡
+- [PROJECT_STATUS.md](./PROJECT_STATUS.md) - Current status and metrics
+- [FINAL_DELIVERY.md](./FINAL_DELIVERY.md) - Complete delivery report
+- [PROTOTYPE_SUMMARY.md](./PROTOTYPE_SUMMARY.md) - Implementation details
+- [DELIVERABLES.md](./DELIVERABLES.md) - Deliverables checklist
 
 ## How It Works
 
