@@ -47,6 +47,7 @@ npm run cli -- --list
 **📌 Start Here:**
 - [PROJECT_STATUS.md](./PROJECT_STATUS.md) - **Current status and quick guide**
 - [OVERVIEW.md](./OVERVIEW.md) - Visual overview and comparison
+- [REST_AND_OPENAPI.md](./REST_AND_OPENAPI.md) - **REST API & OpenAPI generation** ⭐
 
 **📚 Deep Dive:**
 - [PHILOSOPHY.md](./PHILOSOPHY.md) - Framework philosophy and principles
@@ -108,9 +109,12 @@ export const createUser: Procedure = {
 ### 3. It's Automatically Available!
 
 No registration needed. The handler works via:
-- **HTTP**: `POST /rpc/users.create`
+- **RPC**: `POST /rpc/users.create`
+- **REST**: `POST /users` (auto-generated!)
 - **CLI**: `npm run cli -- users.create --name "..." --email "..."`
-- **Future transports**: GraphQL, gRPC, WebSocket, etc.
+- **OpenAPI**: Auto-generated spec at `/openapi.json`
+- **Swagger UI**: Interactive docs at `/docs`
+- **Future**: GraphQL, gRPC, WebSocket, etc.
 
 ## Project Structure
 

@@ -13,3 +13,7 @@ export * from "./policies/index.js";
 // Adapters
 export { createHttpServer } from "./adapters/http.js";
 export { runCli } from "./adapters/cli.js";
+export { handleRESTRequest, listRESTRoutes } from "./adapters/rest.js";
+
+// Generators
+export { generateOpenAPISpec, generateOpenAPIJSON, generateOpenAPIYAML } from "./generators/openapi.js";

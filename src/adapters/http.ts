@@ -1,10 +1,12 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createExecutionContext, executeProcedure } from "../core/executor.js";
 import type { Registry } from "../core/types.js";
+import { generateOpenAPIJSON } from "../generators/openapi.js";
+import { handleRESTRequest, listRESTRoutes } from "./rest.js";
 
 /**
  * HTTP adapter for tsdev
- * Demonstrates transport-agnostic principle - same handlers work via HTTP
+ * Supports both RPC and REST endpoints from the same contracts
  */
 export function createHttpServer(registry: Registry, port = 3000) {
 	const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
@@ -36,6 +38,65 @@ export function createHttpServer(registry: Registry, port = 3000) {
 
 			res.writeHead(200, { "Content-Type": "application/json" });
 			res.end(JSON.stringify({ procedures }));
+			return;
+		}
+
+		// OpenAPI specification endpoint
+		if (req.url === "/openapi.json" && req.method === "GET") {
+			const spec = generateOpenAPIJSON(registry, {
+				title: "tsdev API",
+				version: "1.0.0",
+				description: "Auto-generated API from tsdev contracts",
+				servers: [{ url: `http://localhost:${port}`, description: "Development server" }],
+			});
+
+			res.writeHead(200, { "Content-Type": "application/json" });
+			res.end(spec);
+			return;
+		}
+
+		// Swagger UI (simple HTML version)
+		if (req.url === "/docs" && req.method === "GET") {
+			const html = `
+<!DOCTYPE html>
+<html>
+<head>
+	<title>tsdev API Documentation</title>
+	<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+	<div id="swagger-ui"></div>
+	<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+	<script>
+		SwaggerUIBundle({
+			url: '/openapi.json',
+			dom_id: '#swagger-ui',
+			presets: [
+				SwaggerUIBundle.presets.apis,
+				SwaggerUIBundle.SwaggerUIStandalonePreset
+			],
+		});
+	</script>
+</body>
+</html>`;
+
+			res.writeHead(200, { "Content-Type": "text/html" });
+			res.end(html);
+			return;
+		}
+
+		// List REST routes
+		if (req.url === "/routes" && req.method === "GET") {
+			const routes = listRESTRoutes(registry);
+
+			res.writeHead(200, { "Content-Type": "application/json" });
+			res.end(JSON.stringify({ routes }));
+			return;
+		}
+
+		// Try REST endpoints first
+		const restHandled = await handleRESTRequest(req, res, registry);
+		if (restHandled) {
 			return;
 		}
 
@@ -90,8 +151,24 @@ export function createHttpServer(registry: Registry, port = 3000) {
 
 	server.listen(port, () => {
 		console.log(`🚀 HTTP server listening on http://localhost:${port}`);
-		console.log(`📋 List procedures: http://localhost:${port}/procedures`);
-		console.log(`🔧 RPC endpoint: POST http://localhost:${port}/rpc/:procedureName`);
+		console.log(`\n📚 Documentation:`);
+		console.log(`   Swagger UI:     http://localhost:${port}/docs`);
+		console.log(`   OpenAPI JSON:   http://localhost:${port}/openapi.json`);
+		console.log(`   Procedures:     http://localhost:${port}/procedures`);
+		console.log(`   REST Routes:    http://localhost:${port}/routes`);
+		console.log(`\n🔧 Endpoints:`);
+		console.log(`   RPC:  POST http://localhost:${port}/rpc/:procedureName`);
+		console.log(`   REST: http://localhost:${port}/:resource (conventional)`);
+		console.log(``);
+
+		// List REST routes
+		const routes = listRESTRoutes(registry);
+		if (routes.length > 0) {
+			console.log(`📍 Available REST routes:`);
+			for (const route of routes) {
+				console.log(`   ${route.method.padEnd(6)} ${route.path.padEnd(20)} -> ${route.procedure}`);
+			}
+		}
 	});
 
 	return server;

@@ -9,7 +9,7 @@
 
 ## 📦 Deliverables
 
-### Documentation (7 files)
+### Documentation (11 files)
 - [x] `README.md` - Project introduction with quick start
 - [x] `OVERVIEW.md` - Visual architecture diagrams and comparisons
 - [x] `PHILOSOPHY.md` - Framework philosophy (7 principles)
@@ -17,6 +17,10 @@
 - [x] `EXAMPLES.md` - Comprehensive usage examples
 - [x] `PROTOTYPE_SUMMARY.md` - Implementation details
 - [x] `DELIVERABLES.md` - Complete deliverables checklist
+- [x] `PROJECT_STATUS.md` - Current status and metrics
+- [x] `REST_AND_OPENAPI.md` - **REST API & OpenAPI generation guide** ⭐
+- [x] `FEATURE_SHOWCASE.md` - **Complete feature demonstration** ⭐
+- [x] `test.sh` - Integration test script
 
 ### Core Framework (4 files)
 - [x] `src/core/types.ts` - Type definitions
@@ -31,9 +35,13 @@
 - [x] `src/policies/withLogging.ts` - Logging
 - [x] `src/policies/index.ts` - Policy exports
 
-### Adapters (2 files)
-- [x] `src/adapters/http.ts` - HTTP/REST adapter
+### Adapters (3 files)
+- [x] `src/adapters/http.ts` - HTTP server (RPC + REST + OpenAPI)
+- [x] `src/adapters/rest.ts` - **REST API generator** ⭐
 - [x] `src/adapters/cli.ts` - CLI adapter
+
+### Generators (1 file)
+- [x] `src/generators/openapi.ts` - **OpenAPI 3.0 spec generator** ⭐
 
 ### Contracts (2 files)
 - [x] `src/contracts/users.ts` - User domain
@@ -69,12 +77,14 @@
 
 ## 📊 Metrics
 
-- **Total Files**: 28
-- **TypeScript Files**: 18 (~1,200 LOC)
-- **Documentation**: 7 files (~1,600 lines)
+- **Total Files**: 34
+- **TypeScript Files**: 21 (~1,800 LOC)
+- **Documentation**: 11 files (~3,500+ lines)
 - **Procedures Implemented**: 5 (users.create, users.get, users.list, math.add, math.multiply)
 - **Policies Implemented**: 4 (withSpan, withRetry, withRateLimit, withLogging)
-- **Transports Implemented**: 2 (HTTP, CLI)
+- **Transports Implemented**: 3 (RPC, REST, CLI)
+- **Generators**: 1 (OpenAPI/Swagger)
+- **API Styles**: RPC + REST (from same handlers!)
 - **Test Coverage**: Integration test script
 
 ---
@@ -93,18 +103,37 @@ npm run dev:http
 
 Server starts at `http://localhost:3000`
 
-### 3. Test HTTP API
+### 3. Explore Documentation
 ```bash
-# List procedures
-curl http://localhost:3000/procedures
+# View Swagger UI
+open http://localhost:3000/docs
 
-# Create a user
+# Get OpenAPI spec
+curl http://localhost:3000/openapi.json
+
+# List all REST routes
+curl http://localhost:3000/routes
+```
+
+### 4. Test HTTP API
+
+**RPC Style:**
+```bash
 curl -X POST http://localhost:3000/rpc/users.create \
   -H "Content-Type: application/json" \
   -d '{"name": "John Doe", "email": "john@example.com"}'
 ```
 
-### 4. Use CLI
+**REST Style (same handler!):**
+```bash
+curl -X POST http://localhost:3000/users \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Jane Doe", "email": "jane@example.com"}'
+
+curl http://localhost:3000/users
+```
+
+### 5. Use CLI
 ```bash
 # List procedures
 npm run cli -- --list
@@ -122,13 +151,15 @@ npm run cli -- math.add --a 5 --b 3
 
 **Start here:**
 1. `README.md` - Overview and quick start
-2. `OVERVIEW.md` - Visual diagrams and architecture
-3. `PHILOSOPHY.md` - Understand the principles
+2. `REST_AND_OPENAPI.md` - **REST & OpenAPI features** ⭐
+3. `FEATURE_SHOWCASE.md` - **Complete example** ⭐
+4. `OVERVIEW.md` - Visual diagrams and architecture
+5. `PHILOSOPHY.md` - Understand the principles
 
 **Then explore:**
-4. `EXAMPLES.md` - See how to use it
-5. `ARCHITECTURE.md` - Understand how it works
-6. `PROTOTYPE_SUMMARY.md` - Implementation details
+6. `EXAMPLES.md` - See how to use it
+7. `ARCHITECTURE.md` - Understand how it works
+8. `PROTOTYPE_SUMMARY.md` - Implementation details
 
 ---
 

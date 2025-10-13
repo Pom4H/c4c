@@ -8,9 +8,29 @@ This document demonstrates how to use the tsdev framework.
 npm run dev:http
 ```
 
-The server will start on `http://localhost:3000`.
+The server will start on `http://localhost:3000` with:
+- 📚 Swagger UI at `http://localhost:3000/docs`
+- 📄 OpenAPI spec at `http://localhost:3000/openapi.json`
+- 🔧 RPC endpoints at `POST /rpc/:procedureName`
+- 🌐 REST endpoints at `/:resource` (conventional routes)
 
-## HTTP Examples
+## Documentation & Introspection
+
+### Swagger UI (Interactive API Docs)
+
+```bash
+open http://localhost:3000/docs
+```
+
+Browse and test all API endpoints directly in your browser!
+
+### OpenAPI Specification
+
+```bash
+curl http://localhost:3000/openapi.json
+```
+
+Get the complete OpenAPI 3.0 specification auto-generated from contracts.
 
 ### List all available procedures
 
@@ -18,7 +38,15 @@ The server will start on `http://localhost:3000`.
 curl http://localhost:3000/procedures
 ```
 
-### Create a user
+### List all REST routes
+
+```bash
+curl http://localhost:3000/routes
+```
+
+## HTTP Examples
+
+### Create a user (RPC style)
 
 ```bash
 curl -X POST http://localhost:3000/rpc/users.create \
@@ -36,7 +64,7 @@ Response:
 }
 ```
 
-### Get a user
+### Get a user (RPC style)
 
 ```bash
 curl -X POST http://localhost:3000/rpc/users.get \
@@ -44,12 +72,60 @@ curl -X POST http://localhost:3000/rpc/users.get \
   -d '{"id": "550e8400-e29b-41d4-a716-446655440000"}'
 ```
 
-### List users
+### List users (RPC style)
 
 ```bash
 curl -X POST http://localhost:3000/rpc/users.list \
   -H "Content-Type: application/json" \
   -d '{"limit": 10, "offset": 0}'
+```
+
+## REST API Examples
+
+The same procedures are automatically available as RESTful endpoints!
+
+### Create a user (REST style)
+
+```bash
+curl -X POST http://localhost:3000/users \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Alice Smith", "email": "alice@example.com"}'
+```
+
+Response:
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "Alice Smith",
+  "email": "alice@example.com",
+  "createdAt": "2024-01-01T00:00:00.000Z"
+}
+```
+
+### Get a user (REST style)
+
+```bash
+curl http://localhost:3000/users/550e8400-e29b-41d4-a716-446655440000
+```
+
+### List users (REST style)
+
+```bash
+curl "http://localhost:3000/users?limit=10&offset=0"
+```
+
+Response:
+```json
+{
+  "users": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "Alice Smith",
+      "email": "alice@example.com"
+    }
+  ],
+  "total": 1
+}
 ```
 
 ### Math operations
@@ -113,10 +189,23 @@ npm run cli -- math.multiply --a 6 --b 7
 ### Transport-Agnostic
 
 The same `users.create` handler works identically via:
-- HTTP: `POST /rpc/users.create`
-- CLI: `npm run cli -- users.create`
+- **RPC**: `POST /rpc/users.create`
+- **REST**: `POST /users`
+- **CLI**: `npm run cli -- users.create`
 
 The handler code doesn't know which transport called it!
+
+### Auto-Generated Documentation
+
+From a single Zod contract, you automatically get:
+- ✅ OpenAPI 3.0 specification
+- ✅ Swagger UI documentation
+- ✅ RPC endpoints
+- ✅ REST endpoints
+- ✅ Type definitions
+- ✅ Runtime validation
+
+No manual documentation needed!
 
 ### Self-Describing
 
