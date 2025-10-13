@@ -3,6 +3,7 @@ import { createExecutionContext, executeProcedure } from "../core/executor.js";
 import type { Registry } from "../core/types.js";
 import { generateOpenAPIJSON } from "../generators/openapi.js";
 import { handleRESTRequest, listRESTRoutes } from "./rest.js";
+import { handleWorkflowRequest } from "./workflow-http.js";
 
 /**
  * HTTP adapter for tsdev
@@ -94,7 +95,13 @@ export function createHttpServer(registry: Registry, port = 3000) {
 			return;
 		}
 
-		// Try REST endpoints first
+		// Try workflow endpoints
+		const workflowHandled = await handleWorkflowRequest(req, res, registry);
+		if (workflowHandled) {
+			return;
+		}
+
+		// Try REST endpoints
 		const restHandled = await handleRESTRequest(req, res, registry);
 		if (restHandled) {
 			return;
@@ -152,10 +159,15 @@ export function createHttpServer(registry: Registry, port = 3000) {
 	server.listen(port, () => {
 		console.log(`🚀 HTTP server listening on http://localhost:${port}`);
 		console.log(`\n📚 Documentation:`);
-		console.log(`   Swagger UI:     http://localhost:${port}/docs`);
-		console.log(`   OpenAPI JSON:   http://localhost:${port}/openapi.json`);
-		console.log(`   Procedures:     http://localhost:${port}/procedures`);
-		console.log(`   REST Routes:    http://localhost:${port}/routes`);
+		console.log(`   Swagger UI:       http://localhost:${port}/docs`);
+		console.log(`   OpenAPI JSON:     http://localhost:${port}/openapi.json`);
+		console.log(`   Procedures:       http://localhost:${port}/procedures`);
+		console.log(`   REST Routes:      http://localhost:${port}/routes`);
+		console.log(`\n🔄 Workflow:`);
+		console.log(`   Node Palette:     http://localhost:${port}/workflow/palette`);
+		console.log(`   UI Config:        http://localhost:${port}/workflow/ui-config`);
+		console.log(`   Execute:          POST http://localhost:${port}/workflow/execute`);
+		console.log(`   Validate:         POST http://localhost:${port}/workflow/validate`);
 		console.log(`\n🔧 Endpoints:`);
 		console.log(`   RPC:  POST http://localhost:${port}/rpc/:procedureName`);
 		console.log(`   REST: http://localhost:${port}/:resource (conventional)`);

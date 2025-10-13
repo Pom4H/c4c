@@ -12,6 +12,21 @@ A complete **contracts-first, transport-agnostic framework** that demonstrates a
 
 ### 1. Core Framework (8 files)
 
+*(Same as before)*
+
+### 1.5 Workflow System (4 files) ⭐ NEW!
+
+| Component | File | Lines | Purpose |
+|-----------|------|-------|---------|
+| Types | `src/workflow/types.ts` | ~150 | Workflow type definitions |
+| Runtime | `src/workflow/runtime.ts` | ~300 | Workflow execution engine |
+| Generator | `src/workflow/generator.ts` | ~400 | UI config generators |
+| Examples | `src/workflow/examples.ts` | ~200 | Example workflows |
+
+**Total Workflow:** ~1,050 lines
+
+### 2. Core Framework (continued)
+
 | Component | File | Lines | Purpose |
 |-----------|------|-------|---------|
 | Types | `src/core/types.ts` | ~60 | TypeScript type definitions |
@@ -186,7 +201,7 @@ const createUserContract: Contract = {
 };
 ```
 
-### Output: 14+ Features (Automatically!)
+### Output: 15+ Features (Automatically!)
 
 1. ✅ **RPC Endpoint** - `POST /rpc/users.create`
 2. ✅ **REST Endpoint** - `POST /users`
@@ -202,8 +217,9 @@ const createUserContract: Contract = {
 12. ✅ **Retry Logic** - Exponential backoff
 13. ✅ **Logging** - Execution metrics
 14. ✅ **Introspection** - Self-describing API
+15. ✅ **Workflow Node** - Visual programming ⭐ NEW!
 
-**ROI: 14+ features from 15 lines of code!**
+**ROI: 15+ features from 15 lines of code!**
 
 ---
 

@@ -17,3 +17,9 @@ export { handleRESTRequest, listRESTRoutes } from "./adapters/rest.js";
 
 // Generators
 export { generateOpenAPISpec, generateOpenAPIJSON, generateOpenAPIYAML } from "./generators/openapi.js";
+
+// Workflow
+export type { WorkflowDefinition, WorkflowNode, WorkflowContext, WorkflowExecutionResult, NodeMetadata } from "./workflow/types.js";
+export { executeWorkflow, validateWorkflow } from "./workflow/runtime.js";
+export { generateWorkflowUI, generateWorkflowHTML, generateReactFlowConfig, generateN8NConfig, generateMermaidDiagram } from "./workflow/generator.js";
+export { handleWorkflowRequest } from "./adapters/workflow-http.js";

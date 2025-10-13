@@ -18,6 +18,7 @@ tsdev is a framework implementing a **contracts-first** approach to application 
 - 🔄 **Transport-agnostic**: one handler works via RPC, REST, CLI, SDK, agents
 - 🌐 **Auto REST API**: RESTful endpoints auto-generated from contracts ⭐
 - 📄 **Auto OpenAPI**: OpenAPI 3.0 spec + Swagger UI auto-generated ⭐
+- 🔀 **Visual Workflows**: procedures become workflow nodes automatically ⭐
 - 📝 **Self-describing**: automatic introspection and documentation
 - 📊 **Telemetry by design**: OpenTelemetry built into the domain model
 - 🧩 **Composable**: extensibility through function composition, not framework magic
@@ -53,8 +54,10 @@ curl http://localhost:3000/openapi.json
 ## Documentation
 
 **📌 Start Here:**
-- [FEATURE_SHOWCASE.md](./FEATURE_SHOWCASE.md) - **See all 14+ features in action** ⭐
+- [FEATURE_SHOWCASE.md](./FEATURE_SHOWCASE.md) - **See all 15+ features in action** ⭐
 - [REST_AND_OPENAPI.md](./REST_AND_OPENAPI.md) - **REST API & OpenAPI generation** ⭐
+- [WORKFLOW_QUICK_START.md](./WORKFLOW_QUICK_START.md) - **Try workflows in 3 minutes** ⚡
+- [WORKFLOW_SYSTEM.md](./WORKFLOW_SYSTEM.md) - **Visual workflows from contracts** ⭐
 - [OVERVIEW.md](./OVERVIEW.md) - Visual overview and comparison
 
 **📚 Deep Dive:**
@@ -127,6 +130,7 @@ No registration needed. The handler works via:
 - **CLI**: `npm run cli -- users.create --name "..." --email "..."`
 - **OpenAPI**: Auto-generated spec at `/openapi.json`
 - **Swagger UI**: Interactive docs at `/docs`
+- **Workflow Node**: Visual programming at `/workflow/palette` ⭐
 - **Future**: GraphQL, gRPC, WebSocket, etc.
 
 ## Project Structure
