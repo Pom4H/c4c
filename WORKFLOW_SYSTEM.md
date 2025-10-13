@@ -512,6 +512,177 @@ categories.forEach(category => {
 
 ---
 
+## 📊 OpenTelemetry Integration
+
+### Полная трассировка workflow
+
+**Workflow полностью интегрирован с OpenTelemetry из коробки!**
+
+Каждое выполнение workflow создаёт иерархию spans:
+
+```
+workflow.execute (root span)
+  ├─ workflow.node.procedure (node-1)
+  │  └─ users.create (procedure span from withSpan)
+  │     └─ [business logic]
+  ├─ workflow.node.condition
+  │  └─ [condition evaluation]
+  └─ workflow.node.procedure (node-2)
+     └─ emails.send (procedure span from withSpan)
+        └─ [email logic]
+```
+
+### Автоматические атрибуты
+
+#### Workflow-level attributes:
+```typescript
+{
+  "workflow.id": "user-onboarding",
+  "workflow.name": "User Onboarding",
+  "workflow.version": "1.0.0",
+  "workflow.execution_id": "wf_exec_1234567890_abc123",
+  "workflow.start_node": "create-user",
+  "workflow.node_count": 5,
+  "workflow.nodes_executed_total": 5,
+  "workflow.execution_time_ms": 1234,
+  "workflow.status": "completed"
+}
+```
+
+#### Node-level attributes:
+```typescript
+{
+  "node.id": "create-user",
+  "node.type": "procedure",
+  "node.procedure": "users.create",
+  "node.status": "completed",
+  "node.next": "send-email",
+  "procedure.input": "{\"name\":\"Alice\",\"email\":\"alice@example.com\"}",
+  "procedure.output": "{\"id\":\"123\",\"name\":\"Alice\"}"
+}
+```
+
+#### Condition-level attributes:
+```typescript
+{
+  "condition.expression": "subscription === 'premium'",
+  "condition.variables": "{\"subscription\":\"premium\"}",
+  "condition.result": true,
+  "condition.branch_taken": "premium-features"
+}
+```
+
+#### Parallel execution attributes:
+```typescript
+{
+  "parallel.node_id": "parallel-tasks",
+  "parallel.branch_id": "task-1",
+  "parallel.branch_index": 0
+}
+```
+
+### Policies работают автоматически
+
+Процедуры в workflow используют те же policies, что и в обычных вызовах:
+
+```typescript
+export const createUser: Procedure = {
+  contract: createUserContract,
+  handler: applyPolicies(
+    baseHandler,
+    withLogging("users.create"),
+    withSpan("users.create"),  // ← Создаёт span автоматически
+    withRetry({ maxAttempts: 3 })
+  )
+};
+
+// В workflow эта процедура создаст span как child node span
+```
+
+### Span Hierarchy Example
+
+```
+Trace ID: abc123def456
+│
+└─ workflow.execute (1234ms)
+   │  workflow.id: "user-registration"
+   │  workflow.status: "completed"
+   │
+   ├─ workflow.node.procedure (234ms)
+   │  │  node.id: "create-user"
+   │  │  node.procedure: "users.create"
+   │  │
+   │  └─ users.create (220ms)  ← from withSpan policy
+   │     │  request.id: "req_..."
+   │     │  context.transport: "workflow"
+   │     │  context.workflowId: "user-registration"
+   │     │
+   │     └─ [business logic execution]
+   │
+   ├─ workflow.node.condition (5ms)
+   │     condition.expression: "emailVerified === true"
+   │     condition.result: true
+   │
+   └─ workflow.node.procedure (456ms)
+      │  node.id: "send-welcome"
+      │  node.procedure: "emails.send"
+      │
+      └─ emails.send (445ms)  ← from withSpan policy
+         └─ [email sending logic]
+```
+
+### Viewing Traces
+
+Работает со всеми OpenTelemetry-совместимыми инструментами:
+
+**Jaeger:**
+```bash
+# View trace in Jaeger UI
+http://localhost:16686/trace/<trace-id>
+```
+
+**DataDog:**
+```bash
+# Spans appear in APM > Traces
+# Filter by: service:tsdev, operation:workflow.execute
+```
+
+**Honeycomb:**
+```bash
+# Query:
+# WHERE workflow.id = "user-registration"
+# GROUP BY node.id
+```
+
+### Error Tracking
+
+При ошибках traces содержат полную информацию:
+
+```typescript
+{
+  "workflow.status": "failed",
+  "workflow.error": "User with email alice@example.com already exists",
+  "node.status": "failed",
+  "node.error": "Duplicate email",
+  "error.type": "ValidationError",
+  "error.stack": "..."
+}
+```
+
+### Пример использования
+
+```typescript
+// Выполни workflow
+const result = await executeWorkflow(workflow, registry, input);
+
+// Trace автоматически создан!
+// Смотри в Jaeger/DataDog/etc:
+// - Полный путь выполнения
+// - Время каждой ноды
+// - Input/output данные
+// - Ошибки с stack traces
+```
+
 ## 🔧 Advanced Features
 
 ### Error Handling

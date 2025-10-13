@@ -58,6 +58,7 @@ curl http://localhost:3000/openapi.json
 - [REST_AND_OPENAPI.md](./REST_AND_OPENAPI.md) - **REST API & OpenAPI generation** ⭐
 - [WORKFLOW_QUICK_START.md](./WORKFLOW_QUICK_START.md) - **Try workflows in 3 minutes** ⚡
 - [WORKFLOW_SYSTEM.md](./WORKFLOW_SYSTEM.md) - **Visual workflows from contracts** ⭐
+- [WORKFLOW_TELEMETRY_GUIDE.md](./WORKFLOW_TELEMETRY_GUIDE.md) - **Full OpenTelemetry integration** 📊
 - [OVERVIEW.md](./OVERVIEW.md) - Visual overview and comparison
 
 **📚 Deep Dive:**
