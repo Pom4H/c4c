@@ -1,10 +1,11 @@
 /**
  * Hono app for workflow execution with SSE
+ * Using real tsdev framework
  */
 
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { executeWorkflow } from "./runtime";
+import { executeWorkflow } from "./runtime-integration";
 import {
   mathWorkflow,
   conditionalWorkflow,

@@ -5,7 +5,7 @@
  * Fully integrated with OpenTelemetry tracing
  */
 
-import { trace, type Span, SpanStatusCode, context as otelContext } from "@opentelemetry/api";
+import { trace, type Span, SpanStatusCode } from "@opentelemetry/api";
 import { executeProcedure, createExecutionContext } from "../core/executor.js";
 import type { Registry } from "../core/types.js";
 import type {
@@ -104,7 +104,7 @@ export async function executeWorkflow(
 
 				return {
 					executionId,
-					status: "completed",
+					status: "completed" as const,
 					outputs,
 					executionTime,
 					nodesExecuted,
@@ -132,7 +132,7 @@ export async function executeWorkflow(
 
 				return {
 					executionId,
-					status: "failed",
+					status: "failed" as const,
 					outputs: {},
 					error: error instanceof Error ? error : new Error(String(error)),
 					executionTime,
@@ -301,7 +301,7 @@ async function executeConditionNode(
 	node: WorkflowNode,
 	context: WorkflowContext
 ): Promise<string | undefined> {
-	const config = node.config as ConditionConfig;
+	const config = node.config as unknown as ConditionConfig;
 	if (!config?.expression) {
 		throw new Error(`Condition node ${node.id} missing expression`);
 	}
@@ -345,7 +345,7 @@ async function executeParallelNode(
 	registry: Registry,
 	workflow: WorkflowDefinition
 ): Promise<string | undefined> {
-	const config = node.config as ParallelConfig;
+	const config = node.config as unknown as ParallelConfig;
 	if (!config?.branches || config.branches.length === 0) {
 		throw new Error(`Parallel node ${node.id} missing branches`);
 	}
@@ -407,7 +407,7 @@ async function executeParallelNode(
  */
 async function executeSequentialNode(
 	node: WorkflowNode,
-	context: WorkflowContext
+	_context: WorkflowContext
 ): Promise<string | undefined> {
 	// Sequential is just returning next node
 	return typeof node.next === "string" ? node.next : node.next?.[0];

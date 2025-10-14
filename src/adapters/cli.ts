@@ -63,8 +63,9 @@ export async function runCli(registry: Registry, args: string[]) {
 function parseCliArgs(args: string[]): Record<string, unknown> {
 	// Check for --json flag
 	const jsonIndex = args.indexOf("--json");
-	if (jsonIndex !== -1 && args[jsonIndex + 1]) {
-		return JSON.parse(args[jsonIndex + 1]);
+	const jsonArg = args[jsonIndex + 1];
+	if (jsonIndex !== -1 && jsonArg) {
+		return JSON.parse(jsonArg);
 	}
 
 	const input: Record<string, unknown> = {};

@@ -8,77 +8,60 @@ import { useState, useEffect } from "react";
 import WorkflowVisualizer from "@/components/WorkflowVisualizer";
 import TraceViewer from "@/components/TraceViewer";
 import SpanGanttChart from "@/components/SpanGanttChart";
-import {
-  executeWorkflowSSE,
-  fetchWorkflows,
-  fetchWorkflowDefinition,
-} from "@/lib/workflow/sse-client";
-import type {
-  WorkflowDefinition,
-  WorkflowExecutionResult,
-} from "@/lib/workflow/types";
+import { useWorkflow, useWorkflows, useWorkflowDefinition } from "@/hooks/useWorkflow";
 
 export default function Home() {
-  const [workflows, setWorkflows] = useState<Array<{ id: string; name: string; nodeCount: number }>>([]);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>("");
-  const [selectedWorkflow, setSelectedWorkflow] =
-    useState<WorkflowDefinition | null>(null);
-  const [executionResult, setExecutionResult] =
-    useState<WorkflowExecutionResult | null>(null);
-  const [isExecuting, setIsExecuting] = useState(false);
   const [activeTab, setActiveTab] = useState<"graph" | "trace" | "gantt">("graph");
+
+  // Use workflow hooks
+  const { workflows, fetchWorkflows } = useWorkflows();
+  const { workflow: selectedWorkflow, fetchWorkflow } = useWorkflowDefinition(selectedWorkflowId);
+  
+  const {
+    execute,
+    isExecuting,
+    result: executionResult,
+  } = useWorkflow({
+    onStart: (data) => {
+      console.log("Workflow started:", data.workflowName);
+    },
+    onProgress: (data) => {
+      console.log("Node executed:", data.nodeId);
+    },
+    onComplete: (result) => {
+      console.log("Workflow completed:", result);
+      setActiveTab("graph"); // Switch to graph view to see execution
+    },
+    onError: (error) => {
+      console.error("Workflow error:", error);
+      alert(`Execution failed: ${error}`);
+    },
+  });
 
   // Load available workflows on mount
   useEffect(() => {
-    fetchWorkflows().then((wfs) => {
-      setWorkflows(wfs);
-      if (wfs.length > 0) {
-        setSelectedWorkflowId(wfs[0].id);
-      }
-    });
+    fetchWorkflows();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  
+  // Set first workflow when workflows load
+  useEffect(() => {
+    if (workflows.length > 0 && !selectedWorkflowId) {
+      setSelectedWorkflowId(workflows[0].id);
+    }
+  }, [workflows, selectedWorkflowId]);
 
   // Load workflow definition when selection changes
   useEffect(() => {
     if (selectedWorkflowId) {
-      fetchWorkflowDefinition(selectedWorkflowId).then((wf) => {
-        setSelectedWorkflow(wf);
-        setExecutionResult(null); // Clear previous execution
-      });
+      fetchWorkflow(selectedWorkflowId);
     }
-  }, [selectedWorkflowId]);
+  }, [selectedWorkflowId, fetchWorkflow]);
 
   const handleExecute = async () => {
     if (!selectedWorkflowId) return;
-
-    setIsExecuting(true);
-    setExecutionResult(null);
-
-    try {
-      await executeWorkflowSSE(selectedWorkflowId, undefined, {
-        onStart: (event) => {
-          console.log("Workflow started:", event.workflowName);
-        },
-        onProgress: (event) => {
-          console.log("Node executed:", event.nodeId);
-        },
-        onComplete: (event) => {
-          setExecutionResult(event.result);
-          setActiveTab("graph"); // Switch to graph view to see execution
-        },
-        onError: (event) => {
-          console.error("Workflow error:", event.error);
-          alert(`Execution failed: ${event.error}`);
-        },
-      });
-    } catch (error) {
-      console.error("Workflow execution failed:", error);
-      alert(
-        `Execution failed: ${error instanceof Error ? error.message : String(error)}`
-      );
-    } finally {
-      setIsExecuting(false);
-    }
+    await execute(selectedWorkflowId);
   };
 
   return (

@@ -25,7 +25,7 @@ export const createUser: Procedure<
 > = {
 	contract: createUserContract,
 	handler: applyPolicies(
-		async (input: { name: string; email: string }, context: ExecutionContext) => {
+		async (input: { name: string; email: string }, _context: ExecutionContext) => {
 			// Pure business logic - doesn't know about transport
 			const user: User = {
 				id: crypto.randomUUID(),
