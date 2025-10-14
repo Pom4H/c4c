@@ -2,7 +2,20 @@
 
 Пример приложения на Next.js 15.0.5 с серверными экшенами для запуска workflow и фронтенд компонентом для визуализации работы workflow с использованием OpenTelemetry протокола и React Flow.
 
-## 🚀 Возможности
+## 🚀 Quick Start
+
+```bash
+# 1. Установите зависимости
+npm install
+
+# 2. Запустите dev сервер
+npm run dev
+
+# 3. Откройте в браузере
+# http://localhost:3000
+```
+
+## 🎯 Возможности
 
 - **Next.js 15.0.5** с App Router
 - **Server Actions** для выполнения workflow на сервере
@@ -10,21 +23,6 @@
 - **OpenTelemetry Protocol** для сбора и отображения трейсов
 - **Реактивное обновление** визуализации по мере выполнения
 - **4 примера workflow**: простой, условный, параллельный и комплексный
-
-## 📦 Установка
-
-```bash
-cd examples/nextjs-workflow-viz
-npm install
-```
-
-## 🏃 Запуск
-
-```bash
-npm run dev
-```
-
-Откройте [http://localhost:3000](http://localhost:3000) в браузере.
 
 ## 🏗️ Архитектура
 
@@ -239,12 +237,76 @@ import { registry } from "@/core/registry";
 const result = await executeWorkflow(workflow, registry, initialInput);
 ```
 
-## 📚 Дополнительная информация
+## 🎓 Примеры использования
 
+### 1. Math Calculation (простой)
+Последовательное выполнение: add(10, 5) → multiply(15, 2) → subtract(100, 30) = 70
+
+### 2. Conditional Processing (с ветвлением) 
+Демонстрирует условную логику с проверкой premium статуса
+
+### 3. Parallel Tasks (параллельный)
+Выполнение 3 задач одновременно с последующей агрегацией
+
+### 4. Complex Workflow (комплексный)
+Комбинация всех паттернов: последовательность + параллельность + условия
+
+## 🛠️ Расширение
+
+### Добавить свой workflow
+
+Отредактируйте `src/lib/workflow/examples.ts`:
+
+```typescript
+export const myWorkflow: WorkflowDefinition = {
+  id: "my-workflow",
+  name: "My Custom Workflow",
+  version: "1.0.0",
+  startNode: "step-1",
+  nodes: [
+    {
+      id: "step-1",
+      type: "procedure",
+      procedureName: "math.add",
+      config: { a: 100, b: 200 },
+      next: "step-2"
+    }
+  ]
+};
+```
+
+### Добавить новую процедуру
+
+В `src/lib/workflow/runtime.ts`:
+
+```typescript
+const mockProcedures = {
+  "my.procedure": async (input) => {
+    // Ваша логика
+    return { result: "value" };
+  }
+};
+```
+
+## 🔍 Troubleshooting
+
+**Порт 3000 занят?**
+```bash
+PORT=3001 npm run dev
+```
+
+**Ошибки установки?**
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
+
+## 📚 Документация
+
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - Детальная архитектура системы
 - [Next.js Documentation](https://nextjs.org/docs)
 - [React Flow](https://reactflow.dev/)
 - [OpenTelemetry](https://opentelemetry.io/)
-- [Server Actions](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations)
 
 ## 📄 Лицензия
 

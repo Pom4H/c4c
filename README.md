@@ -72,18 +72,8 @@ The workflow module allows composing procedures into visual workflows with:
 
 ## 📖 Documentation
 
-### Setup & Installation
-- [MONOREPO_INSTALL.md](./MONOREPO_INSTALL.md) - Installation guide
-- [MONOREPO_SETUP.md](./MONOREPO_SETUP.md) - Workspace configuration
-
-### Refactoring Documentation
-- [EXECUTIVE_SUMMARY.md](./EXECUTIVE_SUMMARY.md) - High-level overview
-- [RUNTIME_FIX_SUMMARY.md](./RUNTIME_FIX_SUMMARY.md) - Runtime separation
-- [WORKFLOW_REFACTOR_SUMMARY.md](./WORKFLOW_REFACTOR_SUMMARY.md) - Complete guide
-
-### Framework Philosophy
-- [PHILOSOPHY.md](./PHILOSOPHY.md) - Core principles
-- [WORKFLOW_SYSTEM.md](./WORKFLOW_SYSTEM.md) - Workflow architecture
+- [PHILOSOPHY.md](./PHILOSOPHY.md) - Core principles and design philosophy
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - System architecture and design
 
 ## 🎨 Example Application
 
