@@ -3,21 +3,19 @@
  */
 
 import { Hono } from "hono";
-import { streamSSE } from "hono/streaming";
-import { executeWorkflow } from "../../../dist/workflow/runtime.js";
-import type { Registry } from "../../../dist/core/types.js";
-import type { Procedure } from "../../../dist/core/types.js";
-import { addProcedure, multiplyProcedure, greetProcedure } from "./procedures";
+import { createRegistryFromProcedures } from "../../../dist/core/registry-helpers.js";
+import { createWorkflowRoutes } from "../../../dist/adapters/hono-workflow.js";
+import { demoProcedures } from "../../../dist/examples/index.js";
 import { workflows } from "./workflows";
 
-// Setup Registry
-const registry: Registry = new Map();
-registry.set("math.add", addProcedure as unknown as Procedure);
-registry.set("math.multiply", multiplyProcedure as unknown as Procedure);
-registry.set("greet", greetProcedure as unknown as Procedure);
+// Setup Registry using framework helper
+const registry = createRegistryFromProcedures(demoProcedures);
 
 // Create Hono app
 const app = new Hono();
+
+// Add workflow routes using framework adapter
+createWorkflowRoutes(app, registry, workflows, { basePath: "/api/workflows" });
 
 // Home page with JSX
 app.get("/", (c) => {
@@ -221,79 +219,7 @@ app.get("/", (c) => {
   );
 });
 
-// API: Get workflows
-app.get("/api/workflows", (c) => {
-  return c.json(
-    Object.values(workflows).map((wf) => ({
-      id: wf.id,
-      name: wf.name,
-      description: wf.description,
-      nodeCount: wf.nodes.length,
-    }))
-  );
-});
-
-// API: Execute workflow with SSE
-app.post("/api/workflows/:id/execute", async (c) => {
-  const workflowId = c.req.param("id");
-  const workflow = workflows[workflowId as keyof typeof workflows];
-
-  if (!workflow) {
-    return c.json({ error: `Workflow ${workflowId} not found` }, 404);
-  }
-
-  const body = await c.req.json().catch(() => ({}));
-  const input = body.input || {};
-
-  return streamSSE(c, async (stream) => {
-    try {
-      // Send start event
-      await stream.writeSSE({
-        data: JSON.stringify({
-          type: "start",
-          workflowId,
-          workflowName: workflow.name,
-          timestamp: Date.now(),
-        }),
-        event: "workflow-start",
-      });
-
-      // Execute workflow with tsdev framework
-      const result = await executeWorkflow(workflow, registry, input);
-
-      // Send progress events
-      for (const nodeId of result.nodesExecuted) {
-        await stream.writeSSE({
-          data: JSON.stringify({
-            type: "node-executed",
-            nodeId,
-            timestamp: Date.now(),
-          }),
-          event: "workflow-progress",
-        });
-      }
-
-      // Send completion event
-      await stream.writeSSE({
-        data: JSON.stringify({
-          type: "complete",
-          result,
-          timestamp: Date.now(),
-        }),
-        event: "workflow-complete",
-      });
-    } catch (error) {
-      await stream.writeSSE({
-        data: JSON.stringify({
-          type: "error",
-          error: error instanceof Error ? error.message : String(error),
-          timestamp: Date.now(),
-        }),
-        event: "workflow-error",
-      });
-    }
-  });
-});
+// API routes are now handled by framework adapter above!
 
 // Start server
 const port = process.env.PORT || 3001;
