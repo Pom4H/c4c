@@ -1,0 +1,36 @@
+{
+  "name": "@tsdev/adapters",
+  "version": "0.1.0",
+  "description": "Transport adapters (HTTP, CLI, REST) for tsdev",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "keywords": [
+    "http",
+    "cli",
+    "rest",
+    "adapters"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@tsdev/core": "workspace:*",
+    "@tsdev/workflow": "workspace:*",
+    "@tsdev/generators": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "typescript": "^5.9.3"
+  }
+}

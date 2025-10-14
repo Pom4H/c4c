@@ -5,7 +5,9 @@
   "description": "tsdev framework monorepo",
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter nextjs-workflow-viz dev",
+    "dev": "pnpm --filter workflow-viz dev",
+    "dev:basic": "pnpm --filter basic-example dev",
+    "dev:workflows": "pnpm --filter workflows-example dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "lint:fix": "pnpm -r lint:fix"

@@ -7,37 +7,75 @@ This document explains the internal architecture of the tsdev framework.
 ```
 tsdev/
 ├── packages/
-│   ├── tsdev/              # Core framework package
-│   │   ├── core/           # Core framework functionality
-│   │   │   ├── types.ts    # Type definitions
-│   │   │   ├── registry.ts # Procedure registry and discovery
-│   │   │   ├── executor.ts # Procedure execution engine
-│   │   │   └── workflow/   # Workflow runtime with OTEL
-│   │   ├── policies/       # Composable policies
-│   │   │   ├── withSpan.ts # OpenTelemetry tracing
-│   │   │   ├── withRetry.ts # Retry with backoff
-│   │   │   ├── withRateLimit.ts # Rate limiting
-│   │   │   └── withLogging.ts # Logging
-│   │   ├── adapters/       # Transport adapters
-│   │   │   ├── http.ts     # HTTP/REST adapter
-│   │   │   └── cli.ts      # CLI adapter
-│   │   └── generators/     # Code generators
-│   │       └── openapi.ts  # OpenAPI spec generator
+│   ├── core/                    # @tsdev/core
+│   │   ├── src/
+│   │   │   ├── types.ts         # Contract, Procedure, Registry, Policy
+│   │   │   ├── registry.ts      # collectRegistry(), getProcedure()
+│   │   │   ├── executor.ts      # executeProcedure(), applyPolicies()
+│   │   │   └── index.ts
+│   │   ├── package.json
+│   │   └── tsconfig.json
 │   │
-│   └── tsdev-react/        # React integration package
-│       └── src/
-│           ├── index.ts
-│           └── useWorkflow.ts # React hooks for workflows
+│   ├── workflow/                # @tsdev/workflow
+│   │   ├── src/
+│   │   │   ├── types.ts         # WorkflowDefinition, WorkflowNode
+│   │   │   ├── runtime.ts       # executeWorkflow() with OpenTelemetry
+│   │   │   └── index.ts
+│   │   ├── react/               # @tsdev/workflow/react (sub-package)
+│   │   │   ├── src/
+│   │   │   │   ├── useWorkflow.ts  # React hooks
+│   │   │   │   └── index.ts
+│   │   │   ├── package.json
+│   │   │   └── tsconfig.json
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── adapters/                # @tsdev/adapters
+│   │   ├── src/
+│   │   │   ├── http.ts          # HTTP/RPC server
+│   │   │   ├── rest.ts          # RESTful routing
+│   │   │   ├── cli.ts           # CLI interface
+│   │   │   ├── workflow-http.ts # Workflow HTTP endpoints
+│   │   │   └── index.ts
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── policies/                # @tsdev/policies
+│   │   ├── src/
+│   │   │   ├── withSpan.ts      # OpenTelemetry tracing
+│   │   │   ├── withRetry.ts     # Retry logic
+│   │   │   ├── withLogging.ts   # Logging
+│   │   │   ├── withRateLimit.ts # Rate limiting
+│   │   │   └── index.ts
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   └── generators/              # @tsdev/generators
+│       ├── src/
+│       │   ├── openapi.ts       # OpenAPI spec generation
+│       │   └── index.ts
+│       ├── package.json
+│       └── tsconfig.json
 │
 └── examples/
-    ├── tsdev-example/      # Basic framework usage
-    │   ├── contracts/      # Contract definitions (Zod schemas)
-    │   ├── handlers/       # Handler implementations
-    │   ├── apps/           # Application entry points
-    │   └── workflow/       # Workflow examples
+    ├── basic/                   # Basic usage example
+    │   ├── src/
+    │   │   ├── contracts/       # Contract definitions
+    │   │   ├── handlers/        # Handler implementations
+    │   │   └── apps/            # HTTP server & CLI
+    │   ├── package.json
+    │   └── tsconfig.json
     │
-    └── nextjs-workflow-viz/  # Next.js visualization demo
-        └── src/            # React Flow workflow visualization
+    ├── workflows/               # Workflow examples
+    │   ├── src/
+    │   │   ├── mock-procedures.ts
+    │   │   ├── examples.ts
+    │   │   └── server.ts
+    │   ├── package.json
+    │   └── tsconfig.json
+    │
+    └── workflow-viz/            # Next.js visualization
+        └── src/                 # React Flow demo
 ```
 
 ## Core Concepts
@@ -50,6 +88,9 @@ Contracts are Zod schemas that define:
 - **Metadata**: Tags, rate limits, descriptions, etc.
 
 ```typescript
+import { z } from 'zod';
+import type { Contract } from '@tsdev/core';
+
 const createUserContract: Contract = {
   name: "users.create",
   description: "Create a new user",
@@ -74,6 +115,8 @@ const createUserContract: Contract = {
 A procedure combines a contract with a handler function:
 
 ```typescript
+import type { Procedure } from '@tsdev/core';
+
 const createUser: Procedure = {
   contract: createUserContract,
   handler: async (input, context) => {
@@ -88,8 +131,7 @@ const createUser: Procedure = {
 The registry automatically discovers all procedures:
 
 ```typescript
-// In your application (e.g., examples/tsdev-example/apps/http-server.ts)
-import { collectRegistry } from 'tsdev/core';
+import { collectRegistry } from '@tsdev/core';
 
 const registry = await collectRegistry("./handlers");
 ```
@@ -117,6 +159,9 @@ The adapter populates metadata with transport-specific information (HTTP headers
 Policies are functions that wrap handlers to add cross-cutting concerns:
 
 ```typescript
+import { applyPolicies } from '@tsdev/core';
+import { withLogging, withSpan, withRetry, withRateLimit } from '@tsdev/policies';
+
 const handler = applyPolicies(
   baseHandler,
   withLogging("procedure.name"),
@@ -132,12 +177,37 @@ Policies are applied right-to-left (inner to outer):
 3. Tracing span
 4. Logging
 
-Each policy:
-- Receives a handler
-- Returns a new handler
-- Can run code before/after the handler
-- Can modify input/output/context
-- Can catch and handle errors
+### Workflows (Composable Procedures)
+
+Workflows compose procedures into visual graphs with OpenTelemetry tracing:
+
+```typescript
+import { executeWorkflow, type WorkflowDefinition } from '@tsdev/workflow';
+
+const workflow: WorkflowDefinition = {
+  id: "user-onboarding",
+  name: "User Onboarding Flow",
+  version: "1.0.0",
+  startNode: "create-user",
+  nodes: [
+    {
+      id: "create-user",
+      type: "procedure",
+      procedureName: "users.create",
+      config: { /* input */ },
+      next: "send-email"
+    },
+    {
+      id: "send-email",
+      type: "procedure",
+      procedureName: "emails.sendWelcome",
+      next: undefined
+    }
+  ]
+};
+
+const result = await executeWorkflow(workflow, registry);
+```
 
 ### Adapters (Transport Layer)
 
@@ -150,6 +220,18 @@ Adapters bridge transports to the core:
 
 Adapters are **thin layers** - all business logic lives in handlers.
 
+## Package Dependencies
+
+```
+@tsdev/core (no dependencies on other @tsdev packages)
+    ↑
+    ├── @tsdev/workflow (depends on @tsdev/core)
+    │   └── @tsdev/workflow/react (depends on @tsdev/workflow, react)
+    ├── @tsdev/adapters (depends on @tsdev/core, @tsdev/workflow, @tsdev/generators)
+    ├── @tsdev/policies (depends on @tsdev/core)
+    └── @tsdev/generators (depends on @tsdev/core, @tsdev/workflow)
+```
+
 ## Data Flow
 
 ### HTTP Request Flow
@@ -157,13 +239,13 @@ Adapters are **thin layers** - all business logic lives in handlers.
 ```
 HTTP Request
   ↓
-HTTP Adapter
+HTTP Adapter (@tsdev/adapters)
   ↓
 Parse JSON body
   ↓
 Create ExecutionContext { transport: "http", ... }
   ↓
-executeProcedure(procedure, input, context)
+executeProcedure(@tsdev/core)
   ↓
 Validate input (Zod)
   ↓
@@ -180,24 +262,22 @@ HTTP Adapter formats as JSON
 HTTP Response
 ```
 
-### CLI Request Flow
+### Workflow Execution Flow
 
 ```
-CLI Arguments
+executeWorkflow(@tsdev/workflow)
   ↓
-CLI Adapter
+Create workflow-level OpenTelemetry span
   ↓
-Parse --key value arguments
+For each node in workflow:
+  ├─→ procedure node → executeProcedure(@tsdev/core)
+  ├─→ condition node → evaluate expression → branch
+  ├─→ parallel node → execute branches concurrently
+  └─→ sequential node → pass through
   ↓
-Create ExecutionContext { transport: "cli", ... }
+Collect all spans
   ↓
-executeProcedure(procedure, input, context)
-  ↓
-[Same as HTTP flow]
-  ↓
-CLI Adapter formats as pretty-printed JSON
-  ↓
-Console Output
+Return WorkflowExecutionResult with spans
 ```
 
 ## Key Principles in Action
@@ -234,9 +314,11 @@ Every procedure runs in a tracing span. Business-level attributes (user_id, org_
 
 ### Adding a New Transport
 
-1. Create an adapter in `src/adapters/`:
+1. Create an adapter in a new package or in `@tsdev/adapters`:
 
 ```typescript
+import { createExecutionContext, executeProcedure, type Registry } from '@tsdev/core';
+
 export async function createWebSocketServer(registry: Registry) {
   // Parse WebSocket messages
   // Create ExecutionContext
@@ -245,20 +327,17 @@ export async function createWebSocketServer(registry: Registry) {
 }
 ```
 
-2. Create an app in `src/apps/`:
-
-```typescript
-const registry = await collectRegistry("src/handlers");
-createWebSocketServer(registry);
-```
+2. Use it in your application
 
 **That's it!** All existing handlers now work via WebSocket.
 
 ### Adding a New Policy
 
-1. Create a policy in `src/policies/`:
+1. Create a policy in `@tsdev/policies` or your own package:
 
 ```typescript
+import type { Policy } from '@tsdev/core';
+
 export function withCache(ttl: number): Policy {
   const cache = new Map();
   
@@ -284,31 +363,22 @@ export function withCache(ttl: number): Policy {
 2. Use it in any handler:
 
 ```typescript
-handler: applyPolicies(
+import { applyPolicies } from '@tsdev/core';
+import { withCache } from './policies/withCache.js';
+
+const handler = applyPolicies(
   baseHandler,
   withCache(60000), // 1 minute cache
-  withLogging("procedure.name")
-)
+);
 ```
 
 ### Adding a New Procedure
 
-1. Define contract in your application's `contracts/` directory
+1. Define contract in your `contracts/` directory
 2. Implement handler in `handlers/` directory
 3. Export the procedure
 
 **It's automatically discovered and available via all transports!**
-
-Example structure (see `examples/tsdev-example/`):
-```
-my-app/
-├── contracts/
-│   └── myfeature.ts
-├── handlers/
-│   └── myfeature.ts
-└── apps/
-    └── server.ts
-```
 
 ## Testing Strategy
 
@@ -334,7 +404,10 @@ expect(result).toMatchObject({
 Test via adapters:
 
 ```typescript
-const registry = await collectRegistry("src/handlers");
+import { collectRegistry } from '@tsdev/core';
+import { createHttpServer } from '@tsdev/adapters';
+
+const registry = await collectRegistry("./handlers");
 const server = createHttpServer(registry, 3001);
 
 const response = await fetch("http://localhost:3001/rpc/users.create", {
@@ -343,19 +416,6 @@ const response = await fetch("http://localhost:3001/rpc/users.create", {
 });
 
 expect(response.ok).toBe(true);
-```
-
-### Contract Tests
-
-Contracts ensure type safety:
-
-```typescript
-// TypeScript will error if input doesn't match contract
-const result = await executeProcedure(
-  createUser,
-  { name: "Test", email: "invalid" }, // Zod will validate and throw
-  context
-);
 ```
 
 ## Performance Considerations
@@ -380,13 +440,16 @@ OpenTelemetry spans have minimal overhead (~microseconds) and are sampled in pro
 
 Potential additions that maintain the philosophy:
 
-1. **OpenAPI Generator**: Generate OpenAPI specs from contracts
-2. **SDK Generator**: Generate TypeScript/Python SDKs from contracts
-3. **GraphQL Adapter**: Expose procedures via GraphQL
-4. **gRPC Adapter**: Expose procedures via gRPC
-5. **Message Queue Adapter**: Consume procedures from queues
-6. **Agent Interface**: Let LLMs call procedures directly
-7. **Schema Registry**: Central registry for contract versioning
-8. **Contract Evolution**: Backward-compatible contract changes
+1. **SDK Generator**: Generate TypeScript/Python SDKs from contracts
+2. **GraphQL Adapter**: Expose procedures via GraphQL
+3. **gRPC Adapter**: Expose procedures via gRPC
+4. **Message Queue Adapter**: Consume procedures from queues
+5. **Agent Interface**: Let LLMs call procedures directly
+6. **Schema Registry**: Central registry for contract versioning
+7. **Contract Evolution**: Backward-compatible contract changes
 
 All of these maintain the core principle: **write the contract once, derive everything else**.
+
+## License
+
+MIT

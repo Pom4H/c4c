@@ -1,0 +1,36 @@
+{
+  "name": "@tsdev/generators",
+  "version": "0.1.0",
+  "description": "Code generators (OpenAPI, SDK) for tsdev",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "keywords": [
+    "openapi",
+    "sdk",
+    "generators"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@tsdev/core": "workspace:*",
+    "@tsdev/workflow": "workspace:*",
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.23.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "typescript": "^5.9.3"
+  }
+}
