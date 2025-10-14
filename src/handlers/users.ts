@@ -1,6 +1,6 @@
+import { createUserContract, getUserContract, listUsersContract } from "../contracts/users.js";
 import { applyPolicies } from "../core/executor.js";
 import type { ExecutionContext, Procedure } from "../core/types.js";
-import { createUserContract, getUserContract, listUsersContract } from "../contracts/users.js";
 import { withLogging, withRateLimit, withRetry, withSpan } from "../policies/index.js";
 
 /**
@@ -25,7 +25,7 @@ export const createUser: Procedure<
 > = {
 	contract: createUserContract,
 	handler: applyPolicies(
-		async (input: { name: string; email: string }, context: ExecutionContext) => {
+		async (input: { name: string; email: string }, _context: ExecutionContext) => {
 			// Pure business logic - doesn't know about transport
 			const user: User = {
 				id: crypto.randomUUID(),
@@ -47,10 +47,7 @@ export const createUser: Procedure<
 /**
  * Get user handler
  */
-export const getUser: Procedure<
-	{ id: string },
-	{ id: string; name: string; email: string }
-> = {
+export const getUser: Procedure<{ id: string }, { id: string; name: string; email: string }> = {
 	contract: getUserContract,
 	handler: applyPolicies(
 		async (input: { id: string }, _context: ExecutionContext) => {

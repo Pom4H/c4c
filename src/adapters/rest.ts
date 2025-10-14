@@ -88,11 +88,7 @@ export async function handleRESTRequest(
 /**
  * Match REST route to procedure
  */
-function matchRESTRoute(
-	url: string,
-	method: string,
-	registry: Registry
-): RouteMatch | null {
+function matchRESTRoute(url: string, method: string, registry: Registry): RouteMatch | null {
 	const [pathname, queryString] = url.split("?");
 	const parts = pathname?.split("/").filter(Boolean) || [];
 
@@ -216,10 +212,7 @@ export function listRESTRoutes(registry: Registry): Array<{
 /**
  * Get REST route for a resource action
  */
-function getRESTRoute(
-	resource: string,
-	action: string
-): { method: string; path: string } | null {
+function getRESTRoute(resource: string, action: string): { method: string; path: string } | null {
 	switch (action) {
 		case "create":
 			return { method: "POST", path: `/${resource}` };

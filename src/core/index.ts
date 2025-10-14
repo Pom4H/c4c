@@ -1,6 +1,6 @@
 /**
  * tsdev - Contracts-first framework
- * 
+ *
  * Core exports for building transport-agnostic applications
  */
 

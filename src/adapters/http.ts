@@ -1,4 +1,4 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { type IncomingMessage, type ServerResponse, createServer } from "node:http";
 import { createExecutionContext, executeProcedure } from "../core/executor.js";
 import type { Registry } from "../core/types.js";
 import { generateOpenAPIJSON } from "../generators/openapi.js";
@@ -140,7 +140,8 @@ export function createHttpServer(registry: Registry, port = 3000) {
 			} catch (error) {
 				console.error("HTTP error:", error);
 
-				const statusCode = error instanceof Error && error.message.includes("not found") ? 404 : 400;
+				const statusCode =
+					error instanceof Error && error.message.includes("not found") ? 404 : 400;
 				res.writeHead(statusCode, { "Content-Type": "application/json" });
 				res.end(
 					JSON.stringify({
@@ -158,25 +159,25 @@ export function createHttpServer(registry: Registry, port = 3000) {
 
 	server.listen(port, () => {
 		console.log(`🚀 HTTP server listening on http://localhost:${port}`);
-		console.log(`\n📚 Documentation:`);
+		console.log("\n📚 Documentation:");
 		console.log(`   Swagger UI:       http://localhost:${port}/docs`);
 		console.log(`   OpenAPI JSON:     http://localhost:${port}/openapi.json`);
 		console.log(`   Procedures:       http://localhost:${port}/procedures`);
 		console.log(`   REST Routes:      http://localhost:${port}/routes`);
-		console.log(`\n🔄 Workflow:`);
+		console.log("\n🔄 Workflow:");
 		console.log(`   Node Palette:     http://localhost:${port}/workflow/palette`);
 		console.log(`   UI Config:        http://localhost:${port}/workflow/ui-config`);
 		console.log(`   Execute:          POST http://localhost:${port}/workflow/execute`);
 		console.log(`   Validate:         POST http://localhost:${port}/workflow/validate`);
-		console.log(`\n🔧 Endpoints:`);
+		console.log("\n🔧 Endpoints:");
 		console.log(`   RPC:  POST http://localhost:${port}/rpc/:procedureName`);
 		console.log(`   REST: http://localhost:${port}/:resource (conventional)`);
-		console.log(``);
+		console.log("");
 
 		// List REST routes
 		const routes = listRESTRoutes(registry);
 		if (routes.length > 0) {
-			console.log(`📍 Available REST routes:`);
+			console.log("📍 Available REST routes:");
 			for (const route of routes) {
 				console.log(`   ${route.method.padEnd(6)} ${route.path.padEnd(20)} -> ${route.procedure}`);
 			}

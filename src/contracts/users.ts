@@ -28,22 +28,24 @@ export const createUserContract: Contract<
 	},
 };
 
-export const getUserContract: Contract<{ id: string }, { id: string; name: string; email: string }> =
-	{
-		name: "users.get",
-		description: "Get user by ID",
-		input: z.object({
-			id: z.string().uuid("Valid UUID required"),
-		}),
-		output: z.object({
-			id: z.string(),
-			name: z.string(),
-			email: z.string(),
-		}),
-		metadata: {
-			tags: ["users", "read"],
-		},
-	};
+export const getUserContract: Contract<
+	{ id: string },
+	{ id: string; name: string; email: string }
+> = {
+	name: "users.get",
+	description: "Get user by ID",
+	input: z.object({
+		id: z.string().uuid("Valid UUID required"),
+	}),
+	output: z.object({
+		id: z.string(),
+		name: z.string(),
+		email: z.string(),
+	}),
+	metadata: {
+		tags: ["users", "read"],
+	},
+};
 
 export const listUsersContract: Contract<
 	{ limit?: number; offset?: number },

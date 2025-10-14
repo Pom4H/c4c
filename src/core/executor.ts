@@ -23,9 +23,7 @@ export async function executeProcedure<TInput, TOutput>(
 /**
  * Create execution context
  */
-export function createExecutionContext(
-	metadata: Record<string, unknown> = {}
-): ExecutionContext {
+export function createExecutionContext(metadata: Record<string, unknown> = {}): ExecutionContext {
 	return {
 		requestId: generateRequestId(),
 		timestamp: new Date(),

@@ -41,15 +41,15 @@ export async function runCli(registry: Registry, args: string[]) {
 
 		// Execute procedure
 		console.log(`\n🔧 Executing: ${procedureName}`);
-		console.log(`📥 Input:`, JSON.stringify(input, null, 2));
+		console.log("📥 Input:", JSON.stringify(input, null, 2));
 
 		const result = await executeProcedure(procedure, input, context);
 
-		console.log(`\n✅ Success!`);
-		console.log(`📤 Output:`, JSON.stringify(result, null, 2));
+		console.log("\n✅ Success!");
+		console.log("📤 Output:", JSON.stringify(result, null, 2));
 		console.log("");
 	} catch (error) {
-		console.error(`\n❌ Error:`, error instanceof Error ? error.message : String(error));
+		console.error("\n❌ Error:", error instanceof Error ? error.message : String(error));
 		console.log("");
 		process.exit(1);
 	}

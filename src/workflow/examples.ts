@@ -6,7 +6,7 @@ import type { WorkflowDefinition } from "./types.js";
 
 /**
  * Simple user registration workflow
- * 
+ *
  * Flow:
  * 1. Create user
  * 2. Send welcome email (parallel with profile setup)
@@ -47,7 +47,7 @@ export const userRegistrationWorkflow: WorkflowDefinition = {
 
 /**
  * Data processing pipeline workflow
- * 
+ *
  * Flow:
  * 1. Fetch user data
  * 2. Check if user is premium
@@ -101,7 +101,7 @@ export const dataProcessingWorkflow: WorkflowDefinition = {
 
 /**
  * Parallel task execution workflow
- * 
+ *
  * Flow:
  * 1. Start multiple tasks in parallel
  * 2. Wait for all to complete
@@ -153,7 +153,7 @@ export const parallelTasksWorkflow: WorkflowDefinition = {
 
 /**
  * Error handling workflow
- * 
+ *
  * Flow:
  * 1. Try to execute procedure
  * 2. If error, execute error handler
@@ -241,5 +241,79 @@ export const mathCalculationWorkflow: WorkflowDefinition = {
 	],
 	metadata: {
 		tags: ["math", "demo"],
+	},
+};
+
+/**
+ * Error demonstration workflow
+ *
+ * Flow:
+ * 1. Add two numbers successfully
+ * 2. Try to divide by zero (will cause error)
+ * 3. Handle the error gracefully
+ */
+export const errorDemonstrationWorkflow: WorkflowDefinition = {
+	id: "error-demonstration",
+	name: "Error Demonstration Workflow",
+	description: "Demonstrates error handling with division by zero",
+	version: "1.0.0",
+	startNode: "add-numbers",
+	variables: {
+		a: 10,
+		b: 5,
+	},
+	nodes: [
+		{
+			id: "add-numbers",
+			type: "procedure",
+			procedureName: "math.add",
+			config: {
+				a: 10,
+				b: 5,
+			},
+			next: "divide-by-zero",
+		},
+		{
+			id: "divide-by-zero",
+			type: "procedure",
+			procedureName: "math.divide",
+			config: {
+				a: 15, // Result from previous step
+				b: 0, // This will cause an error!
+			},
+			onError: "error-handler",
+			next: "success-message",
+		},
+		{
+			id: "error-handler",
+			type: "procedure",
+			procedureName: "logging.error", // Would need to implement
+			config: {
+				message: "Division by zero error caught and handled",
+			},
+			next: "fallback-calculation",
+		},
+		{
+			id: "fallback-calculation",
+			type: "procedure",
+			procedureName: "math.multiply",
+			config: {
+				a: 15, // Use previous result
+				b: 1, // Safe fallback
+			},
+			next: "success-message",
+		},
+		{
+			id: "success-message",
+			type: "procedure",
+			procedureName: "logging.success", // Would need to implement
+			config: {
+				message: "Workflow completed with error handling",
+			},
+			next: undefined,
+		},
+	],
+	metadata: {
+		tags: ["math", "error", "demo"],
 	},
 };

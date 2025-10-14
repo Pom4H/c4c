@@ -1,20 +1,20 @@
 /**
  * Workflow Runtime Executor
- * 
+ *
  * Executes workflows composed of procedure nodes
  * Fully integrated with OpenTelemetry tracing
  */
 
-import { trace, type Span, SpanStatusCode, context as otelContext } from "@opentelemetry/api";
-import { executeProcedure, createExecutionContext } from "../core/executor.js";
+import { type Span, SpanStatusCode, context as otelContext, trace } from "@opentelemetry/api";
+import { createExecutionContext, executeProcedure } from "../core/executor.js";
 import type { Registry } from "../core/types.js";
 import type {
-	WorkflowDefinition,
-	WorkflowContext,
-	WorkflowExecutionResult,
-	WorkflowNode,
 	ConditionConfig,
 	ParallelConfig,
+	WorkflowContext,
+	WorkflowDefinition,
+	WorkflowExecutionResult,
+	WorkflowNode,
 } from "./types.js";
 
 const tracer = trace.getTracer("tsdev.workflow");
@@ -33,7 +33,7 @@ export async function executeWorkflow(
 
 	// Create workflow-level span
 	return tracer.startActiveSpan(
-		`workflow.execute`,
+		"workflow.execute",
 		{
 			attributes: {
 				"workflow.id": workflow.id,
@@ -198,7 +198,9 @@ async function executeNode(
 				});
 				nodeSpan.setStatus({ code: SpanStatusCode.OK });
 
-				console.log(`[Workflow] ✅ Node completed: ${node.id}${nextNodeId ? ` → ${nextNodeId}` : " (end)"}`);
+				console.log(
+					`[Workflow] ✅ Node completed: ${node.id}${nextNodeId ? ` → ${nextNodeId}` : " (end)"}`
+				);
 
 				return nextNodeId;
 			} catch (error) {
@@ -327,9 +329,7 @@ async function executeConditionNode(
 		});
 	}
 
-	console.log(
-		`[Workflow] 🔀 Condition "${config.expression}" = ${result} → ${nextBranch}`
-	);
+	console.log(`[Workflow] 🔀 Condition "${config.expression}" = ${result} → ${nextBranch}`);
 
 	// Return appropriate branch
 	return nextBranch;
@@ -357,7 +357,7 @@ async function executeParallelNode(
 	// Execute all branches in parallel
 	const branchPromises = config.branches.map(async (branchNodeId, index) => {
 		return tracer.startActiveSpan(
-			`workflow.parallel.branch`,
+			"workflow.parallel.branch",
 			{
 				attributes: {
 					"workflow.id": workflow.id,
@@ -395,7 +395,7 @@ async function executeParallelNode(
 		console.log(`[Workflow] ✅ All ${config.branches.length} branches completed`);
 	} else {
 		await Promise.race(branchPromises);
-		console.log(`[Workflow] ✅ First branch completed`);
+		console.log("[Workflow] ✅ First branch completed");
 	}
 
 	// Return next node after parallel execution
@@ -407,7 +407,7 @@ async function executeParallelNode(
  */
 async function executeSequentialNode(
 	node: WorkflowNode,
-	context: WorkflowContext
+	_context: WorkflowContext
 ): Promise<string | undefined> {
 	// Sequential is just returning next node
 	return typeof node.next === "string" ? node.next : node.next?.[0];

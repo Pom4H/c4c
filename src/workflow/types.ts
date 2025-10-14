@@ -1,6 +1,6 @@
 /**
  * Workflow system types
- * 
+ *
  * Procedures with input/output contracts become workflow nodes automatically!
  */
 

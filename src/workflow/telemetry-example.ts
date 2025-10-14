@@ -1,6 +1,6 @@
 /**
  * Example demonstrating OpenTelemetry tracing in workflows
- * 
+ *
  * Shows the span hierarchy created during workflow execution
  */
 
@@ -8,9 +8,9 @@ import type { WorkflowDefinition } from "./types.js";
 
 /**
  * Example workflow that demonstrates telemetry
- * 
+ *
  * Span Hierarchy:
- * 
+ *
  * workflow.execute (root span)
  *   ├─ attributes:
  *   │  ├─ workflow.id: "user-onboarding"
@@ -110,7 +110,7 @@ export const telemetryExampleWorkflow: WorkflowDefinition = {
 
 /**
  * Example trace output (JSON format for Jaeger/Zipkin):
- * 
+ *
  * {
  *   "traceId": "abc123...",
  *   "spans": [
@@ -185,34 +185,34 @@ export const telemetryExampleWorkflow: WorkflowDefinition = {
 
 /**
  * Benefits of integrated telemetry:
- * 
+ *
  * 1. Full visibility into workflow execution
  *    - See entire workflow as one trace
  *    - Track execution time of each node
  *    - Identify bottlenecks
- * 
+ *
  * 2. Procedure-level tracing
  *    - Each procedure creates its own span
  *    - Policies (withSpan, withRetry) add their spans
  *    - Full hierarchy preserved
- * 
+ *
  * 3. Business context in traces
  *    - workflow.id, execution_id
  *    - node.id, procedure names
  *    - Input/output data
  *    - Condition expressions and results
- * 
+ *
  * 4. Error tracking
  *    - Failed nodes marked in traces
  *    - Error messages captured
  *    - Stack traces preserved
  *    - Error handler paths visible
- * 
+ *
  * 5. Parallel execution visibility
  *    - See all parallel branches
  *    - Track which completed first
  *    - Identify slow branches
- * 
+ *
  * 6. Compatible with all observability tools
  *    - Jaeger
  *    - Zipkin

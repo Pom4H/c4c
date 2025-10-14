@@ -1,6 +1,6 @@
 /**
  * Workflow UI and Configuration Generator
- * 
+ *
  * Automatically generates workflow editor UI config from procedures
  */
 
@@ -198,7 +198,7 @@ function getColorForCategory(category: string): string {
 /**
  * Extract input ports from Zod schema
  */
-function extractInputPorts(schema: unknown): Array<{ id: string; label: string; type: string }> {
+function extractInputPorts(_schema: unknown): Array<{ id: string; label: string; type: string }> {
 	// Simplified - in production, parse Zod schema properly
 	return [
 		{
@@ -212,7 +212,7 @@ function extractInputPorts(schema: unknown): Array<{ id: string; label: string; 
 /**
  * Extract output ports from Zod schema
  */
-function extractOutputPorts(schema: unknown): Array<{ id: string; label: string; type: string }> {
+function extractOutputPorts(_schema: unknown): Array<{ id: string; label: string; type: string }> {
 	// Simplified - in production, parse Zod schema properly
 	return [
 		{
@@ -226,7 +226,7 @@ function extractOutputPorts(schema: unknown): Array<{ id: string; label: string;
 /**
  * Extract n8n properties from Zod schema
  */
-function extractN8NProperties(schema: unknown): unknown[] {
+function extractN8NProperties(_schema: unknown): unknown[] {
 	// Simplified - in production, parse Zod schema and convert to n8n properties
 	return [
 		{

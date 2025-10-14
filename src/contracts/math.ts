@@ -34,3 +34,18 @@ export const multiplyContract: Contract<{ a: number; b: number }, { result: numb
 		tags: ["math", "calculation"],
 	},
 };
+
+export const divideContract: Contract<{ a: number; b: number }, { result: number }> = {
+	name: "math.divide",
+	description: "Divide two numbers (throws error if dividing by zero)",
+	input: z.object({
+		a: z.number(),
+		b: z.number(),
+	}),
+	output: z.object({
+		result: z.number(),
+	}),
+	metadata: {
+		tags: ["math", "calculation", "error-prone"],
+	},
+};

@@ -2,7 +2,7 @@
 
 /**
  * CLI Application
- * 
+ *
  * Demonstrates the transport-agnostic principle:
  * - Same handlers work via CLI
  * - No handler code knows about CLI

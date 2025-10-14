@@ -1,6 +1,6 @@
 /**
  * HTTP Server Application
- * 
+ *
  * Demonstrates the transport-agnostic principle:
  * - Same handlers work via HTTP
  * - No handler code knows about HTTP

@@ -236,7 +236,10 @@ function generateRESTPath(contract: Contract): Record<string, PathItem> | null {
 /**
  * Map action to REST convention
  */
-function getRESTMapping(resource: string, action: string): {
+function getRESTMapping(
+	resource: string,
+	action: string
+): {
 	method: string;
 	path: string;
 	hasBody: boolean;
