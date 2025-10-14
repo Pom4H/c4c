@@ -2,8 +2,24 @@ node_modules/
 dist/
 *.log
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 .DS_Store
 *.tsbuildinfo
 coverage/
 .vscode/
 .idea/
+
+# Next.js
+.next/
+out/
+
+# Build outputs
+build/
+
+# Lock files (keep package-lock.json, but ignore pnpm-lock.yaml duplicates if using both)
+# Uncomment if standardizing on one package manager:
+# package-lock.json
+# yarn.lock

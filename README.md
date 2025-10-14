@@ -28,16 +28,42 @@ Open http://localhost:3000 to see the workflow visualization example.
 ```
 tsdev/
 ├── packages/
-│   └── tsdev/              # 🎯 Core framework package
-│       ├── core/
-│       │   └── workflow/   # Workflow module with OTEL
-│       │       └── react/  # React hooks
-│       ├── policies/
-│       ├── adapters/
-│       └── ...
+│   ├── core/              # @tsdev/core - Core framework
+│   │   ├── types.ts       # Contract, Procedure, Registry
+│   │   ├── registry.ts    # Auto-discovery via collectRegistry()
+│   │   └── executor.ts    # Procedure execution
+│   │
+│   ├── workflow/          # @tsdev/workflow - Workflow system
+│   │   ├── types.ts       # WorkflowDefinition, WorkflowNode
+│   │   ├── runtime.ts     # executeWorkflow() with OpenTelemetry
+│   │   └── react/         # @tsdev/workflow/react - React hooks
+│   │       └── useWorkflow.ts
+│   │
+│   ├── adapters/          # @tsdev/adapters - Transport adapters
+│   │   ├── http.ts        # HTTP/RPC server
+│   │   ├── rest.ts        # RESTful routing
+│   │   └── cli.ts         # CLI interface
+│   │
+│   ├── policies/          # @tsdev/policies - Composable policies
+│   │   ├── withSpan.ts    # OpenTelemetry tracing
+│   │   ├── withRetry.ts   # Retry logic
+│   │   ├── withLogging.ts # Logging
+│   │   └── withRateLimit.ts
+│   │
+│   └── generators/        # @tsdev/generators - Code generation
+│       └── openapi.ts     # OpenAPI spec generation
 │
 └── examples/
-    └── nextjs-workflow-viz/  # Next.js example with React Flow
+    ├── basic/             # Basic usage example
+    │   ├── contracts/     # Contract definitions
+    │   ├── handlers/      # Handler implementations
+    │   └── apps/          # HTTP server & CLI
+    │
+    ├── workflows/         # Workflow examples
+    │   └── src/           # Mock procedures & workflow definitions
+    │
+    └── workflow-viz/      # Next.js workflow visualization
+        └── src/           # React Flow visualization demo
 ```
 
 ## 🎯 Features
@@ -52,51 +78,65 @@ tsdev/
 
 ## 🏗️ Architecture
 
-### Framework Core (`packages/tsdev`)
+### Core Framework (`@tsdev/core`)
 
 ```typescript
-// Import from tsdev package
-import { executeWorkflow } from 'tsdev/core/workflow';
-import { useWorkflow } from 'tsdev/core/workflow/react';
-import type { Registry, Procedure } from 'tsdev/core';
-import { withSpan, withRetry } from 'tsdev/policies';
+import { collectRegistry, executeProcedure, type Procedure, type Registry } from '@tsdev/core';
 ```
 
-### Workflow System
+### Workflow System (`@tsdev/workflow`)
 
-The workflow module allows composing procedures into visual workflows with:
-- ✅ **OTEL tracing** - automatic span creation
-- ✅ **React hooks** - `useWorkflow()` for UI integration
-- ✅ **API routes** - RESTful workflow execution
-- ✅ **Pure UI** - React Flow visualization
+```typescript
+import { executeWorkflow, type WorkflowDefinition } from '@tsdev/workflow';
+```
+
+### React Integration (`@tsdev/workflow/react`)
+
+```typescript
+import { useWorkflow } from '@tsdev/workflow/react';
+```
+
+### Transport Adapters (`@tsdev/adapters`)
+
+```typescript
+import { createHttpServer, runCli } from '@tsdev/adapters';
+```
+
+### Composable Policies (`@tsdev/policies`)
+
+```typescript
+import { withSpan, withRetry, withLogging, withRateLimit } from '@tsdev/policies';
+```
 
 ## 📖 Documentation
 
-### Setup & Installation
-- [MONOREPO_INSTALL.md](./MONOREPO_INSTALL.md) - Installation guide
-- [MONOREPO_SETUP.md](./MONOREPO_SETUP.md) - Workspace configuration
+- [PHILOSOPHY.md](./PHILOSOPHY.md) - Core principles and design philosophy
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - System architecture and design
 
-### Refactoring Documentation
-- [EXECUTIVE_SUMMARY.md](./EXECUTIVE_SUMMARY.md) - High-level overview
-- [RUNTIME_FIX_SUMMARY.md](./RUNTIME_FIX_SUMMARY.md) - Runtime separation
-- [WORKFLOW_REFACTOR_SUMMARY.md](./WORKFLOW_REFACTOR_SUMMARY.md) - Complete guide
+## 🎨 Example Applications
 
-### Framework Philosophy
-- [PHILOSOPHY.md](./PHILOSOPHY.md) - Core principles
-- [WORKFLOW_SYSTEM.md](./WORKFLOW_SYSTEM.md) - Workflow architecture
-
-## 🎨 Example Application
-
-The Next.js workflow visualization example demonstrates:
-- **Pure UI components** - no business logic in components
-- **Framework hooks** - `useWorkflow()` for state management
-- **API routes** - backend logic in `/api/workflow/*`
-- **OTEL tracing** - automatic span collection and visualization
-- **React Flow** - visual workflow representation
-
+### Basic Example
+Demonstrates contracts-first development:
 ```bash
-cd examples/nextjs-workflow-viz
-pnpm dev
+cd examples/basic
+pnpm install
+pnpm dev  # HTTP server on :3000
+```
+
+### Workflow Example
+Demonstrates workflow execution:
+```bash
+cd examples/workflows
+pnpm install
+pnpm dev  # Workflow server on :3001
+```
+
+### Workflow Visualization
+Next.js app with React Flow visualization:
+```bash
+cd examples/workflow-viz
+pnpm install
+pnpm dev  # Next.js on :3000
 ```
 
 ## 🛠️ Development
@@ -104,11 +144,6 @@ pnpm dev
 ### Install Dependencies
 ```bash
 pnpm install
-```
-
-### Run Example
-```bash
-pnpm dev
 ```
 
 ### Build All Packages
@@ -122,26 +157,40 @@ pnpm lint
 pnpm lint:fix
 ```
 
-### Package-Specific Commands
+### Run Examples
 ```bash
-# Only tsdev
-pnpm --filter tsdev build
-
-# Only example
-pnpm --filter nextjs-workflow-viz dev
+pnpm dev              # Workflow visualization
+pnpm dev:basic        # Basic HTTP/CLI example
+pnpm dev:workflows    # Workflow examples
 ```
 
 ## 📦 Package Exports
 
-The `tsdev` package provides clean exports:
-
+### `@tsdev/core`
 | Import | Module |
 |--------|--------|
-| `tsdev` | Main entry point |
-| `tsdev/core` | Core types and registry |
-| `tsdev/core/workflow` | Workflow runtime with OTEL |
-| `tsdev/core/workflow/react` | React hooks |
-| `tsdev/policies` | Composable policies |
+| `@tsdev/core` | Core types, registry, executor |
+
+### `@tsdev/workflow`
+| Import | Module |
+|--------|--------|
+| `@tsdev/workflow` | Workflow runtime with OpenTelemetry |
+| `@tsdev/workflow/react` | React hooks for workflows |
+
+### `@tsdev/adapters`
+| Import | Module |
+|--------|--------|
+| `@tsdev/adapters` | HTTP, REST, CLI adapters |
+
+### `@tsdev/policies`
+| Import | Module |
+|--------|--------|
+| `@tsdev/policies` | Retry, logging, tracing, rate limiting |
+
+### `@tsdev/generators`
+| Import | Module |
+|--------|--------|
+| `@tsdev/generators` | OpenAPI spec generation |
 
 ## 🏆 Key Benefits
 
@@ -171,7 +220,7 @@ const handler = async (input) => {
 // - SDK: client.users.create()
 ```
 
-### OTEL by Design
+### OpenTelemetry by Design
 ```typescript
 // Automatic tracing in workflows
 const workflow = {
@@ -181,12 +230,7 @@ const workflow = {
   ]
 };
 
-// Creates span hierarchy:
-// workflow.execute
-//   ├─ workflow.node.procedure
-//   │  └─ users.create (with policies)
-//   └─ workflow.node.procedure
-//      └─ emails.send (with policies)
+// Creates span hierarchy automatically
 ```
 
 ## 🎯 Philosophy
