@@ -1,14 +1,61 @@
 /**
  * React hooks for workflow execution with SSE
+ * Part of tsdev framework
  */
 
 import { useState, useCallback } from "react";
-import type { WorkflowExecutionResult, WorkflowDefinition } from "@/lib/workflow/types";
+
+/**
+ * Workflow execution result from framework
+ */
+export interface WorkflowExecutionResult {
+  executionId: string;
+  status: "completed" | "failed" | "cancelled";
+  outputs: Record<string, unknown>;
+  error?: string;
+  executionTime: number;
+  nodesExecuted: string[];
+  spans?: unknown[];
+}
+
+/**
+ * Workflow definition
+ */
+export interface WorkflowDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  version: string;
+  nodes: unknown[];
+  startNode: string;
+  variables?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
 
 export interface UseWorkflowOptions {
+  /**
+   * Base URL for API endpoints (default: /api/workflows)
+   */
+  baseUrl?: string;
+  
+  /**
+   * Called when workflow execution starts
+   */
   onStart?: (data: { workflowId: string; workflowName: string }) => void;
+  
+  /**
+   * Called on each node execution
+   */
   onProgress?: (data: { nodeId: string }) => void;
+  
+  /**
+   * Called when workflow completes successfully
+   */
   onComplete?: (result: WorkflowExecutionResult) => void;
+  
+  /**
+   * Called on workflow execution error
+   */
   onError?: (error: string) => void;
 }
 
@@ -22,11 +69,24 @@ export interface UseWorkflowReturn {
 
 /**
  * Hook for executing workflows with SSE streaming
+ * 
+ * @example
+ * ```tsx
+ * const { execute, isExecuting, result } = useWorkflow({
+ *   onStart: (data) => console.log("Started:", data.workflowName),
+ *   onProgress: (data) => console.log("Node:", data.nodeId),
+ *   onComplete: (result) => console.log("Done:", result),
+ * });
+ * 
+ * await execute("math-calculation", { a: 10, b: 5 });
+ * ```
  */
 export function useWorkflow(options?: UseWorkflowOptions): UseWorkflowReturn {
   const [isExecuting, setIsExecuting] = useState(false);
   const [result, setResult] = useState<WorkflowExecutionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const baseUrl = options?.baseUrl || "/api/workflows";
 
   const execute = useCallback(
     async (workflowId: string, input?: Record<string, unknown>) => {
@@ -35,7 +95,7 @@ export function useWorkflow(options?: UseWorkflowOptions): UseWorkflowReturn {
       setError(null);
 
       try {
-        const response = await fetch(`/api/workflows/${workflowId}/execute`, {
+        const response = await fetch(`${baseUrl}/${workflowId}/execute`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -70,13 +130,19 @@ export function useWorkflow(options?: UseWorkflowOptions): UseWorkflowReturn {
             const eventMatch = line.match(/^event: (.+)$/m);
             const dataMatch = line.match(/^data: (.+)$/m);
 
-            if (eventMatch && dataMatch) {
+            if (eventMatch?.[1] && dataMatch?.[1]) {
               const eventType = eventMatch[1];
-              const data = JSON.parse(dataMatch[1]);
+              const data = JSON.parse(dataMatch[1]) as {
+                workflowId?: string;
+                workflowName?: string;
+                nodeId?: string;
+                result?: WorkflowExecutionResult;
+                error?: string;
+              };
 
               switch (eventType) {
                 case "workflow-start":
-                  if (options?.onStart) {
+                  if (options?.onStart && data.workflowId && data.workflowName) {
                     options.onStart({
                       workflowId: data.workflowId,
                       workflowName: data.workflowName,
@@ -85,20 +151,22 @@ export function useWorkflow(options?: UseWorkflowOptions): UseWorkflowReturn {
                   break;
 
                 case "workflow-progress":
-                  if (options?.onProgress) {
+                  if (options?.onProgress && data.nodeId) {
                     options.onProgress({ nodeId: data.nodeId });
                   }
                   break;
 
                 case "workflow-complete":
-                  setResult(data.result);
-                  if (options?.onComplete) {
-                    options.onComplete(data.result);
+                  if (data.result) {
+                    setResult(data.result);
+                    if (options?.onComplete) {
+                      options.onComplete(data.result);
+                    }
                   }
                   break;
 
                 case "workflow-error":
-                  const errorMsg = data.error;
+                  const errorMsg = data.error || "Unknown error";
                   setError(errorMsg);
                   if (options?.onError) {
                     options.onError(errorMsg);
@@ -118,7 +186,8 @@ export function useWorkflow(options?: UseWorkflowOptions): UseWorkflowReturn {
         setIsExecuting(false);
       }
     },
-    [options, error]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseUrl]
   );
 
   const reset = useCallback(() => {
@@ -137,14 +206,24 @@ export function useWorkflow(options?: UseWorkflowOptions): UseWorkflowReturn {
 
 /**
  * Hook for fetching workflows list
+ * 
+ * @example
+ * ```tsx
+ * const { workflows, fetchWorkflows } = useWorkflows();
+ * 
+ * useEffect(() => {
+ *   fetchWorkflows();
+ * }, []);
+ * ```
  */
-export function useWorkflows() {
+export function useWorkflows(baseUrl = "/api/workflows") {
   const [workflows, setWorkflows] = useState<
     Array<{
       id: string;
       name: string;
-      description: string;
-      nodeCount: number;
+      description?: string;
+      nodeCount?: number;
+      [key: string]: unknown;
     }>
   >([]);
   const [loading, setLoading] = useState(true);
@@ -153,18 +232,24 @@ export function useWorkflows() {
   const fetchWorkflows = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/workflows");
+      const response = await fetch(baseUrl);
       if (!response.ok) {
         throw new Error(`Failed to fetch workflows: ${response.statusText}`);
       }
-      const data = await response.json();
+      const data = (await response.json()) as Array<{
+        id: string;
+        name: string;
+        description?: string;
+        nodeCount?: number;
+        [key: string]: unknown;
+      }>;
       setWorkflows(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [baseUrl]);
 
   return {
     workflows,
@@ -176,8 +261,17 @@ export function useWorkflows() {
 
 /**
  * Hook for fetching single workflow definition
+ * 
+ * @example
+ * ```tsx
+ * const { workflow, fetchWorkflow } = useWorkflowDefinition();
+ * 
+ * useEffect(() => {
+ *   fetchWorkflow("math-calculation");
+ * }, []);
+ * ```
  */
-export function useWorkflowDefinition(_workflowId: string | null) {
+export function useWorkflowDefinition(baseUrl = "/api/workflows") {
   const [workflow, setWorkflow] = useState<WorkflowDefinition | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -186,11 +280,11 @@ export function useWorkflowDefinition(_workflowId: string | null) {
     async (id: string) => {
       try {
         setLoading(true);
-        const response = await fetch(`/api/workflows/${id}`);
+        const response = await fetch(`${baseUrl}/${id}`);
         if (!response.ok) {
           throw new Error(`Failed to fetch workflow: ${response.statusText}`);
         }
-        const data = await response.json();
+        const data = (await response.json()) as WorkflowDefinition;
         setWorkflow(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -198,7 +292,7 @@ export function useWorkflowDefinition(_workflowId: string | null) {
         setLoading(false);
       }
     },
-    []
+    [baseUrl]
   );
 
   return {

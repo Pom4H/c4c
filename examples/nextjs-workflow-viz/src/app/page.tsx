@@ -8,7 +8,7 @@ import { useState, useEffect } from "react";
 import WorkflowVisualizer from "@/components/WorkflowVisualizer";
 import TraceViewer from "@/components/TraceViewer";
 import SpanGanttChart from "@/components/SpanGanttChart";
-import { useWorkflow, useWorkflows, useWorkflowDefinition } from "@/hooks/useWorkflow";
+import { useWorkflow, useWorkflows, useWorkflowDefinition } from "@tsdev/react";
 
 export default function Home() {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>("");

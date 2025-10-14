@@ -1,0 +1,7 @@
+[install]
+# Production dependencies only
+production = false
+
+[run]
+# Enable JSX
+jsx = "automatic"
