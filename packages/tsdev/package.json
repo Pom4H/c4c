@@ -18,18 +18,12 @@
       "types": "./dist/core/workflow/index.d.ts",
       "import": "./dist/core/workflow/index.js"
     },
-    "./core/workflow/react": {
-      "types": "./dist/core/workflow/react/index.d.ts",
-      "import": "./dist/core/workflow/react/index.js"
-    },
     "./policies": {
       "types": "./dist/policies/index.d.ts",
       "import": "./dist/policies/index.js"
     }
   },
   "scripts": {
-    "dev:http": "tsx apps/http-server.ts",
-    "cli": "tsx apps/cli.ts",
     "build": "tsc",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
@@ -48,13 +42,11 @@
     "@opentelemetry/sdk-trace-base": "^1.25.1",
     "@opentelemetry/sdk-trace-node": "^1.25.1",
     "glob": "^10.4.5",
-    "react": "^19.2.0",
     "zod": "^3.23.8",
     "zod-to-json-schema": "^3.23.2"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",
-    "@types/react": "^19.2.2",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   }

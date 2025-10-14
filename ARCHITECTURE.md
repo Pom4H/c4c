@@ -2,31 +2,42 @@
 
 This document explains the internal architecture of the tsdev framework.
 
-## Directory Structure
+## Monorepo Structure
 
 ```
-src/
-├── core/              # Core framework functionality
-│   ├── types.ts       # Type definitions
-│   ├── registry.ts    # Procedure registry and discovery
-│   └── executor.ts    # Procedure execution engine
-├── policies/          # Composable policies
-│   ├── withSpan.ts    # OpenTelemetry tracing
-│   ├── withRetry.ts   # Retry with backoff
-│   ├── withRateLimit.ts  # Rate limiting
-│   └── withLogging.ts    # Logging
-├── adapters/          # Transport adapters
-│   ├── http.ts        # HTTP/REST adapter
-│   └── cli.ts         # CLI adapter
-├── contracts/         # Contract definitions (Zod schemas)
-│   ├── users.ts
-│   └── math.ts
-├── handlers/          # Handler implementations
-│   ├── users.ts
-│   └── math.ts
-└── apps/              # Application entry points
-    ├── http-server.ts
-    └── cli.ts
+tsdev/
+├── packages/
+│   ├── tsdev/              # Core framework package
+│   │   ├── core/           # Core framework functionality
+│   │   │   ├── types.ts    # Type definitions
+│   │   │   ├── registry.ts # Procedure registry and discovery
+│   │   │   ├── executor.ts # Procedure execution engine
+│   │   │   └── workflow/   # Workflow runtime with OTEL
+│   │   ├── policies/       # Composable policies
+│   │   │   ├── withSpan.ts # OpenTelemetry tracing
+│   │   │   ├── withRetry.ts # Retry with backoff
+│   │   │   ├── withRateLimit.ts # Rate limiting
+│   │   │   └── withLogging.ts # Logging
+│   │   ├── adapters/       # Transport adapters
+│   │   │   ├── http.ts     # HTTP/REST adapter
+│   │   │   └── cli.ts      # CLI adapter
+│   │   └── generators/     # Code generators
+│   │       └── openapi.ts  # OpenAPI spec generator
+│   │
+│   └── tsdev-react/        # React integration package
+│       └── src/
+│           ├── index.ts
+│           └── useWorkflow.ts # React hooks for workflows
+│
+└── examples/
+    ├── tsdev-example/      # Basic framework usage
+    │   ├── contracts/      # Contract definitions (Zod schemas)
+    │   ├── handlers/       # Handler implementations
+    │   ├── apps/           # Application entry points
+    │   └── workflow/       # Workflow examples
+    │
+    └── nextjs-workflow-viz/  # Next.js visualization demo
+        └── src/            # React Flow workflow visualization
 ```
 
 ## Core Concepts
@@ -77,10 +88,13 @@ const createUser: Procedure = {
 The registry automatically discovers all procedures:
 
 ```typescript
-const registry = await collectRegistry("src/handlers");
+// In your application (e.g., examples/tsdev-example/apps/http-server.ts)
+import { collectRegistry } from 'tsdev/core';
+
+const registry = await collectRegistry("./handlers");
 ```
 
-This scans all TypeScript files in `src/handlers/` and registers any exports that match the `Procedure` interface.
+This scans all TypeScript files in the `handlers/` directory and registers any exports that match the `Procedure` interface.
 
 **No manual registration required!**
 
@@ -279,11 +293,22 @@ handler: applyPolicies(
 
 ### Adding a New Procedure
 
-1. Define contract in `src/contracts/`:
-2. Implement handler in `src/handlers/`:
-3. Export it
+1. Define contract in your application's `contracts/` directory
+2. Implement handler in `handlers/` directory
+3. Export the procedure
 
-**It's automatically available via all transports!**
+**It's automatically discovered and available via all transports!**
+
+Example structure (see `examples/tsdev-example/`):
+```
+my-app/
+├── contracts/
+│   └── myfeature.ts
+├── handlers/
+│   └── myfeature.ts
+└── apps/
+    └── server.ts
+```
 
 ## Testing Strategy
 

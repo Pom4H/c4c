@@ -28,16 +28,24 @@ Open http://localhost:3000 to see the workflow visualization example.
 ```
 tsdev/
 ├── packages/
-│   └── tsdev/              # 🎯 Core framework package
-│       ├── core/
-│       │   └── workflow/   # Workflow module with OTEL
-│       │       └── react/  # React hooks
-│       ├── policies/
-│       ├── adapters/
-│       └── ...
+│   ├── tsdev/              # 🎯 Core framework package
+│   │   ├── core/           # Core types, registry, executor, workflow
+│   │   ├── policies/       # Composable policies (retry, logging, etc.)
+│   │   ├── adapters/       # Transport adapters (HTTP, CLI)
+│   │   └── generators/     # Code generators (OpenAPI)
+│   │
+│   └── tsdev-react/        # ⚛️ React hooks for workflows
+│       └── src/            # useWorkflow, useWorkflows, etc.
 │
 └── examples/
-    └── nextjs-workflow-viz/  # Next.js example with React Flow
+    ├── tsdev-example/      # Basic usage examples
+    │   ├── contracts/      # Contract definitions
+    │   ├── handlers/       # Handler implementations
+    │   ├── apps/           # HTTP server & CLI
+    │   └── workflow/       # Workflow examples
+    │
+    └── nextjs-workflow-viz/  # Next.js workflow visualization
+        └── src/            # React Flow visualization demo
 ```
 
 ## 🎯 Features
@@ -52,14 +60,20 @@ tsdev/
 
 ## 🏗️ Architecture
 
-### Framework Core (`packages/tsdev`)
+### Framework Packages
+
+#### Core Framework (`tsdev`)
 
 ```typescript
-// Import from tsdev package
 import { executeWorkflow } from 'tsdev/core/workflow';
-import { useWorkflow } from 'tsdev/core/workflow/react';
 import type { Registry, Procedure } from 'tsdev/core';
 import { withSpan, withRetry } from 'tsdev/policies';
+```
+
+#### React Hooks (`tsdev-react`)
+
+```typescript
+import { useWorkflow } from 'tsdev-react';
 ```
 
 ### Workflow System
@@ -123,15 +137,20 @@ pnpm --filter nextjs-workflow-viz dev
 
 ## 📦 Package Exports
 
-The `tsdev` package provides clean exports:
+### `tsdev` - Core Framework
 
 | Import | Module |
 |--------|--------|
 | `tsdev` | Main entry point |
 | `tsdev/core` | Core types and registry |
 | `tsdev/core/workflow` | Workflow runtime with OTEL |
-| `tsdev/core/workflow/react` | React hooks |
 | `tsdev/policies` | Composable policies |
+
+### `tsdev-react` - React Integration
+
+| Import | Module |
+|--------|--------|
+| `tsdev-react` | React hooks (useWorkflow, useWorkflows) |
 
 ## 🏆 Key Benefits
 
