@@ -7,6 +7,7 @@
 import { useState, useEffect } from "react";
 import WorkflowVisualizer from "@/components/WorkflowVisualizer";
 import TraceViewer from "@/components/TraceViewer";
+import SpanGanttChart from "@/components/SpanGanttChart";
 import {
   executeWorkflowAction,
   getAvailableWorkflows,
@@ -18,14 +19,14 @@ import type {
 } from "@/lib/workflow/types";
 
 export default function Home() {
-  const [workflows, setWorkflows] = useState<any[]>([]);
+  const [workflows, setWorkflows] = useState<Array<{ id: string; name: string; nodeCount: number }>>([]);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>("");
   const [selectedWorkflow, setSelectedWorkflow] =
     useState<WorkflowDefinition | null>(null);
   const [executionResult, setExecutionResult] =
     useState<WorkflowExecutionResult | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [activeTab, setActiveTab] = useState<"graph" | "trace">("graph");
+  const [activeTab, setActiveTab] = useState<"graph" | "trace" | "gantt">("graph");
 
   // Load available workflows on mount
   useEffect(() => {
@@ -194,6 +195,16 @@ export default function Home() {
                 📊 Workflow Graph
               </button>
               <button
+                onClick={() => setActiveTab("gantt")}
+                className={`px-6 py-3 font-medium text-sm ${
+                  activeTab === "gantt"
+                    ? "border-b-2 border-blue-600 text-blue-600"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                📈 Span Gantt Chart
+              </button>
+              <button
                 onClick={() => setActiveTab("trace")}
                 className={`px-6 py-3 font-medium text-sm ${
                   activeTab === "trace"
@@ -201,7 +212,7 @@ export default function Home() {
                     : "text-gray-600 hover:text-gray-900"
                 }`}
               >
-                🔍 OpenTelemetry Traces
+                🔍 Trace Details
               </button>
             </nav>
           </div>
@@ -219,6 +230,10 @@ export default function Home() {
                     : undefined
                 }
               />
+            )}
+
+            {activeTab === "gantt" && (
+              <SpanGanttChart spans={executionResult?.spans || []} />
             )}
 
             {activeTab === "trace" && (

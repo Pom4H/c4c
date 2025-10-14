@@ -4,7 +4,7 @@
  * Workflow Visualizer using React Flow
  */
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import {
   ReactFlow,
   Background,
@@ -123,7 +123,7 @@ export default function WorkflowVisualizer({
 
       // Add conditional branches
       if (node.type === "condition" && node.config) {
-        const config = node.config as any;
+        const config = node.config as { trueBranch?: string; falseBranch?: string };
         if (config.trueBranch) {
           edges.push({
             id: `${node.id}-true-${config.trueBranch}`,
@@ -154,7 +154,7 @@ export default function WorkflowVisualizer({
 
       // Add parallel branches
       if (node.type === "parallel" && node.config) {
-        const config = node.config as any;
+        const config = node.config as { branches?: string[] };
         if (config.branches) {
           config.branches.forEach((branchId: string, index: number) => {
             edges.push({

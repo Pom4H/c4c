@@ -84,37 +84,45 @@ class TraceCollector {
 /**
  * Mock procedure registry for demo
  */
-const mockProcedures: Record<string, (input: any) => Promise<any>> = {
-  "math.add": async (input: { a: number; b: number }) => {
+const mockProcedures: Record<
+  string,
+  (input: Record<string, unknown>) => Promise<Record<string, unknown>>
+> = {
+  "math.add": async (input: Record<string, unknown>) => {
     await new Promise((resolve) => setTimeout(resolve, 500));
-    return { result: input.a + input.b };
+    const a = input.a as number;
+    const b = input.b as number;
+    return { result: a + b };
   },
-  "math.multiply": async (input: { a: number; b?: number }) => {
+  "math.multiply": async (input: Record<string, unknown>) => {
     await new Promise((resolve) => setTimeout(resolve, 600));
-    const b = input.b ?? input.result ?? 1;
-    return { result: input.a * b };
+    const a = input.a as number;
+    const b = (input.b as number | undefined) ?? (input.result as number | undefined) ?? 1;
+    return { result: a * b };
   },
-  "math.subtract": async (input: { a: number; b: number }) => {
+  "math.subtract": async (input: Record<string, unknown>) => {
     await new Promise((resolve) => setTimeout(resolve, 400));
-    return { result: input.a - input.b };
+    const a = input.a as number;
+    const b = input.b as number;
+    return { result: a - b };
   },
-  "data.fetch": async (input: { userId: string }) => {
+  "data.fetch": async (input: Record<string, unknown>) => {
     await new Promise((resolve) => setTimeout(resolve, 700));
     return {
-      userId: input.userId,
+      userId: input.userId as string,
       name: "John Doe",
       isPremium: true,
       data: { score: 95 },
     };
   },
-  "data.process": async (input: { data: any; mode: string }) => {
+  "data.process": async (input: Record<string, unknown>) => {
     await new Promise((resolve) => setTimeout(resolve, 800));
     return {
-      processedData: `${input.mode} processing completed`,
+      processedData: `${input.mode as string} processing completed`,
       score: 100,
     };
   },
-  "data.save": async (input: any) => {
+  "data.save": async () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
     return { saved: true, timestamp: Date.now() };
   },
@@ -203,7 +211,7 @@ export async function executeWorkflow(
 
 async function executeNode(
   node: WorkflowNode,
-  context: any,
+  context: { variables: Record<string, unknown>; nodeOutputs: Map<string, unknown> },
   collector: TraceCollector,
   parentSpanId: string,
   workflow: WorkflowDefinition
@@ -260,7 +268,7 @@ async function executeNode(
 
 async function executeProcedureNode(
   node: WorkflowNode,
-  context: any,
+  context: { variables: Record<string, unknown>; nodeOutputs: Map<string, unknown> },
   collector: TraceCollector,
   parentSpanId: string
 ): Promise<string | undefined> {
@@ -306,9 +314,9 @@ async function executeProcedureNode(
 
 async function executeConditionNode(
   node: WorkflowNode,
-  context: any
+  context: { variables: Record<string, unknown>; nodeOutputs: Map<string, unknown> }
 ): Promise<string | undefined> {
-  const config = node.config as any;
+  const config = node.config as { expression?: string; trueBranch?: string; falseBranch?: string };
   if (!config?.expression) {
     throw new Error(`Condition node ${node.id} missing expression`);
   }
@@ -319,12 +327,12 @@ async function executeConditionNode(
 
 async function executeParallelNode(
   node: WorkflowNode,
-  context: any,
+  context: { variables: Record<string, unknown>; nodeOutputs: Map<string, unknown> },
   collector: TraceCollector,
   parentSpanId: string,
   workflow: WorkflowDefinition
 ): Promise<string | undefined> {
-  const config = node.config as any;
+  const config = node.config as { branches?: string[]; waitForAll?: boolean };
   if (!config?.branches || config.branches.length === 0) {
     throw new Error(`Parallel node ${node.id} missing branches`);
   }
