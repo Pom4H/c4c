@@ -3,28 +3,28 @@
   "version": "0.1.0",
   "description": "Contracts-first framework for transport-agnostic applications",
   "type": "module",
-  "main": "./index.js",
-  "types": "./index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./index.d.ts",
-      "import": "./index.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
     "./core": {
-      "types": "./core/index.d.ts",
-      "import": "./core/index.js"
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
     },
     "./core/workflow": {
-      "types": "./core/workflow/index.d.ts",
-      "import": "./core/workflow/index.js"
+      "types": "./dist/core/workflow/index.d.ts",
+      "import": "./dist/core/workflow/index.js"
     },
     "./core/workflow/react": {
-      "types": "./core/workflow/react/index.d.ts",
-      "import": "./core/workflow/react/index.js"
+      "types": "./dist/core/workflow/react/index.d.ts",
+      "import": "./dist/core/workflow/react/index.js"
     },
     "./policies": {
-      "types": "./policies/index.d.ts",
-      "import": "./policies/index.js"
+      "types": "./dist/policies/index.d.ts",
+      "import": "./dist/policies/index.js"
     }
   },
   "scripts": {
@@ -48,13 +48,14 @@
     "@opentelemetry/sdk-trace-base": "^1.25.1",
     "@opentelemetry/sdk-trace-node": "^1.25.1",
     "glob": "^10.4.5",
+    "react": "^19.2.0",
     "zod": "^3.23.8",
     "zod-to-json-schema": "^3.23.2"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.8.3",
-    "@types/node": "^20.14.10",
-    "tsx": "^4.16.2",
-    "typescript": "^5.5.3"
+    "@types/node": "^24.7.2",
+    "@types/react": "^19.2.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
   }
 }

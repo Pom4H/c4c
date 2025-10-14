@@ -41,6 +41,7 @@ export async function executeWorkflow(
     // Add collected spans for UI visualization
     return {
       ...result,
+      error: result.error ? (result.error instanceof Error ? result.error.message : String(result.error)) : undefined,
       spans: collector.getSpans(),
     };
   } catch (error) {

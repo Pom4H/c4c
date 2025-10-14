@@ -14,7 +14,9 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@biomejs/biome": "^1.8.3",
-    "typescript": "^5.5.3"
+    "@biomejs/biome": "^2.2.6",
+    "@types/node": "^24.7.2",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   }
 }

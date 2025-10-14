@@ -10,7 +10,8 @@ import { useState, useEffect } from "react";
 import WorkflowVisualizer from "@/components/WorkflowVisualizer";
 import TraceViewer from "@/components/TraceViewer";
 import SpanGanttChart from "@/components/SpanGanttChart";
-import { useWorkflow, useWorkflows, useWorkflowDefinition } from "@/lib/hooks/useWorkflow";
+import { useWorkflow } from "tsdev/core/workflow/react";
+import { useWorkflows, useWorkflowDefinition } from "@/lib/hooks/useWorkflow";
 
 export default function Home() {
 	const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>("");
@@ -152,11 +153,11 @@ export default function Home() {
 									<div className="text-sm text-muted-foreground">
 										Duration: {result.executionTime}ms | Nodes executed:{" "}
 										{result.nodesExecuted.length} | Spans collected:{" "}
-										{result.spans.length}
+										{result.spans?.length || 0}
 									</div>
 									{result.error && (
 										<div className="text-sm text-destructive mt-1">
-											Error: {result.error}
+											Error: {result.error.message || String(result.error)}
 										</div>
 									)}
 								</div>
@@ -213,7 +214,7 @@ export default function Home() {
 									result
 										? {
 												nodesExecuted: result.nodesExecuted,
-												spans: result.spans,
+												spans: result.spans || [],
 										  }
 										: undefined
 								}
@@ -262,7 +263,7 @@ export default function Home() {
 								<div className="space-y-2">
 									{Object.entries(
 										definition.nodes.reduce(
-											(acc, node) => {
+											(acc: Record<string, number>, node) => {
 												acc[node.type] = (acc[node.type] || 0) + 1;
 												return acc;
 											},
@@ -284,7 +285,7 @@ export default function Home() {
 												}}
 											/>
 											<span className="text-sm">
-												{type}: {count}
+												{type}: {count as number}
 											</span>
 										</div>
 									))}
@@ -306,7 +307,7 @@ export default function Home() {
 										</tr>
 									</thead>
 									<tbody className="divide-y divide-border">
-										{definition.nodes.map((node) => (
+										{definition.nodes.map((node: any) => (
 											<tr
 												key={node.id}
 												className="hover:bg-muted/50 transition-colors"

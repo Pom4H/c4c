@@ -92,11 +92,11 @@ export function useWorkflow(options: UseWorkflowOptions = {}): UseWorkflowReturn
 				});
 
 				if (!response.ok) {
-					const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+					const errorData = await response.json().catch(() => ({ error: "Unknown error" })) as { error?: string };
 					throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
 				}
 
-				const executionResult = await response.json();
+				const executionResult = await response.json() as WorkflowExecutionResult;
 				setResult(executionResult);
 
 				if (onSuccess) {
@@ -163,7 +163,7 @@ export function useWorkflows(options: { apiBaseUrl?: string } = {}) {
 				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 			}
 
-			const data = await response.json();
+			const data = await response.json() as { workflows?: Array<{ id: string; name: string; description?: string; version: string; nodeCount: number }> };
 			setWorkflows(data.workflows || []);
 		} catch (err) {
 			const error = err instanceof Error ? err : new Error(String(err));
@@ -209,7 +209,7 @@ export function useWorkflowDefinition(
 				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 			}
 
-			const data = await response.json();
+			const data = await response.json() as { definition?: any };
 			setDefinition(data.definition);
 		} catch (err) {
 			const error = err instanceof Error ? err : new Error(String(err));
