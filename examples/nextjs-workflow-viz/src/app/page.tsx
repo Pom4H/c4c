@@ -7,6 +7,7 @@
 import { useState, useEffect } from "react";
 import WorkflowVisualizer from "@/components/WorkflowVisualizer";
 import TraceViewer from "@/components/TraceViewer";
+import SpanGanttChart from "@/components/SpanGanttChart";
 import {
   executeWorkflowAction,
   getAvailableWorkflows,
@@ -18,14 +19,14 @@ import type {
 } from "@/lib/workflow/types";
 
 export default function Home() {
-  const [workflows, setWorkflows] = useState<any[]>([]);
+  const [workflows, setWorkflows] = useState<Array<{ id: string; name: string; nodeCount: number }>>([]);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>("");
   const [selectedWorkflow, setSelectedWorkflow] =
     useState<WorkflowDefinition | null>(null);
   const [executionResult, setExecutionResult] =
     useState<WorkflowExecutionResult | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [activeTab, setActiveTab] = useState<"graph" | "trace">("graph");
+  const [activeTab, setActiveTab] = useState<"graph" | "trace" | "gantt">("graph");
 
   // Load available workflows on mount
   useEffect(() => {
@@ -68,25 +69,25 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
-      <div className="max-w-7xl mx-auto">
+    <main className="min-h-screen gradient-workflow p-8">
+      <div className="max-w-7xl mx-auto animate-slide-in">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-4xl font-bold text-foreground mb-2">
             🔄 Workflow Visualization with OpenTelemetry
           </h1>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Next.js 15 + Server Actions + React Flow + OpenTelemetry Protocol
           </p>
         </div>
 
         {/* Controls */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <div className="workflow-card p-6 mb-6">
           <div className="flex items-center gap-4 flex-wrap">
             <div className="flex-1 min-w-[300px]">
               <label
                 htmlFor="workflow-select"
-                className="block text-sm font-medium text-gray-700 mb-2"
+                className="block text-sm font-medium text-foreground mb-2"
               >
                 Select Workflow
               </label>
@@ -94,7 +95,7 @@ export default function Home() {
                 id="workflow-select"
                 value={selectedWorkflowId}
                 onChange={(e) => setSelectedWorkflowId(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="workflow-input w-full"
                 disabled={isExecuting}
               >
                 {workflows.map((wf) => (
@@ -109,7 +110,7 @@ export default function Home() {
               <button
                 onClick={handleExecute}
                 disabled={!selectedWorkflowId || isExecuting}
-                className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors mt-6"
+                className="workflow-button-primary disabled:opacity-50 disabled:cursor-not-allowed mt-6"
               >
                 {isExecuting ? (
                   <span className="flex items-center gap-2">
@@ -145,31 +146,31 @@ export default function Home() {
           {/* Execution status */}
           {executionResult && (
             <div
-              className={`mt-4 p-4 rounded-lg ${
+              className={`mt-4 p-4 rounded-lg border ${
                 executionResult.status === "completed"
-                  ? "bg-green-50 border border-green-200"
-                  : "bg-red-50 border border-red-200"
+                  ? "bg-[var(--workflow-success)]/10 border-[var(--workflow-success)]"
+                  : "bg-[var(--workflow-error)]/10 border-[var(--workflow-error)]"
               }`}
             >
               <div className="flex items-center gap-2">
                 <span
                   className={`text-2xl ${
-                    executionResult.status === "completed" ? "text-green-600" : "text-red-600"
+                    executionResult.status === "completed" ? "text-[var(--workflow-success)]" : "text-[var(--workflow-error)]"
                   }`}
                 >
                   {executionResult.status === "completed" ? "✓" : "✗"}
                 </span>
                 <div>
-                  <div className="font-semibold">
+                  <div className="font-semibold text-foreground">
                     Execution {executionResult.status}
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-muted-foreground">
                     Duration: {executionResult.executionTime}ms | Nodes
                     executed: {executionResult.nodesExecuted.length} | Spans
                     collected: {executionResult.spans.length}
                   </div>
                   {executionResult.error && (
-                    <div className="text-sm text-red-600 mt-1">
+                    <div className="text-sm text-destructive mt-1">
                       Error: {executionResult.error}
                     </div>
                   )}
@@ -180,28 +181,32 @@ export default function Home() {
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          <div className="border-b border-gray-200">
+        <div className="workflow-card overflow-hidden">
+          <div className="border-b border-border">
             <nav className="flex">
               <button
                 onClick={() => setActiveTab("graph")}
-                className={`px-6 py-3 font-medium text-sm ${
-                  activeTab === "graph"
-                    ? "border-b-2 border-blue-600 text-blue-600"
-                    : "text-gray-600 hover:text-gray-900"
+                className={`workflow-tab ${
+                  activeTab === "graph" ? "workflow-tab-active" : ""
                 }`}
               >
                 📊 Workflow Graph
               </button>
               <button
-                onClick={() => setActiveTab("trace")}
-                className={`px-6 py-3 font-medium text-sm ${
-                  activeTab === "trace"
-                    ? "border-b-2 border-blue-600 text-blue-600"
-                    : "text-gray-600 hover:text-gray-900"
+                onClick={() => setActiveTab("gantt")}
+                className={`workflow-tab ${
+                  activeTab === "gantt" ? "workflow-tab-active" : ""
                 }`}
               >
-                🔍 OpenTelemetry Traces
+                📈 Span Gantt Chart
+              </button>
+              <button
+                onClick={() => setActiveTab("trace")}
+                className={`workflow-tab ${
+                  activeTab === "trace" ? "workflow-tab-active" : ""
+                }`}
+              >
+                🔍 Trace Details
               </button>
             </nav>
           </div>
@@ -221,6 +226,10 @@ export default function Home() {
               />
             )}
 
+            {activeTab === "gantt" && (
+              <SpanGanttChart spans={executionResult?.spans || []} />
+            )}
+
             {activeTab === "trace" && (
               <TraceViewer spans={executionResult?.spans || []} />
             )}
@@ -229,26 +238,26 @@ export default function Home() {
 
         {/* Workflow Details */}
         {selectedWorkflow && (
-          <div className="mt-6 bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-2xl font-bold mb-4">Workflow Details</h2>
+          <div className="mt-6 workflow-card p-6">
+            <h2 className="text-2xl font-bold text-foreground mb-4">Workflow Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-semibold text-lg mb-2">Information</h3>
                 <dl className="space-y-2 text-sm">
                   <div>
-                    <dt className="text-gray-600">ID:</dt>
+                    <dt className="text-muted-foreground">ID:</dt>
                     <dd className="font-mono">{selectedWorkflow.id}</dd>
                   </div>
                   <div>
-                    <dt className="text-gray-600">Version:</dt>
+                    <dt className="text-muted-foreground">Version:</dt>
                     <dd>{selectedWorkflow.version}</dd>
                   </div>
                   <div>
-                    <dt className="text-gray-600">Start Node:</dt>
+                    <dt className="text-muted-foreground">Start Node:</dt>
                     <dd className="font-mono">{selectedWorkflow.startNode}</dd>
                   </div>
                   <div>
-                    <dt className="text-gray-600">Total Nodes:</dt>
+                    <dt className="text-muted-foreground">Total Nodes:</dt>
                     <dd>{selectedWorkflow.nodes.length}</dd>
                   </div>
                 </dl>
@@ -292,9 +301,9 @@ export default function Home() {
             {/* Node list */}
             <div className="mt-6">
               <h3 className="font-semibold text-lg mb-2">All Nodes</h3>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto scrollbar-thin">
                 <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-muted">
                     <tr>
                       <th className="px-4 py-2 text-left">ID</th>
                       <th className="px-4 py-2 text-left">Type</th>
@@ -302,15 +311,15 @@ export default function Home() {
                       <th className="px-4 py-2 text-left">Next</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y divide-border">
                     {selectedWorkflow.nodes.map((node) => (
-                      <tr key={node.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 font-mono">{node.id}</td>
-                        <td className="px-4 py-2">{node.type}</td>
-                        <td className="px-4 py-2 font-mono text-blue-600">
+                      <tr key={node.id} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-2 font-mono text-foreground">{node.id}</td>
+                        <td className="px-4 py-2 text-foreground">{node.type}</td>
+                        <td className="px-4 py-2 font-mono text-primary">
                           {node.procedureName || "-"}
                         </td>
-                        <td className="px-4 py-2 font-mono text-gray-600">
+                        <td className="px-4 py-2 font-mono text-muted-foreground">
                           {node.next
                             ? Array.isArray(node.next)
                               ? node.next.join(", ")
@@ -327,7 +336,7 @@ export default function Home() {
         )}
 
         {/* Footer */}
-        <div className="mt-8 text-center text-gray-600 text-sm">
+        <div className="mt-8 text-center text-muted-foreground text-sm">
           <p>
             Built with Next.js 15, React Flow, and OpenTelemetry Protocol
           </p>
