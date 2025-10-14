@@ -5,7 +5,7 @@
  */
 
 // Types
-export type { Contract, Procedure, Handler, Registry, ExecutionContext, Policy } from "@tsdev/workflow";
+export type { Contract, Procedure, Handler, Registry, ExecutionContext, Policy } from "./types.js";
 
 // Registry
 export { collectRegistry, getProcedure, listProcedures, describeRegistry } from "./registry.js";

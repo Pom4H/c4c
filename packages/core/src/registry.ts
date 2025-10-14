@@ -1,5 +1,5 @@
 import { globSync } from "glob";
-import type { Procedure, Registry } from "@tsdev/workflow";
+import type { Procedure, Registry } from "./types.js";
 
 /**
  * Collects all procedures from handlers directory
