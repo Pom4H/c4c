@@ -1,0 +1,23 @@
+{
+  "name": "tsdev-adapters",
+  "version": "0.1.0",
+  "description": "HTTP, REST, CLI adapters for tsdev",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "license": "MIT",
+  "dependencies": {
+    "tsdev-core": "workspace:*",
+    "tsdev-openapi": "workspace:*",
+    "tsdev-workflow": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "typescript": "^5.9.3"
+  }
+}

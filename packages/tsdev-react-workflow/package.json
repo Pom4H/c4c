@@ -1,0 +1,27 @@
+{
+  "name": "tsdev-react-workflow",
+  "version": "0.1.0",
+  "description": "React hooks and UI helpers for tsdev workflows",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "license": "MIT",
+  "dependencies": {
+    "react": "^19.2.0",
+    "tsdev-workflow": "workspace:*",
+    "tsdev-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "@types/react": "^19.2.2",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
+}
