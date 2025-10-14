@@ -54,6 +54,31 @@ export interface WorkflowExecutionResult {
 	error?: Error;
 	executionTime: number;
 	nodesExecuted: string[];
+	spans?: TraceSpan[]; // Optional: for visualization purposes
+}
+
+/**
+ * OpenTelemetry span representation for visualization
+ */
+export interface TraceSpan {
+	spanId: string;
+	traceId: string;
+	parentSpanId?: string;
+	name: string;
+	kind: string;
+	startTime: number;
+	endTime: number;
+	duration: number;
+	status: {
+		code: "OK" | "ERROR" | "UNSET";
+		message?: string;
+	};
+	attributes: Record<string, string | number | boolean>;
+	events?: Array<{
+		name: string;
+		timestamp: number;
+		attributes?: Record<string, unknown>;
+	}>;
 }
 
 /**
