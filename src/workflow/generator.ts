@@ -5,7 +5,7 @@
  */
 
 import type { Registry } from "../core/types.js";
-import type { NodeMetadata, WorkflowUIConfig } from "./types.js";
+import type { NodeMetadata, WorkflowUIConfig } from "../core/workflow/types.js";
 
 /**
  * Generate workflow UI configuration from registry

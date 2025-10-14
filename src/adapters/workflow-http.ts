@@ -5,8 +5,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Registry } from "../core/types.js";
 import { generateWorkflowHTML, generateWorkflowUI } from "../workflow/generator.js";
-import { executeWorkflow, validateWorkflow } from "../workflow/runtime.js";
-import type { WorkflowDefinition } from "../workflow/types.js";
+import { executeWorkflow, validateWorkflow } from "../core/workflow/runtime.js";
+import type { WorkflowDefinition } from "../core/workflow/types.js";
 
 /**
  * Handle workflow-related HTTP requests

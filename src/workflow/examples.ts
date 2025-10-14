@@ -2,7 +2,7 @@
  * Example workflows demonstrating the workflow system
  */
 
-import type { WorkflowDefinition } from "./types.js";
+import type { WorkflowDefinition } from "../core/workflow/types.js";
 
 /**
  * Simple user registration workflow

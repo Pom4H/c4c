@@ -6,8 +6,8 @@
  */
 
 import { trace, type Span, SpanStatusCode, context as otelContext } from "@opentelemetry/api";
-import { executeProcedure, createExecutionContext } from "../core/executor.js";
-import type { Registry } from "../core/types.js";
+import { executeProcedure, createExecutionContext } from "../executor.js";
+import type { Registry } from "../types.js";
 import type {
 	WorkflowDefinition,
 	WorkflowContext,

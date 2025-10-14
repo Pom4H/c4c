@@ -4,7 +4,7 @@
  * Shows the span hierarchy created during workflow execution
  */
 
-import type { WorkflowDefinition } from "./types.js";
+import type { WorkflowDefinition } from "../core/workflow/types.js";
 
 /**
  * Example workflow that demonstrates telemetry
