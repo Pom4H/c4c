@@ -6,20 +6,8 @@
  */
 
 import { z } from "zod";
+import type { Registry, Procedure } from "tsdev/core";
 import { mockProcedures } from "./mock-procedures";
-
-// Import types from framework core
-type Registry = Map<string, Procedure>;
-
-interface Procedure {
-  contract: {
-    name: string;
-    description?: string;
-    input: z.ZodType;
-    output: z.ZodType;
-  };
-  handler: (input: unknown, context?: unknown) => Promise<unknown>;
-}
 
 /**
  * Create a mock registry from mock procedures

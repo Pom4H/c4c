@@ -4,7 +4,7 @@
  * This uses the framework's core workflow runtime with mock procedures
  */
 
-import { executeWorkflow as coreExecuteWorkflow } from "@/lib/workflow/core-runtime";
+import { executeWorkflow as coreExecuteWorkflow } from "tsdev/core/workflow";
 import { createMockRegistry } from "./mock-registry";
 import { SpanCollector } from "./span-collector";
 import type { WorkflowDefinition, WorkflowExecutionResult } from "./types";

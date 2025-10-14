@@ -1,35 +1,20 @@
 {
-  "name": "tsdev",
+  "name": "tsdev-monorepo",
   "version": "0.1.0",
-  "description": "Contracts-first framework for transport-agnostic applications",
+  "private": true,
+  "description": "tsdev framework monorepo",
   "type": "module",
   "scripts": {
-    "dev:http": "tsx src/apps/http-server.ts",
-    "cli": "tsx src/apps/cli.ts",
-    "build": "tsc",
-    "lint": "biome check .",
-    "lint:fix": "biome check --write ."
+    "dev": "pnpm --filter nextjs-workflow-viz dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "lint:fix": "pnpm -r lint:fix"
   },
-  "keywords": [
-    "contracts-first",
-    "transport-agnostic",
-    "zod",
-    "opentelemetry"
-  ],
+  "keywords": [],
   "author": "",
   "license": "MIT",
-  "dependencies": {
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/sdk-trace-base": "^1.25.1",
-    "@opentelemetry/sdk-trace-node": "^1.25.1",
-    "glob": "^10.4.5",
-    "zod": "^3.23.8",
-    "zod-to-json-schema": "^3.23.2"
-  },
   "devDependencies": {
     "@biomejs/biome": "^1.8.3",
-    "@types/node": "^20.14.10",
-    "tsx": "^4.16.2",
     "typescript": "^5.5.3"
   }
 }

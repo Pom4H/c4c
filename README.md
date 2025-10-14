@@ -3,153 +3,211 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue.svg)](https://www.typescriptlang.org/)
 [![Zod](https://img.shields.io/badge/Zod-Schema-green.svg)](https://zod.dev/)
 [![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-Enabled-orange.svg)](https://opentelemetry.io/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![pnpm](https://img.shields.io/badge/pnpm-workspaces-yellow.svg)](https://pnpm.io/)
 
 > **Write once — describe forever.**  
 > Meta-level unification of application code through contracts, not transport or infrastructure.
 
-## About
+## 🚀 Quick Start
 
-tsdev is a framework implementing a **contracts-first** approach to application development. Instead of designing APIs as a transport layer, we create domain contracts (Zod schemas) from which REST endpoints, CLI commands, SDKs, OpenAPI specs, and AI agent interfaces are automatically derived.
+```bash
+# Install pnpm
+npm install -g pnpm
 
-## Key Features
+# Install dependencies
+pnpm install
+
+# Run example
+pnpm dev
+```
+
+Open http://localhost:3000 to see the workflow visualization example.
+
+## 📦 Monorepo Structure
+
+```
+tsdev/
+├── packages/
+│   └── tsdev/              # 🎯 Core framework package
+│       ├── core/
+│       │   └── workflow/   # Workflow module with OTEL
+│       │       └── react/  # React hooks
+│       ├── policies/
+│       ├── adapters/
+│       └── ...
+│
+└── examples/
+    └── nextjs-workflow-viz/  # Next.js example with React Flow
+```
+
+## 🎯 Features
 
 - 🎯 **Contracts-first**: single source of truth for all interfaces
 - 🔄 **Transport-agnostic**: one handler works via RPC, REST, CLI, SDK, agents
-- 🌐 **Auto REST API**: RESTful endpoints auto-generated from contracts ⭐
-- 📄 **Auto OpenAPI**: OpenAPI 3.0 spec + Swagger UI auto-generated ⭐
-- 🔀 **Visual Workflows**: procedures become workflow nodes automatically ⭐
 - 📝 **Self-describing**: automatic introspection and documentation
 - 📊 **Telemetry by design**: OpenTelemetry built into the domain model
-- 🧩 **Composable**: extensibility through function composition, not framework magic
+- 🔀 **Visual Workflows**: procedures become workflow nodes automatically
+- 🧩 **Composable**: extensibility through function composition
 - 📐 **Convention-driven**: code structure determines automation
 
-## Quick Start
+## 🏗️ Architecture
+
+### Framework Core (`packages/tsdev`)
+
+```typescript
+// Import from tsdev package
+import { executeWorkflow } from 'tsdev/core/workflow';
+import { useWorkflow } from 'tsdev/core/workflow/react';
+import type { Registry, Procedure } from 'tsdev/core';
+import { withSpan, withRetry } from 'tsdev/policies';
+```
+
+### Workflow System
+
+The workflow module allows composing procedures into visual workflows with:
+- ✅ **OTEL tracing** - automatic span creation
+- ✅ **React hooks** - `useWorkflow()` for UI integration
+- ✅ **API routes** - RESTful workflow execution
+- ✅ **Pure UI** - React Flow visualization
+
+## 📖 Documentation
+
+### Setup & Installation
+- [MONOREPO_INSTALL.md](./MONOREPO_INSTALL.md) - Installation guide
+- [MONOREPO_SETUP.md](./MONOREPO_SETUP.md) - Workspace configuration
+
+### Refactoring Documentation
+- [EXECUTIVE_SUMMARY.md](./EXECUTIVE_SUMMARY.md) - High-level overview
+- [RUNTIME_FIX_SUMMARY.md](./RUNTIME_FIX_SUMMARY.md) - Runtime separation
+- [WORKFLOW_REFACTOR_SUMMARY.md](./WORKFLOW_REFACTOR_SUMMARY.md) - Complete guide
+
+### Framework Philosophy
+- [PHILOSOPHY.md](./PHILOSOPHY.md) - Core principles
+- [WORKFLOW_SYSTEM.md](./WORKFLOW_SYSTEM.md) - Workflow architecture
+
+## 🎨 Example Application
+
+The Next.js workflow visualization example demonstrates:
+- **Pure UI components** - no business logic in components
+- **Framework hooks** - `useWorkflow()` for state management
+- **API routes** - backend logic in `/api/workflow/*`
+- **OTEL tracing** - automatic span collection and visualization
+- **React Flow** - visual workflow representation
 
 ```bash
-# Install dependencies
-npm install
-
-# Run the HTTP server
-npm run dev:http
-
-# 📚 View Swagger UI docs
-open http://localhost:3000/docs
-
-# 🌐 Try REST API (auto-generated!)
-curl -X POST http://localhost:3000/users \
-  -d '{"name": "Alice", "email": "alice@example.com"}'
-
-# 🔧 Or use RPC style
-curl -X POST http://localhost:3000/rpc/users.create \
-  -d '{"name": "Bob", "email": "bob@example.com"}'
-
-# 💻 Or use CLI
-npm run cli -- users.create --name "Charlie" --email "charlie@example.com"
-
-# 📄 Get OpenAPI spec
-curl http://localhost:3000/openapi.json
+cd examples/nextjs-workflow-viz
+pnpm dev
 ```
 
-## Documentation
+## 🛠️ Development
 
-**📌 Start Here:**
-- [FEATURE_SHOWCASE.md](./FEATURE_SHOWCASE.md) - **See all 15+ features in action** ⭐
-- [REST_AND_OPENAPI.md](./REST_AND_OPENAPI.md) - **REST API & OpenAPI generation** ⭐
-- [WORKFLOW_QUICK_START.md](./WORKFLOW_QUICK_START.md) - **Try workflows in 3 minutes** ⚡
-- [WORKFLOW_SYSTEM.md](./WORKFLOW_SYSTEM.md) - **Visual workflows from contracts** ⭐
-- [WORKFLOW_TELEMETRY_GUIDE.md](./WORKFLOW_TELEMETRY_GUIDE.md) - **Full OpenTelemetry integration** 📊
-- [OVERVIEW.md](./OVERVIEW.md) - Visual overview and comparison
+### Install Dependencies
+```bash
+pnpm install
+```
 
-**📚 Deep Dive:**
-- [PHILOSOPHY.md](./PHILOSOPHY.md) - Framework philosophy and principles
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - Internal architecture and design
-- [EXAMPLES.md](./EXAMPLES.md) - Usage examples and tutorials
+### Run Example
+```bash
+pnpm dev
+```
 
-**📋 Reference:**
-- [DX_COMPARISON.md](./DX_COMPARISON.md) - **DX comparison vs oRPC/tRPC** ⚡
-- [PROJECT_STATUS.md](./PROJECT_STATUS.md) - Current status and metrics
-- [FINAL_DELIVERY.md](./FINAL_DELIVERY.md) - Complete delivery report
-- [PROTOTYPE_SUMMARY.md](./PROTOTYPE_SUMMARY.md) - Implementation details
-- [DELIVERABLES.md](./DELIVERABLES.md) - Deliverables checklist
+### Build All Packages
+```bash
+pnpm build
+```
 
-## How It Works
+### Lint
+```bash
+pnpm lint
+pnpm lint:fix
+```
 
-### 1. Define a Contract
+### Package-Specific Commands
+```bash
+# Only tsdev
+pnpm --filter tsdev build
 
-Contracts are Zod schemas - the single source of truth:
+# Only example
+pnpm --filter nextjs-workflow-viz dev
+```
 
+## 📦 Package Exports
+
+The `tsdev` package provides clean exports:
+
+| Import | Module |
+|--------|--------|
+| `tsdev` | Main entry point |
+| `tsdev/core` | Core types and registry |
+| `tsdev/core/workflow` | Workflow runtime with OTEL |
+| `tsdev/core/workflow/react` | React hooks |
+| `tsdev/policies` | Composable policies |
+
+## 🏆 Key Benefits
+
+### Contracts-First
 ```typescript
-// src/contracts/users.ts
-export const createUserContract: Contract = {
+// Define contract once
+const contract = {
   name: "users.create",
-  description: "Create a new user",
-  input: z.object({
-    name: z.string().min(1),
-    email: z.string().email(),
-  }),
-  output: z.object({
-    id: z.string(),
-    name: z.string(),
-    email: z.string(),
-    createdAt: z.string(),
-  }),
+  input: z.object({ name: z.string(), email: z.string() }),
+  output: z.object({ id: z.string(), name: z.string() }),
 };
+
+// Use everywhere: REST, CLI, SDK, Workflows
 ```
 
-### 2. Implement the Handler
-
-Handlers are pure functions with composable policies:
-
+### Transport-Agnostic
 ```typescript
-// src/handlers/users.ts
-export const createUser: Procedure = {
-  contract: createUserContract,
-  handler: applyPolicies(
-    async (input, context) => {
-      // Pure business logic - transport-agnostic
-      const user = {
-        id: crypto.randomUUID(),
-        name: input.name,
-        email: input.email,
-        createdAt: new Date().toISOString(),
-      };
-      return user;
-    },
-    withLogging("users.create"),
-    withSpan("users.create"),
-    withRateLimit({ maxTokens: 5 })
-  ),
+// Same handler, multiple transports
+const handler = async (input) => {
+  return await createUser(input);
 };
+
+// Available via:
+// - REST: POST /users
+// - CLI: tsdev users.create --name Alice
+// - Workflow: procedure node
+// - SDK: client.users.create()
 ```
 
-### 3. It's Automatically Available!
+### OTEL by Design
+```typescript
+// Automatic tracing in workflows
+const workflow = {
+  nodes: [
+    { type: "procedure", procedureName: "users.create" },
+    { type: "procedure", procedureName: "emails.send" }
+  ]
+};
 
-No registration needed. The handler works via:
-- **RPC**: `POST /rpc/users.create`
-- **REST**: `POST /users` (auto-generated!)
-- **CLI**: `npm run cli -- users.create --name "..." --email "..."`
-- **OpenAPI**: Auto-generated spec at `/openapi.json`
-- **Swagger UI**: Interactive docs at `/docs`
-- **Workflow Node**: Visual programming at `/workflow/palette` ⭐
-- **Future**: GraphQL, gRPC, WebSocket, etc.
-
-## Project Structure
-
-```
-src/
-├── core/          # Framework core (registry, executor, types)
-├── policies/      # Composable policies (retry, rate limit, tracing)
-├── adapters/      # Transport adapters (HTTP, CLI)
-├── contracts/     # Contract definitions (Zod schemas)
-├── handlers/      # Handler implementations
-└── apps/          # Application entry points
+// Creates span hierarchy:
+// workflow.execute
+//   ├─ workflow.node.procedure
+//   │  └─ users.create (with policies)
+//   └─ workflow.node.procedure
+//      └─ emails.send (with policies)
 ```
 
-## Philosophy
+## 🎯 Philosophy
 
-Read more about the framework's philosophy and principles in [PHILOSOPHY.md](./PHILOSOPHY.md).
+1. **Contracts-first** - Contracts are the source of truth
+2. **Transport-agnostic** - One handler, multiple adapters
+3. **Self-describing** - Automatic introspection for SDKs and agents
+4. **Telemetry by default** - Every call is observable
+5. **Composable** - Behavior extends via functions, not framework
+6. **Convention-driven** - Structure → introspection → automation
 
-## License
+## 📚 Related
 
-See [LICENSE](./LICENSE).
+- [OpenTelemetry](https://opentelemetry.io/) - Observability framework
+- [Zod](https://zod.dev/) - Schema validation
+- [pnpm](https://pnpm.io/) - Fast, disk space efficient package manager
+
+## 📄 License
+
+MIT
+
+---
+
+**Built with ❤️ using contracts-first architecture**

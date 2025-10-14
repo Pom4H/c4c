@@ -1,31 +1,73 @@
 /**
- * React hooks for workflow execution
+ * React hook for workflow execution
  * 
- * Uses framework hooks from tsdev package
- * This follows the framework philosophy of keeping UI layer thin
+ * This hook provides a clean interface for React components to execute workflows
+ * All business logic and OTEL tracing happens server-side via API routes
  */
 
 "use client";
 
 import { useState, useCallback } from "react";
-import type { WorkflowExecutionResult } from "tsdev/core/workflow";
+import type { WorkflowExecutionResult } from "../types.js";
 
 export interface UseWorkflowOptions {
+	/**
+	 * Base URL for workflow API endpoints
+	 * Defaults to '/api/workflow'
+	 */
 	apiBaseUrl?: string;
+
+	/**
+	 * Callback when workflow execution completes successfully
+	 */
 	onSuccess?: (result: WorkflowExecutionResult) => void;
+
+	/**
+	 * Callback when workflow execution fails
+	 */
 	onError?: (error: Error) => void;
 }
 
 export interface UseWorkflowReturn {
+	/**
+	 * Execute a workflow by ID
+	 */
 	execute: (workflowId: string, input?: Record<string, unknown>) => Promise<WorkflowExecutionResult>;
+
+	/**
+	 * Current execution result (null if not executed)
+	 */
 	result: WorkflowExecutionResult | null;
+
+	/**
+	 * Loading state
+	 */
 	isExecuting: boolean;
+
+	/**
+	 * Error state (null if no error)
+	 */
 	error: Error | null;
+
+	/**
+	 * Reset state
+	 */
 	reset: () => void;
 }
 
 /**
  * Hook for executing workflows via API
+ * 
+ * @example
+ * ```tsx
+ * const { execute, result, isExecuting, error } = useWorkflow({
+ *   onSuccess: (result) => console.log('Done!', result),
+ *   onError: (err) => console.error('Failed:', err)
+ * });
+ * 
+ * // Execute workflow
+ * await execute('my-workflow-id', { input: 'data' });
+ * ```
  */
 export function useWorkflow(options: UseWorkflowOptions = {}): UseWorkflowReturn {
 	const { apiBaseUrl = "/api/workflow", onSuccess, onError } = options;
