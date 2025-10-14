@@ -9,10 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.5",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/sdk-trace-base": "^1.25.1",
     "@opentelemetry/sdk-trace-web": "^1.25.1",
     "@xyflow/react": "^12.0.0",
+    "hono": "^4.9.12",
     "next": "15.5.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

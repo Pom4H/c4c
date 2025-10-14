@@ -9,10 +9,10 @@ import WorkflowVisualizer from "@/components/WorkflowVisualizer";
 import TraceViewer from "@/components/TraceViewer";
 import SpanGanttChart from "@/components/SpanGanttChart";
 import {
-  executeWorkflowAction,
-  getAvailableWorkflows,
-  getWorkflowDefinition,
-} from "./actions";
+  executeWorkflowSSE,
+  fetchWorkflows,
+  fetchWorkflowDefinition,
+} from "@/lib/workflow/sse-client";
 import type {
   WorkflowDefinition,
   WorkflowExecutionResult,
@@ -30,7 +30,7 @@ export default function Home() {
 
   // Load available workflows on mount
   useEffect(() => {
-    getAvailableWorkflows().then((wfs) => {
+    fetchWorkflows().then((wfs) => {
       setWorkflows(wfs);
       if (wfs.length > 0) {
         setSelectedWorkflowId(wfs[0].id);
@@ -41,7 +41,7 @@ export default function Home() {
   // Load workflow definition when selection changes
   useEffect(() => {
     if (selectedWorkflowId) {
-      getWorkflowDefinition(selectedWorkflowId).then((wf) => {
+      fetchWorkflowDefinition(selectedWorkflowId).then((wf) => {
         setSelectedWorkflow(wf);
         setExecutionResult(null); // Clear previous execution
       });
@@ -55,9 +55,22 @@ export default function Home() {
     setExecutionResult(null);
 
     try {
-      const result = await executeWorkflowAction(selectedWorkflowId);
-      setExecutionResult(result);
-      setActiveTab("graph"); // Switch to graph view to see execution
+      await executeWorkflowSSE(selectedWorkflowId, undefined, {
+        onStart: (event) => {
+          console.log("Workflow started:", event.workflowName);
+        },
+        onProgress: (event) => {
+          console.log("Node executed:", event.nodeId);
+        },
+        onComplete: (event) => {
+          setExecutionResult(event.result);
+          setActiveTab("graph"); // Switch to graph view to see execution
+        },
+        onError: (event) => {
+          console.error("Workflow error:", event.error);
+          alert(`Execution failed: ${event.error}`);
+        },
+      });
     } catch (error) {
       console.error("Workflow execution failed:", error);
       alert(
@@ -77,7 +90,7 @@ export default function Home() {
             🔄 Workflow Visualization with OpenTelemetry
           </h1>
           <p className="text-muted-foreground">
-            Next.js 15 + Server Actions + React Flow + OpenTelemetry Protocol
+            Next.js 15 + Hono SSE + React Flow + OpenTelemetry Protocol
           </p>
         </div>
 
@@ -338,11 +351,10 @@ export default function Home() {
         {/* Footer */}
         <div className="mt-8 text-center text-muted-foreground text-sm">
           <p>
-            Built with Next.js 15, React Flow, and OpenTelemetry Protocol
+            Built with Next.js 15, Hono, React Flow, and OpenTelemetry Protocol
           </p>
           <p className="mt-1">
-            Server Actions execute workflows and collect traces for
-            visualization
+            Hono SSE endpoints execute workflows and stream traces in real-time
           </p>
         </div>
       </div>
