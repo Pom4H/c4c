@@ -2,14 +2,15 @@
 
 /**
  * Main page component for Workflow Visualization
+ * Now uses Hono SSE instead of Server Actions
  */
 
 import { useState, useEffect } from "react";
 import WorkflowVisualizer from "@/components/WorkflowVisualizer";
 import TraceViewer from "@/components/TraceViewer";
 import SpanGanttChart from "@/components/SpanGanttChart";
+import { useWorkflowSSE } from "@/lib/sse-client";
 import {
-  executeWorkflowAction,
   getAvailableWorkflows,
   getWorkflowDefinition,
 } from "./actions";
@@ -17,6 +18,7 @@ import type {
   WorkflowDefinition,
   WorkflowExecutionResult,
 } from "@/lib/workflow/types";
+import type { SSEEvent } from "@/lib/sse-client";
 
 export default function Home() {
   const [workflows, setWorkflows] = useState<Array<{ id: string; name: string; nodeCount: number }>>([]);
@@ -27,6 +29,11 @@ export default function Home() {
     useState<WorkflowExecutionResult | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
   const [activeTab, setActiveTab] = useState<"graph" | "trace" | "gantt">("graph");
+  const [sseEvents, setSseEvents] = useState<SSEEvent[]>([]);
+  const [currentExecutionId, setCurrentExecutionId] = useState<string | null>(null);
+
+  // Initialize SSE client
+  const { executeWorkflow } = useWorkflowSSE();
 
   // Load available workflows on mount
   useEffect(() => {
@@ -49,15 +56,38 @@ export default function Home() {
   }, [selectedWorkflowId]);
 
   const handleExecute = async () => {
-    if (!selectedWorkflowId) return;
+    if (!selectedWorkflowId || !selectedWorkflow) return;
 
     setIsExecuting(true);
     setExecutionResult(null);
+    setSseEvents([]);
+    setCurrentExecutionId(null);
 
     try {
-      const result = await executeWorkflowAction(selectedWorkflowId);
+      const result = await executeWorkflow(
+        selectedWorkflow,
+        {},
+        (event: SSEEvent) => {
+          console.log("SSE Event:", event);
+          setSseEvents(prev => [...prev, event]);
+          
+          // Track execution ID
+          if (event.executionId) {
+            setCurrentExecutionId(event.executionId);
+          }
+
+          // Update execution result for real-time visualization
+          if (event.type === "workflow_completed") {
+            setExecutionResult(event.result);
+            setActiveTab("graph"); // Switch to graph view to see execution
+          } else if (event.type === "workflow_error") {
+            throw new Error(event.error);
+          }
+        }
+      );
+      
       setExecutionResult(result);
-      setActiveTab("graph"); // Switch to graph view to see execution
+      setActiveTab("graph");
     } catch (error) {
       console.error("Workflow execution failed:", error);
       alert(
@@ -74,10 +104,10 @@ export default function Home() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-foreground mb-2">
-            🔄 Workflow Visualization with OpenTelemetry
+            🔄 Workflow Visualization with Real-time SSE
           </h1>
           <p className="text-muted-foreground">
-            Next.js 15 + Server Actions + React Flow + OpenTelemetry Protocol
+            Next.js 15 + Hono SSE + React Flow + OpenTelemetry Protocol
           </p>
         </div>
 
@@ -175,6 +205,33 @@ export default function Home() {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* SSE Events Stream */}
+          {isExecuting && sseEvents.length > 0 && (
+            <div className="mt-4 p-4 rounded-lg border bg-muted/50">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span className="font-semibold text-foreground">
+                  Real-time Execution Stream
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  ({sseEvents.length} events)
+                </span>
+              </div>
+              <div className="max-h-32 overflow-y-auto space-y-1">
+                {sseEvents.slice(-10).map((event, index) => (
+                  <div key={index} className="text-xs font-mono bg-background/50 p-2 rounded border">
+                    <span className="text-blue-500">[{event.type}]</span>
+                    <span className="text-muted-foreground ml-2">
+                      {event.nodeId && `Node: ${event.nodeId}`}
+                      {event.procedureName && ` | Procedure: ${event.procedureName}`}
+                      {event.progress && ` | Progress: ${event.progress}%`}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -338,10 +395,10 @@ export default function Home() {
         {/* Footer */}
         <div className="mt-8 text-center text-muted-foreground text-sm">
           <p>
-            Built with Next.js 15, React Flow, and OpenTelemetry Protocol
+            Built with Next.js 15, Hono SSE, React Flow, and OpenTelemetry Protocol
           </p>
           <p className="mt-1">
-            Server Actions execute workflows and collect traces for
+            Real-time workflow execution with Server-Sent Events for live
             visualization
           </p>
         </div>

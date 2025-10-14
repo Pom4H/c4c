@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev:http": "tsx src/apps/http-server.ts",
+    "dev:sse": "tsx src/apps/hono-sse-server.ts",
     "cli": "tsx src/apps/cli.ts",
     "build": "tsc",
     "lint": "biome check .",
@@ -19,10 +20,12 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@hono/node-server": "^1.19.5",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/sdk-trace-base": "^1.25.1",
     "@opentelemetry/sdk-trace-node": "^1.25.1",
     "glob": "^10.4.5",
+    "hono": "^4.9.12",
     "zod": "^3.23.8",
     "zod-to-json-schema": "^3.23.2"
   },

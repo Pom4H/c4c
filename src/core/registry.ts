@@ -63,6 +63,13 @@ export function listProcedures(registry: Registry): string[] {
 }
 
 /**
+ * Create an empty registry
+ */
+export function createRegistry(): Registry {
+	return new Map();
+}
+
+/**
  * Get registry metadata for introspection
  */
 export function describeRegistry(registry: Registry) {

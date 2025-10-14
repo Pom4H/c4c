@@ -1,17 +1,16 @@
 "use server";
 
 /**
- * Server Actions for workflow execution
+ * Server Actions for workflow metadata (no longer executes workflows)
+ * Workflow execution now handled by Hono SSE endpoints
  */
 
-import { executeWorkflow } from "@/lib/workflow/runtime";
 import {
   mathWorkflow,
   conditionalWorkflow,
   parallelWorkflow,
   complexWorkflow,
 } from "@/lib/workflow/examples";
-import type { WorkflowExecutionResult } from "@/lib/workflow/types";
 
 const workflows = {
   "math-calculation": mathWorkflow,
@@ -19,30 +18,6 @@ const workflows = {
   "parallel-tasks": parallelWorkflow,
   "complex-workflow": complexWorkflow,
 };
-
-/**
- * Execute a workflow by ID
- */
-export async function executeWorkflowAction(
-  workflowId: string,
-  input?: Record<string, unknown>
-): Promise<WorkflowExecutionResult> {
-  const workflow = workflows[workflowId as keyof typeof workflows];
-
-  if (!workflow) {
-    throw new Error(`Workflow ${workflowId} not found`);
-  }
-
-  console.log(`[Server Action] Executing workflow: ${workflow.name}`);
-
-  const result = await executeWorkflow(workflow, input);
-
-  console.log(
-    `[Server Action] Workflow completed: ${result.status} (${result.executionTime}ms)`
-  );
-
-  return result;
-}
 
 /**
  * Get all available workflows
