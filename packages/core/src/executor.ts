@@ -1,4 +1,4 @@
-import type { ExecutionContext, Handler, Procedure } from "@tsdev/workflow";
+import type { ExecutionContext, Handler, Procedure } from "./types.js";
 
 /**
  * Execute a procedure with input validation and output validation
