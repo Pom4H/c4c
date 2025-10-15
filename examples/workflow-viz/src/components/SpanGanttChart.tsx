@@ -108,16 +108,16 @@ export default function SpanGanttChart({ spans }: SpanGanttChartProps) {
     return { leftPercent, widthPercent };
   };
 
-  const getSpanColor = (span: TraceSpan) => {
+  const getSpanColor = (span: TraceSpan): string => {
     if (span.status.code === "ERROR") {
-      return "bg-destructive hover:bg-destructive/90";
+      return "#ef4444"; // Red for errors
     }
     // Color by span kind or attributes
     const nodeType = span.attributes["node.type"];
-    if (nodeType === "procedure") return "bg-[hsl(var(--span-procedure))] hover:opacity-90";
-    if (nodeType === "condition") return "bg-[hsl(var(--span-condition))] hover:opacity-90";
-    if (nodeType === "parallel") return "bg-[hsl(var(--span-parallel))] hover:opacity-90";
-    return "bg-primary hover:bg-primary/90";
+    if (nodeType === "procedure") return "#4ade80"; // Green
+    if (nodeType === "condition") return "#fbbf24"; // Yellow
+    if (nodeType === "parallel") return "#818cf8"; // Purple
+    return "#60a5fa"; // Blue for other types
   };
 
   const selectedSpanData = useMemo(
@@ -146,19 +146,24 @@ export default function SpanGanttChart({ spans }: SpanGanttChartProps) {
       {/* Legend */}
       <div className="flex gap-4 text-xs mb-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <Badge className="bg-[hsl(var(--span-procedure))]">Procedure</Badge>
+          <div className="w-4 h-4 rounded" style={{ background: "#4ade80" }} />
+          <span>Procedure</span>
         </div>
         <div className="flex items-center gap-2">
-          <Badge className="bg-[hsl(var(--span-condition))]">Condition</Badge>
+          <div className="w-4 h-4 rounded" style={{ background: "#fbbf24" }} />
+          <span>Condition</span>
         </div>
         <div className="flex items-center gap-2">
-          <Badge className="bg-[hsl(var(--span-parallel))]">Parallel</Badge>
+          <div className="w-4 h-4 rounded" style={{ background: "#818cf8" }} />
+          <span>Parallel</span>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="default">Other</Badge>
+          <div className="w-4 h-4 rounded" style={{ background: "#60a5fa" }} />
+          <span>Sequential</span>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="destructive">Error</Badge>
+          <div className="w-4 h-4 rounded" style={{ background: "#ef4444" }} />
+          <span>Error</span>
         </div>
       </div>
 
@@ -248,9 +253,7 @@ export default function SpanGanttChart({ spans }: SpanGanttChartProps) {
                   {/* Span bar */}
                   <div className="relative h-8 flex items-center">
                     <div
-                      className={`absolute h-6 rounded shadow-sm transition-all ${getSpanColor(
-                        span
-                      )} ${
+                      className={`absolute h-6 rounded shadow-sm transition-all ${
                         isHovered || isSelected
                           ? "ring-2 ring-ring z-10 scale-105"
                           : ""
@@ -259,12 +262,13 @@ export default function SpanGanttChart({ spans }: SpanGanttChartProps) {
                         left: `${leftPercent}%`,
                         width: `${widthPercent}%`,
                         minWidth: "4px",
+                        backgroundColor: getSpanColor(span),
                       }}
                       title={`${span.name}: ${span.duration}ms`}
                     >
                       {/* Duration label (only show if wide enough) */}
                       {widthPercent > 5 && (
-                        <span className="absolute inset-0 flex items-center justify-center text-xs text-primary-foreground font-semibold">
+                        <span className="absolute inset-0 flex items-center justify-center text-xs text-white font-semibold">
                           {span.duration}ms
                         </span>
                       )}
