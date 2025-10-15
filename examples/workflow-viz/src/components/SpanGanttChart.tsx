@@ -195,7 +195,7 @@ export default function SpanGanttChart({ spans }: SpanGanttChartProps) {
         </div>
 
         {/* Span rows */}
-        <div className="max-h-[500px] overflow-y-auto">
+        <div className="max-h-[500px] overflow-y-auto overflow-x-hidden">
           {flatSpans.map((row, idx) => {
             const { span, level } = row;
             const { leftPercent, widthPercent } = getSpanPosition(span);
