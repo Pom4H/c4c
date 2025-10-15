@@ -5,8 +5,8 @@ import type { Registry } from "@tsdev/core";
  * CLI adapter for tsdev
  * Demonstrates transport-agnostic principle - same handlers work via CLI
  */
-export async function runCli(registry: Registry, args: string[]) {
-	const [procedureName, ...inputArgs] = args;
+export async function runCli(registry: Registry, args: string[] = process.argv.slice(2)) {
+    const [procedureName, ...inputArgs] = args;
 
 	// List all procedures if no procedure name provided
 	if (!procedureName || procedureName === "list" || procedureName === "--list") {
