@@ -75,10 +75,11 @@ tsdev/
 
 - 🎯 **Contracts-first**: single source of truth for all interfaces
 - 🔄 **Transport-agnostic**: one handler works via RPC, REST, CLI, SDK, agents
-- 📝 **Self-describing**: automatic introspection and documentation
+- 📝 **API generators**: OpenAPI/JSON Schema generated from contracts for clients, docs and mocks
+- 🧪 **Self-describing registry**: programmatic introspection for SDKs and agents
 - 📊 **Telemetry by design**: OpenTelemetry built into the domain model
-- 🔀 **Visual Workflows**: procedures become workflow nodes automatically
-- 🧩 **Composable**: extensibility through function composition
+- 🔀 **Procedural → Workflow**: procedures compose into visual workflows, runnable by agents
+- 🧩 **Composable policies**: cross-cutting concerns via function composition
 - 📐 **Convention-driven**: code structure determines automation
 
 ## 🏗️ Architecture
@@ -108,6 +109,18 @@ import { createHttpServer, runCli } from '@tsdev/adapters';
 ```
 
 ### Composable Policies (`@tsdev/policies`)
+### Generators (`@tsdev/generators`)
+
+```typescript
+import { generateOpenAPISpec, generateOpenAPIJSON } from '@tsdev/generators';
+import { collectRegistry } from '@tsdev/core';
+
+const registry = await collectRegistry('./src/handlers');
+const spec = generateOpenAPISpec(registry, { title: 'My Service', version: '1.0.0' });
+```
+
+Use the generated OpenAPI/JSON Schema to power clients, mocks, documentation sites, and contract tests.
+
 
 ```typescript
 import { withSpan, withRetry, withLogging, withRateLimit } from '@tsdev/policies';
@@ -176,6 +189,43 @@ pnpm dev              # Workflow visualization
 pnpm dev:basic        # Basic HTTP/CLI example
 pnpm dev:workflows    # Workflow examples
 ```
+
+## 🔌 GitHub Integration (delivery via code/workflows and agent edits)
+
+- Use GitHub Actions to generate and publish API docs on each push:
+
+```yaml
+name: api-docs
+on:
+  push:
+    branches: [ main ]
+jobs:
+  generate-openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'pnpm' }
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          node -e "(async () => {
+            const { collectRegistry } = await import('./packages/core/dist/index.js');
+            const { generateOpenAPIJSON } = await import('./packages/generators/dist/index.js');
+            const registry = await collectRegistry('./examples/basic/src/handlers');
+            const json = generateOpenAPIJSON(registry, { title: 'tsdev API' });
+            await import('node:fs/promises').then(fs => fs.writeFile('openapi.json', json));
+          })()"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openapi
+          path: openapi.json
+```
+
+- Use PRs as a powerful delivery surface: agents can propose edits to contracts/handlers/workflows; CI validates, regenerates OpenAPI, and previews docs.
+
+- Wire agents to GitHub via a bot token to edit procedures and workflows; the `collectRegistry()`-backed registry stays the single source of truth, ensuring safe automation.
 
 ## 📦 Package Exports
 

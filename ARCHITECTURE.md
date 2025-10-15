@@ -210,6 +210,20 @@ const workflow: WorkflowDefinition = {
 const result = await executeWorkflow(workflow, registry);
 ```
 
+### Generators (API/Schema)
+
+Contracts in the registry power code generation and documentation:
+
+```typescript
+import { generateOpenAPISpec } from "@tsdev/generators";
+import { collectRegistry } from "@tsdev/core";
+
+const registry = await collectRegistry("./src/handlers");
+const openapi = generateOpenAPISpec(registry, { title: "Service", version: "1.0.0" });
+```
+
+Outputs can be consumed by API gateways, clients, mock servers, and docs sites.
+
 ### Adapters (Transport Layer)
 
 Adapters bridge transports to the core:
@@ -221,6 +235,15 @@ Adapters bridge transports to the core:
 
 Adapters are **thin layers** - all business logic lives in handlers.
 
+### Agents (LLM-assisted composition)
+
+Because contracts and registry are machine-readable, agents can:
+1. Discover available procedures via `describeRegistry()`
+2. Generate or modify workflows to compose procedures
+3. Open PRs with proposed edits to contracts/handlers/workflows
+
+The same artifacts (OpenAPI, JSON Schemas) provide validation and safety.
+
 ## Package Dependencies
 
 ```
@@ -231,6 +254,12 @@ Adapters are **thin layers** - all business logic lives in handlers.
     ├── @tsdev/adapters (depends on @tsdev/core, @tsdev/workflow, @tsdev/generators)
     ├── @tsdev/policies (depends on @tsdev/core)
     └── @tsdev/generators (depends on @tsdev/core, @tsdev/workflow)
+
+## CI/CD and GitHub Integration
+
+- Generate OpenAPI on CI from the registry and publish as artifact or to Pages
+- Validate PRs by building registry, running generators, and executing example workflows
+- Agents (via bot account) can submit PRs that update procedures and workflows; CI provides guardrails
 ```
 
 ## Data Flow
