@@ -26,5 +26,8 @@
     "react": "^19.2.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@tsdev/workflow-react": "workspace:*"
   }
 }

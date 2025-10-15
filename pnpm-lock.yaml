@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@tsdev/workflow-react':
+        specifier: workspace:*
+        version: link:packages/workflow-react
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.2.6
@@ -91,6 +95,9 @@ importers:
       '@tsdev/workflow':
         specifier: workspace:*
         version: link:../../packages/workflow
+      '@tsdev/workflow-react':
+        specifier: workspace:*
+        version: link:../../packages/workflow-react
       '@xyflow/react':
         specifier: ^12.0.0
         version: 12.8.6(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -272,6 +279,27 @@ importers:
       react:
         specifier: ^19.2.0
         version: 19.2.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/workflow-react:
+    devDependencies:
+      '@tsdev/workflow':
+        specifier: workspace:*
+        version: link:../workflow
+      '@types/node':
+        specifier: ^24.7.2
+        version: 24.7.2
+      '@types/react':
+        specifier: ^19.2.2
+        version: 19.2.2
+      react:
+        specifier: ^19.2.0
+        version: 19.2.0
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.0(react@19.2.0)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

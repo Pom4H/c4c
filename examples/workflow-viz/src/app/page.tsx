@@ -10,7 +10,7 @@ import { useState, useEffect } from "react";
 import WorkflowVisualizer from "@/components/WorkflowVisualizer";
 import TraceViewer from "@/components/TraceViewer";
 import SpanGanttChart from "@/components/SpanGanttChart";
-import { useWorkflow } from "@tsdev/workflow/react";
+import { useWorkflow } from "@tsdev/workflow-react";
 import { useWorkflows, useWorkflowDefinition } from "@/lib/hooks/useWorkflow";
 
 export default function Home() {
