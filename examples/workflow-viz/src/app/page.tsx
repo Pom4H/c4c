@@ -11,7 +11,7 @@ import WorkflowVisualizer from "@/components/WorkflowVisualizer";
 import TraceViewer from "@/components/TraceViewer";
 import SpanGanttChart from "@/components/SpanGanttChart";
 import { useWorkflow } from "@tsdev/workflow-react";
-import { useWorkflows, useWorkflowDefinition } from "@/lib/hooks/useWorkflow";
+import { useWorkflows, useWorkflowDefinition } from "@tsdev/workflow-react";
 
 export default function Home() {
 	const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>("");
@@ -261,15 +261,15 @@ export default function Home() {
 							<div>
 								<h3 className="font-semibold text-lg mb-2">Node Types</h3>
 								<div className="space-y-2">
-									{Object.entries(
-										definition.nodes.reduce(
-											(acc: Record<string, number>, node) => {
-												acc[node.type] = (acc[node.type] || 0) + 1;
-												return acc;
-											},
-											{} as Record<string, number>
-										)
-									).map(([type, count]) => (
+                  {Object.entries(
+                    definition.nodes.reduce(
+                      (acc: Record<string, number>, node: { type: string }) => {
+                        acc[node.type] = (acc[node.type] || 0) + 1;
+                        return acc;
+                      },
+                      {} as Record<string, number>
+                    )
+                  ).map(([type, count]) => (
 										<div key={type} className="flex items-center gap-2">
 											<div
 												className="w-4 h-4 rounded"
