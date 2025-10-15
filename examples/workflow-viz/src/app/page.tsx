@@ -20,7 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CheckCircle2, XCircle, Loader2, Play } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, Play, AlertTriangle } from "lucide-react";
 
 export default function Home() {
 	const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>("");
@@ -32,6 +32,14 @@ export default function Home() {
 	const { execute, result, isExecuting, error } = useWorkflow({
 		onSuccess: () => setActiveTab("graph"),
 	});
+
+	const getErrorMessage = (err: unknown): string => {
+		if (err && typeof err === "object" && "message" in err) {
+			const maybeMessage = (err as { message?: unknown }).message;
+			return typeof maybeMessage === "string" ? maybeMessage : JSON.stringify(maybeMessage);
+		}
+		return String(err);
+	};
 
 	// Load available workflows on mount
 	useEffect(() => {
@@ -151,9 +159,12 @@ export default function Home() {
 										{result.spans?.length || 0}
 									</div>
 									{result.error && (
-										<div className="text-sm mt-2">
-											Error: {result.error.message || String(result.error)}
-										</div>
+								<div className="text-sm mt-2 flex items-start gap-2">
+									<AlertTriangle className="h-4 w-4 mt-0.5" />
+									<span>
+									  Error: {getErrorMessage(result.error)}
+									</span>
+								</div>
 									)}
 								</AlertDescription>
 							</Alert>

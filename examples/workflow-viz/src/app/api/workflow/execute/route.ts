@@ -11,6 +11,7 @@ import {
 	conditionalWorkflow,
 	parallelWorkflow,
 	complexWorkflow,
+	errorWorkflow,
 } from "@/lib/workflow/examples";
 
 const workflows = {
@@ -18,6 +19,7 @@ const workflows = {
 	"conditional-processing": conditionalWorkflow,
 	"parallel-tasks": parallelWorkflow,
 	"complex-workflow": complexWorkflow,
+	"error-demo": errorWorkflow,
 };
 
 export async function POST(request: NextRequest) {
@@ -43,13 +45,27 @@ export async function POST(request: NextRequest) {
 
 		console.log(`[API] Executing workflow: ${workflow.name}`);
 
+
 		const result = await executeWorkflow(workflow, input);
+
+		// Normalize Error for JSON serialization so UI can display message
+		const safeResult =
+			result.status === "failed" && result.error
+				? {
+					...result,
+					error: {
+						name: (result.error as Error).name,
+						message: (result.error as Error).message,
+						stack: (result.error as Error).stack,
+					},
+				}
+				: result;
 
 		console.log(
 			`[API] Workflow completed: ${result.status} (${result.executionTime}ms)`
 		);
 
-		return NextResponse.json(result);
+		return NextResponse.json(safeResult);
 	} catch (error) {
 		console.error("[API] Workflow execution error:", error);
 		return NextResponse.json(
