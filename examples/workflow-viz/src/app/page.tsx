@@ -10,6 +10,7 @@ import { useState, useEffect } from "react";
 import WorkflowVisualizer from "@/components/WorkflowVisualizer";
 import TraceViewer from "@/components/TraceViewer";
 import SpanGanttChart from "@/components/SpanGanttChart";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useWorkflow } from "@tsdev/workflow-react";
 import { useWorkflows, useWorkflowDefinition } from "@tsdev/workflow-react";
 
@@ -57,12 +58,17 @@ export default function Home() {
 			<div className="max-w-7xl mx-auto animate-slide-in">
 				{/* Header */}
 				<div className="mb-8">
-					<h1 className="text-4xl font-bold text-foreground mb-2">
-						🔄 Workflow Visualization with OpenTelemetry
-					</h1>
-					<p className="text-muted-foreground">
-						Next.js 15 + React Flow + Framework OTEL Integration
-					</p>
+					<div className="flex items-center justify-between">
+						<div>
+							<h1 className="text-4xl font-bold text-foreground mb-2">
+								🔄 Workflow Visualization with OpenTelemetry
+							</h1>
+							<p className="text-muted-foreground">
+								Next.js 15 + React Flow + Framework OTEL Integration
+							</p>
+						</div>
+						<ThemeToggle />
+					</div>
 				</div>
 
 				{/* Controls */}

@@ -31,11 +31,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@tsdev/workflow": "workspace:*",
     "@types/node": "^24.7.2",
-    "@types/react": "^19.2.2",
-    "@types/react-dom": "^19.2.2",
-    "react": "^19.2.0",
     "typescript": "^5.9.3"
   }
 }
