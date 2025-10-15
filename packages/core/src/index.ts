@@ -12,3 +12,7 @@ export { collectRegistry, collectRegistryFromPaths, getProcedure, listProcedures
 
 // Executor
 export { executeProcedure, createExecutionContext, applyPolicies } from "./executor.js";
+
+// Procedure events for observability
+export type { ProcedureEvent, ProcedureListener } from "./events.js";
+export { subscribeProcedures, subscribeProcedureRequest } from "./events.js";

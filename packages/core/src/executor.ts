@@ -1,4 +1,5 @@
 import type { ExecutionContext, Handler, Procedure } from "./types.js";
+import { publishProcedureEvent } from "./events.js";
 
 /**
  * Execute a procedure with input validation and output validation
@@ -8,16 +9,47 @@ export async function executeProcedure<TInput, TOutput>(
 	input: unknown,
 	context: ExecutionContext
 ): Promise<TOutput> {
-	// Validate input against contract
-	const validatedInput = procedure.contract.input.parse(input);
+    const name = procedure.contract.name;
+    const startedAt = Date.now();
+    publishProcedureEvent({
+        type: "procedure.started",
+        requestId: context.requestId,
+        procedureName: name,
+        timestamp: startedAt,
+    });
 
-	// Execute handler
-	const result = await procedure.handler(validatedInput, context);
+    try {
+        // Validate input against contract
+        const validatedInput = procedure.contract.input.parse(input);
 
-	// Validate output against contract
-	const validatedOutput = procedure.contract.output.parse(result);
+        // Execute handler
+        const result = await procedure.handler(validatedInput, context);
 
-	return validatedOutput;
+        // Validate output against contract
+        const validatedOutput = procedure.contract.output.parse(result);
+
+        const finishedAt = Date.now();
+        publishProcedureEvent({
+            type: "procedure.completed",
+            requestId: context.requestId,
+            procedureName: name,
+            timestamp: finishedAt,
+            duration: finishedAt - startedAt,
+        });
+
+        return validatedOutput;
+    } catch (err) {
+        const finishedAt = Date.now();
+        publishProcedureEvent({
+            type: "procedure.failed",
+            requestId: context.requestId,
+            procedureName: name,
+            timestamp: finishedAt,
+            duration: finishedAt - startedAt,
+            error: err instanceof Error ? err.message : String(err),
+        });
+        throw err;
+    }
 }
 
 /**

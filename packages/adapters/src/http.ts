@@ -159,7 +159,30 @@ export function createHttpServer(registry: Registry, port = 3000) {
 			return;
 		}
 
-		// 404 for unknown routes
+        // Procedure events SSE (global stream)
+        if (req.url?.startsWith("/events/procedures") && req.method === "GET") {
+            res.writeHead(200, {
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache, no-transform",
+                Connection: "keep-alive",
+                "X-Accel-Buffering": "no",
+            });
+
+            // Dynamic import to avoid circular deps
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            import("@tsdev/core/dist/events.js").then(({ subscribeProcedures }: any) => {
+                const send = (event: unknown) => res.write(`data: ${JSON.stringify(event)}\n\n`);
+                const unsubscribe = subscribeProcedures((evt: unknown) => send(evt));
+                const cleanup = () => { try { unsubscribe(); } catch {} res.end(); };
+                req.on("close", cleanup);
+                req.on("end", cleanup);
+            });
+
+            return;
+        }
+
+        // 404 for unknown routes
 		res.writeHead(404, { "Content-Type": "application/json" });
 		res.end(JSON.stringify({ error: "Not found" }));
 	});
