@@ -7,6 +7,10 @@
 
 import { useMemo, useState } from "react";
 import type { TraceSpan } from "@tsdev/workflow";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 
 interface SpanGanttChartProps {
   spans: TraceSpan[];
@@ -106,14 +110,14 @@ export default function SpanGanttChart({ spans }: SpanGanttChartProps) {
 
   const getSpanColor = (span: TraceSpan) => {
     if (span.status.code === "ERROR") {
-      return "bg-red-500 hover:bg-red-600";
+      return "bg-destructive hover:bg-destructive/90";
     }
     // Color by span kind or attributes
     const nodeType = span.attributes["node.type"];
-    if (nodeType === "procedure") return "bg-green-500 hover:bg-green-600";
-    if (nodeType === "condition") return "bg-yellow-500 hover:bg-yellow-600";
-    if (nodeType === "parallel") return "bg-purple-500 hover:bg-purple-600";
-    return "bg-blue-500 hover:bg-blue-600";
+    if (nodeType === "procedure") return "bg-[hsl(var(--span-procedure))] hover:opacity-90";
+    if (nodeType === "condition") return "bg-[hsl(var(--span-condition))] hover:opacity-90";
+    if (nodeType === "parallel") return "bg-[hsl(var(--span-parallel))] hover:opacity-90";
+    return "bg-primary hover:bg-primary/90";
   };
 
   const selectedSpanData = useMemo(
@@ -123,7 +127,7 @@ export default function SpanGanttChart({ spans }: SpanGanttChartProps) {
 
   if (spans.length === 0) {
     return (
-      <div className="text-center text-gray-500 py-8">
+      <div className="text-center text-muted-foreground py-8">
         No trace data available. Execute a workflow to see the Gantt chart.
       </div>
     );
@@ -133,7 +137,7 @@ export default function SpanGanttChart({ spans }: SpanGanttChartProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xl font-bold">Span Gantt Chart</h3>
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-muted-foreground">
           Total Duration: {timelineMetrics.totalDuration}ms | Spans:{" "}
           {spans.length}
         </div>
@@ -142,34 +146,29 @@ export default function SpanGanttChart({ spans }: SpanGanttChartProps) {
       {/* Legend */}
       <div className="flex gap-4 text-xs mb-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-green-500 rounded" />
-          <span>Procedure</span>
+          <Badge className="bg-[hsl(var(--span-procedure))]">Procedure</Badge>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-yellow-500 rounded" />
-          <span>Condition</span>
+          <Badge className="bg-[hsl(var(--span-condition))]">Condition</Badge>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-purple-500 rounded" />
-          <span>Parallel</span>
+          <Badge className="bg-[hsl(var(--span-parallel))]">Parallel</Badge>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-blue-500 rounded" />
-          <span>Other</span>
+          <Badge variant="default">Other</Badge>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-red-500 rounded" />
-          <span>Error</span>
+          <Badge variant="destructive">Error</Badge>
         </div>
       </div>
 
       {/* Gantt Chart Container */}
-      <div className="border border-gray-300 rounded-lg overflow-hidden bg-white">
+      <Card className="overflow-hidden">
         {/* Time axis header */}
-        <div className="border-b border-gray-300 bg-gray-50">
+        <div className="border-b">
           <div className="flex">
             {/* Span name column header */}
-            <div className="w-64 flex-shrink-0 p-3 font-semibold text-sm border-r border-gray-300">
+            <div className="w-64 flex-shrink-0 p-3 font-semibold text-sm border-r">
               Span Name
             </div>
             {/* Timeline header */}
@@ -180,8 +179,8 @@ export default function SpanGanttChart({ spans }: SpanGanttChartProps) {
                   className="absolute top-0 bottom-0 flex flex-col justify-center"
                   style={{ left: `${marker.position}%` }}
                 >
-                  <div className="border-l border-gray-300 h-full" />
-                  <span className="absolute top-2 -translate-x-1/2 text-xs text-gray-600 whitespace-nowrap">
+                  <div className="border-l border-border h-full" />
+                  <span className="absolute top-2 -translate-x-1/2 text-xs text-muted-foreground whitespace-nowrap">
                     {marker.label}
                   </span>
                 </div>
@@ -202,9 +201,9 @@ export default function SpanGanttChart({ spans }: SpanGanttChartProps) {
             return (
               <div
                 key={span.spanId}
-                className={`flex border-b border-gray-200 hover:bg-blue-50 transition-colors ${
-                  isSelected ? "bg-blue-100" : ""
-                } ${idx % 2 === 0 ? "bg-gray-50" : "bg-white"}`}
+                className={`flex border-b hover:bg-accent transition-colors ${
+                  isSelected ? "bg-accent" : ""
+                } ${idx % 2 === 0 ? "bg-muted/50" : ""}`}
                 onMouseEnter={() => setHoveredSpan(span.spanId)}
                 onMouseLeave={() => setHoveredSpan(null)}
                 onClick={() =>
@@ -215,22 +214,21 @@ export default function SpanGanttChart({ spans }: SpanGanttChartProps) {
               >
                 {/* Span name column */}
                 <div
-                  className="w-64 flex-shrink-0 p-3 border-r border-gray-300 flex items-center"
+                  className="w-64 flex-shrink-0 p-3 border-r flex items-center"
                   style={{ paddingLeft: `${12 + level * 20}px` }}
                 >
                   {level > 0 && (
-                    <span className="text-gray-400 mr-2">└─</span>
+                    <span className="text-muted-foreground mr-2">└─</span>
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate flex items-center gap-2">
-                      <span
-                        className={`inline-block w-2 h-2 rounded-full ${
-                          isError ? "bg-red-500" : "bg-green-500"
-                        }`}
+                      <Badge
+                        variant={isError ? "destructive" : "default"}
+                        className="h-2 w-2 p-0 rounded-full"
                       />
                       {span.name}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-muted-foreground">
                       {span.duration}ms
                     </div>
                   </div>
@@ -242,7 +240,7 @@ export default function SpanGanttChart({ spans }: SpanGanttChartProps) {
                   {timelineMetrics.timeMarkers.map((marker, idx) => (
                     <div
                       key={idx}
-                      className="absolute top-0 bottom-0 border-l border-gray-200"
+                      className="absolute top-0 bottom-0 border-l border-border/50"
                       style={{ left: `${marker.position}%` }}
                     />
                   ))}
@@ -254,7 +252,7 @@ export default function SpanGanttChart({ spans }: SpanGanttChartProps) {
                         span
                       )} ${
                         isHovered || isSelected
-                          ? "ring-2 ring-blue-400 z-10 scale-105"
+                          ? "ring-2 ring-ring z-10 scale-105"
                           : ""
                       }`}
                       style={{
@@ -266,7 +264,7 @@ export default function SpanGanttChart({ spans }: SpanGanttChartProps) {
                     >
                       {/* Duration label (only show if wide enough) */}
                       {widthPercent > 5 && (
-                        <span className="absolute inset-0 flex items-center justify-center text-xs text-white font-semibold">
+                        <span className="absolute inset-0 flex items-center justify-center text-xs text-primary-foreground font-semibold">
                           {span.duration}ms
                         </span>
                       )}
@@ -277,132 +275,154 @@ export default function SpanGanttChart({ spans }: SpanGanttChartProps) {
             );
           })}
         </div>
-      </div>
+      </Card>
 
       {/* Selected span details panel */}
       {selectedSpanData && (
-        <div className="mt-4 p-4 bg-white border border-gray-300 rounded-lg shadow-sm">
-          <div className="flex justify-between items-start mb-3">
-            <h4 className="text-lg font-bold">{selectedSpanData.name}</h4>
-            <button
-              onClick={() => setSelectedSpan(null)}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <div className="text-sm text-gray-600">Duration</div>
-              <div className="font-semibold">{selectedSpanData.duration}ms</div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-600">Status</div>
-              <div
-                className={`font-semibold ${
-                  selectedSpanData.status.code === "OK"
-                    ? "text-green-600"
-                    : "text-red-600"
-                }`}
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-start">
+              <CardTitle className="text-lg">{selectedSpanData.name}</CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedSpan(null)}
               >
-                {selectedSpanData.status.code}
-                {selectedSpanData.status.message &&
-                  ` - ${selectedSpanData.status.message}`}
-              </div>
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-            <div>
-              <div className="text-sm text-gray-600">Span ID</div>
-              <div className="font-mono text-xs">{selectedSpanData.spanId}</div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-600">Trace ID</div>
-              <div className="font-mono text-xs">
-                {selectedSpanData.traceId}
-              </div>
-            </div>
-            {selectedSpanData.parentSpanId && (
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <div className="text-sm text-gray-600">Parent Span</div>
+                <div className="text-sm text-muted-foreground">Duration</div>
+                <div className="font-semibold">{selectedSpanData.duration}ms</div>
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">Status</div>
+                <Badge
+                  variant={
+                    selectedSpanData.status.code === "OK"
+                      ? "default"
+                      : "destructive"
+                  }
+                >
+                  {selectedSpanData.status.code}
+                  {selectedSpanData.status.message &&
+                    ` - ${selectedSpanData.status.message}`}
+                </Badge>
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">Span ID</div>
+                <div className="font-mono text-xs">{selectedSpanData.spanId}</div>
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">Trace ID</div>
                 <div className="font-mono text-xs">
-                  {selectedSpanData.parentSpanId}
+                  {selectedSpanData.traceId}
+                </div>
+              </div>
+              {selectedSpanData.parentSpanId && (
+                <div>
+                  <div className="text-sm text-muted-foreground">Parent Span</div>
+                  <div className="font-mono text-xs">
+                    {selectedSpanData.parentSpanId}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Attributes */}
+            {Object.keys(selectedSpanData.attributes).length > 0 && (
+              <div className="mt-3">
+                <div className="text-sm font-semibold mb-2">Attributes</div>
+                <div className="bg-muted p-3 rounded text-xs font-mono max-h-40 overflow-y-auto">
+                  {Object.entries(selectedSpanData.attributes).map(
+                    ([key, value]) => (
+                      <div key={key} className="mb-1">
+                        <span className="text-primary">{key}:</span>{" "}
+                        <span>
+                          {JSON.stringify(value)}
+                        </span>
+                      </div>
+                    )
+                  )}
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Attributes */}
-          {Object.keys(selectedSpanData.attributes).length > 0 && (
-            <div className="mt-3">
-              <div className="text-sm font-semibold mb-2">Attributes</div>
-              <div className="bg-gray-50 p-3 rounded text-xs font-mono max-h-40 overflow-y-auto">
-                {Object.entries(selectedSpanData.attributes).map(
-                  ([key, value]) => (
-                    <div key={key} className="mb-1">
-                      <span className="text-blue-600">{key}:</span>{" "}
-                      <span className="text-gray-800">
-                        {JSON.stringify(value)}
-                      </span>
-                    </div>
-                  )
-                )}
+            {/* Events */}
+            {selectedSpanData.events && selectedSpanData.events.length > 0 && (
+              <div className="mt-3">
+                <div className="text-sm font-semibold mb-2">Events</div>
+                <div className="space-y-2">
+                  {selectedSpanData.events.map((event, idx) => (
+                    <Card key={idx}>
+                      <CardHeader className="p-3">
+                        <CardTitle className="text-sm">{event.name}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-3 pt-0">
+                        <div className="text-xs text-muted-foreground mb-2">
+                          Timestamp: {event.timestamp}
+                        </div>
+                        {event.attributes && (
+                          <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">
+                            {JSON.stringify(event.attributes, null, 2)}
+                          </pre>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* Events */}
-          {selectedSpanData.events && selectedSpanData.events.length > 0 && (
-            <div className="mt-3">
-              <div className="text-sm font-semibold mb-2">Events</div>
-              <div className="space-y-2">
-                {selectedSpanData.events.map((event, idx) => (
-                  <div key={idx} className="bg-gray-50 p-3 rounded">
-                    <div className="font-semibold text-sm">{event.name}</div>
-                    <div className="text-xs text-gray-600">
-                      Timestamp: {event.timestamp}
-                    </div>
-                    {event.attributes && (
-                      <pre className="mt-2 text-xs bg-white p-2 rounded overflow-x-auto">
-                        {JSON.stringify(event.attributes, null, 2)}
-                      </pre>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Statistics Panel */}
       <div className="mt-4 grid grid-cols-4 gap-4">
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <div className="text-2xl font-bold text-blue-700">
-            {spans.length}
-          </div>
-          <div className="text-sm text-blue-600">Total Spans</div>
-        </div>
-        <div className="bg-green-50 p-4 rounded-lg">
-          <div className="text-2xl font-bold text-green-700">
-            {spans.filter((s) => s.status.code === "OK").length}
-          </div>
-          <div className="text-sm text-green-600">Successful</div>
-        </div>
-        <div className="bg-red-50 p-4 rounded-lg">
-          <div className="text-2xl font-bold text-red-700">
-            {spans.filter((s) => s.status.code === "ERROR").length}
-          </div>
-          <div className="text-sm text-red-600">Errors</div>
-        </div>
-        <div className="bg-purple-50 p-4 rounded-lg">
-          <div className="text-2xl font-bold text-purple-700">
-            {Math.round(
-              spans.reduce((sum, s) => sum + s.duration, 0) / spans.length
-            )}
-            ms
-          </div>
-          <div className="text-sm text-purple-600">Avg Duration</div>
-        </div>
+        <Card>
+          <CardHeader className="p-4">
+            <CardTitle className="text-2xl">{spans.length}</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <p className="text-sm text-muted-foreground">Total Spans</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="p-4">
+            <CardTitle className="text-2xl">
+              {spans.filter((s) => s.status.code === "OK").length}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <p className="text-sm text-muted-foreground">Successful</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="p-4">
+            <CardTitle className="text-2xl">
+              {spans.filter((s) => s.status.code === "ERROR").length}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <p className="text-sm text-muted-foreground">Errors</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="p-4">
+            <CardTitle className="text-2xl">
+              {Math.round(
+                spans.reduce((sum, s) => sum + s.duration, 0) / spans.length
+              )}
+              ms
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <p className="text-sm text-muted-foreground">Avg Duration</p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

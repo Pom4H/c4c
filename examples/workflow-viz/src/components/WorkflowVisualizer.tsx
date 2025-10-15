@@ -18,6 +18,8 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { WorkflowDefinition, TraceSpan } from "@tsdev/workflow";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 interface WorkflowVisualizerProps {
   workflow: WorkflowDefinition;
@@ -27,12 +29,12 @@ interface WorkflowVisualizerProps {
   };
 }
 
-const nodeColors = {
-  procedure: "#4ade80",
-  condition: "#fbbf24",
-  parallel: "#818cf8",
-  sequential: "#60a5fa",
-};
+const nodeTypeColors = {
+  procedure: "hsl(var(--span-procedure))",
+  condition: "hsl(var(--span-condition))",
+  parallel: "hsl(var(--span-parallel))",
+  sequential: "hsl(var(--span-sequential))",
+} as const;
 
 export default function WorkflowVisualizer({
   workflow,
@@ -64,7 +66,7 @@ export default function WorkflowVisualizer({
           label: (
             <div className="text-center">
               <div className="font-bold">{node.id}</div>
-              <div className="text-xs text-gray-600">
+              <div className="text-xs text-muted-foreground">
                 {node.type}
                 {node.procedureName && (
                   <>
@@ -74,7 +76,7 @@ export default function WorkflowVisualizer({
                 )}
               </div>
               {nodeSpan && (
-                <div className="text-xs mt-1 text-blue-600">
+                <div className="text-xs mt-1 text-primary">
                   {nodeSpan.duration}ms
                 </div>
               )}
@@ -83,13 +85,14 @@ export default function WorkflowVisualizer({
         },
         style: {
           background: isExecuted
-            ? nodeColors[node.type] || "#60a5fa"
-            : "#e5e7eb",
-          border: `2px solid ${nodeSpan?.status.code === "ERROR" ? "#ef4444" : "#1e40af"}`,
+            ? nodeTypeColors[node.type as keyof typeof nodeTypeColors] || "hsl(var(--primary))"
+            : "hsl(var(--muted))",
+          border: `2px solid ${nodeSpan?.status.code === "ERROR" ? "hsl(var(--destructive))" : "hsl(var(--primary))"}`,
           borderRadius: "8px",
           padding: "10px",
           width: 180,
           opacity: isExecuted ? 1 : 0.5,
+          color: isExecuted ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))",
         },
       });
     });
@@ -112,8 +115,8 @@ export default function WorkflowVisualizer({
             animated: executionResult?.nodesExecuted.includes(node.id) ?? false,
             style: {
               stroke: executionResult?.nodesExecuted.includes(node.id)
-                ? "#4ade80"
-                : "#94a3b8",
+                ? "hsl(var(--span-procedure))"
+                : "hsl(var(--muted-foreground))",
               strokeWidth: 2,
             },
             label: Array.isArray(node.next) ? `branch ${index + 1}` : undefined,
@@ -131,7 +134,7 @@ export default function WorkflowVisualizer({
             target: config.trueBranch,
             animated: executionResult?.nodesExecuted.includes(node.id) ?? false,
             style: {
-              stroke: "#22c55e",
+              stroke: "hsl(var(--span-procedure))",
               strokeWidth: 2,
             },
             label: "✓ true",
@@ -144,7 +147,7 @@ export default function WorkflowVisualizer({
             target: config.falseBranch,
             animated: false,
             style: {
-              stroke: "#ef4444",
+              stroke: "hsl(var(--destructive))",
               strokeWidth: 2,
             },
             label: "✗ false",
@@ -164,7 +167,7 @@ export default function WorkflowVisualizer({
               animated:
                 executionResult?.nodesExecuted.includes(node.id) ?? false,
               style: {
-                stroke: "#818cf8",
+                stroke: "hsl(var(--span-parallel))",
                 strokeWidth: 2,
               },
               label: `parallel ${index + 1}`,
@@ -201,37 +204,42 @@ export default function WorkflowVisualizer({
         <MiniMap
           nodeColor={(node) => {
             const isExecuted = executionResult?.nodesExecuted.includes(node.id);
-            return isExecuted ? "#4ade80" : "#e5e7eb";
+            return isExecuted ? "hsl(var(--span-procedure))" : "hsl(var(--muted))";
           }}
         />
         <Panel position="top-left">
-          <div className="bg-white p-4 rounded-lg shadow-lg">
-            <h3 className="font-bold text-lg mb-2">{workflow.name}</h3>
-            <p className="text-sm text-gray-600">{workflow.description}</p>
-            <div className="mt-2 text-xs text-gray-500">
-              Version: {workflow.version} | Nodes: {workflow.nodes.length}
-            </div>
-          </div>
+          <Card className="min-w-[250px]">
+            <CardHeader className="p-4">
+              <CardTitle className="text-base">{workflow.name}</CardTitle>
+              <CardDescription className="text-xs">
+                {workflow.description}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <div className="flex gap-2 text-xs">
+                <Badge variant="secondary">v{workflow.version}</Badge>
+                <Badge variant="outline">{workflow.nodes.length} nodes</Badge>
+              </div>
+            </CardContent>
+          </Card>
         </Panel>
         {executionResult && (
           <Panel position="top-right">
-            <div className="bg-white p-4 rounded-lg shadow-lg max-w-xs">
-              <h4 className="font-bold mb-2">Execution Stats</h4>
-              <div className="text-sm space-y-1">
-                <div>
-                  Nodes executed:{" "}
-                  <span className="font-semibold">
-                    {executionResult.nodesExecuted.length}
-                  </span>
+            <Card className="min-w-[200px]">
+              <CardHeader className="p-4">
+                <CardTitle className="text-base">Execution Stats</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Nodes:</span>
+                  <Badge variant="default">{executionResult.nodesExecuted.length}</Badge>
                 </div>
-                <div>
-                  Spans collected:{" "}
-                  <span className="font-semibold">
-                    {executionResult.spans.length}
-                  </span>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Spans:</span>
+                  <Badge variant="default">{executionResult.spans.length}</Badge>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </Panel>
         )}
       </ReactFlow>

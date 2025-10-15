@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Moon, Sun, Monitor } from "lucide-react";
 
 type Theme = "light" | "dark" | "system";
 
@@ -72,44 +74,11 @@ export default function ThemeToggle() {
   const getThemeIcon = (currentTheme: Theme) => {
     switch (currentTheme) {
       case "light":
-        return (
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <circle cx="12" cy="12" r="5" />
-            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-          </svg>
-        );
+        return <Sun className="h-5 w-5" />;
       case "dark":
-        return (
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-          </svg>
-        );
+        return <Moon className="h-5 w-5" />;
       case "system":
-        return (
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-            <line x1="8" y1="21" x2="16" y2="21" />
-            <line x1="12" y1="17" x2="12" y2="21" />
-          </svg>
-        );
+        return <Monitor className="h-5 w-5" />;
     }
   };
 
@@ -129,17 +98,17 @@ export default function ThemeToggle() {
   };
 
   return (
-    <button
+    <Button
+      variant="secondary"
+      size="default"
       onClick={cycleTheme}
-      className="theme-toggle group"
+      className="gap-2"
       title={`Current theme: ${theme}. Click to cycle through themes.`}
     >
-      <div className="theme-toggle-icon">
-        {getThemeIcon(theme)}
-      </div>
+      {getThemeIcon(theme)}
       <span className="text-sm font-medium capitalize">
         {theme}
       </span>
-    </button>
+    </Button>
   );
 }
