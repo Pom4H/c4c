@@ -4,9 +4,9 @@
  * This uses the framework's core workflow runtime with mock procedures
  */
 
-import { executeWorkflow as coreExecuteWorkflow } from "@tsdev/workflow";
 import { createMockRegistry } from "./mock-registry";
 import { SpanCollector } from "./span-collector";
+import { bindCollector, forceFlush, clearActiveCollector } from "./otel";
 import type { WorkflowDefinition, WorkflowExecutionResult } from "./types";
 
 // Create singleton mock registry
@@ -25,18 +25,17 @@ export async function executeWorkflow(
   initialInput: Record<string, unknown> = {}
 ): Promise<WorkflowExecutionResult> {
   const collector = new SpanCollector();
-  
-  // Create workflow span
-  const workflowSpanId = collector.startSpan("workflow.execute", {
-    "workflow.id": workflow.id,
-    "workflow.name": workflow.name,
-  });
+  // Bind OTEL exporter to our collector and ensure provider is installed
+  await bindCollector(collector);
 
   try {
+    // Dynamically import core after installing provider so tracer binds correctly
+    const { executeWorkflow: coreExecuteWorkflow } = await import("@tsdev/workflow");
     // Execute using framework core runtime
     const result = await coreExecuteWorkflow(workflow, mockRegistry, initialInput);
-    
-    collector.endSpan(workflowSpanId, result.status === "completed" ? "OK" : "ERROR");
+    // Ensure all spans are flushed
+    await forceFlush();
+    clearActiveCollector();
     
     // Add collected spans for UI visualization
     return {
@@ -45,11 +44,8 @@ export async function executeWorkflow(
       spans: collector.getSpans(),
     };
   } catch (error) {
-    collector.endSpan(
-      workflowSpanId,
-      "ERROR",
-      error instanceof Error ? error.message : String(error)
-    );
+    await forceFlush();
+    clearActiveCollector();
     throw error;
   }
 }
