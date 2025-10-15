@@ -1,34 +1,26 @@
 {
-  "name": "@tsdev/adapters",
+  "name": "@tsdev/git",
   "version": "0.1.0",
-  "description": "Transport adapters (HTTP, CLI, REST) for tsdev",
   "type": "module",
+  "description": "Git and GitHub integration for AI agents managing workflows",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "default": "./dist/index.js"
     }
   },
   "scripts": {
     "build": "tsc",
+    "dev": "tsc --watch",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
   },
-  "keywords": [
-    "http",
-    "cli",
-    "rest",
-    "adapters"
-  ],
-  "author": "",
-  "license": "MIT",
   "dependencies": {
-    "@tsdev/core": "workspace:*",
     "@tsdev/workflow": "workspace:*",
-    "@tsdev/generators": "workspace:*",
-    "@tsdev/git": "workspace:*"
+    "simple-git": "^3.27.0",
+    "@octokit/rest": "^21.0.2"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",

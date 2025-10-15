@@ -3,6 +3,7 @@ import { createExecutionContext, executeProcedure, type Registry } from "@tsdev/
 import { generateOpenAPIJSON } from "@tsdev/generators";
 import { handleRESTRequest, listRESTRoutes } from "./rest.js";
 import { handleWorkflowRequest } from "./workflow-http.js";
+import { handleAgentRequest } from "./agent-http.js";
 
 /**
  * HTTP adapter for tsdev
@@ -94,6 +95,12 @@ export function createHttpServer(registry: Registry, port = 3000) {
 			return;
 		}
 
+		// Try agent endpoints
+		const agentHandled = await handleAgentRequest(req, res, registry);
+		if (agentHandled) {
+			return;
+		}
+
 		// Try workflow endpoints
 		const workflowHandled = await handleWorkflowRequest(req, res, registry);
 		if (workflowHandled) {
@@ -162,6 +169,12 @@ export function createHttpServer(registry: Registry, port = 3000) {
 		console.log(`   OpenAPI JSON:     http://localhost:${port}/openapi.json`);
 		console.log(`   Procedures:       http://localhost:${port}/procedures`);
 		console.log(`   REST Routes:      http://localhost:${port}/routes`);
+		console.log(`\n🤖 AI Agent:`);
+		console.log(`   Handle Task:      POST http://localhost:${port}/agent/task`);
+		console.log(`   Search Workflow:  GET  http://localhost:${port}/agent/workflow/search?task=...`);
+		console.log(`   Save Workflow:    POST http://localhost:${port}/agent/workflow/save`);
+		console.log(`   Improve Workflow: POST http://localhost:${port}/agent/workflow/improve`);
+		console.log(`   List Workflows:   GET  http://localhost:${port}/agent/workflows`);
 		console.log(`\n🔄 Workflow:`);
 		console.log(`   Node Palette:     http://localhost:${port}/workflow/palette`);
 		console.log(`   UI Config:        http://localhost:${port}/workflow/ui-config`);
