@@ -18,6 +18,8 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { WorkflowDefinition, TraceSpan } from "@tsdev/workflow";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 interface WorkflowVisualizerProps {
   workflow: WorkflowDefinition;
@@ -27,11 +29,15 @@ interface WorkflowVisualizerProps {
   };
 }
 
-const nodeColors = {
-  procedure: "#4ade80",
-  condition: "#fbbf24",
-  parallel: "#818cf8",
-  sequential: "#60a5fa",
+// Node type colors
+const getNodeTypeColor = (type: string) => {
+  const colors = {
+    procedure: "#4ade80",  // Green
+    condition: "#fbbf24",  // Yellow
+    parallel: "#818cf8",   // Purple
+    sequential: "#60a5fa", // Blue
+  } as const;
+  return colors[type as keyof typeof colors] || "#60a5fa";
 };
 
 export default function WorkflowVisualizer({
@@ -64,7 +70,7 @@ export default function WorkflowVisualizer({
           label: (
             <div className="text-center">
               <div className="font-bold">{node.id}</div>
-              <div className="text-xs text-gray-600">
+              <div className="text-xs text-muted-foreground">
                 {node.type}
                 {node.procedureName && (
                   <>
@@ -74,7 +80,7 @@ export default function WorkflowVisualizer({
                 )}
               </div>
               {nodeSpan && (
-                <div className="text-xs mt-1 text-blue-600">
+                <div className="text-xs mt-1 text-primary">
                   {nodeSpan.duration}ms
                 </div>
               )}
@@ -83,13 +89,14 @@ export default function WorkflowVisualizer({
         },
         style: {
           background: isExecuted
-            ? nodeColors[node.type] || "#60a5fa"
+            ? getNodeTypeColor(node.type)
             : "#e5e7eb",
           border: `2px solid ${nodeSpan?.status.code === "ERROR" ? "#ef4444" : "#1e40af"}`,
           borderRadius: "8px",
           padding: "10px",
           width: 180,
           opacity: isExecuted ? 1 : 0.5,
+          color: isExecuted ? "#ffffff" : "#000000",
         },
       });
     });
@@ -187,8 +194,29 @@ export default function WorkflowVisualizer({
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   return (
-    <div style={{ width: "100%", height: "600px" }}>
-      <ReactFlow
+    <div className="space-y-4">
+      {/* Legend */}
+      <div className="flex gap-4 text-xs flex-wrap">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded" style={{ background: "#4ade80" }} />
+          <span>Procedure</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded" style={{ background: "#fbbf24" }} />
+          <span>Condition</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded" style={{ background: "#818cf8" }} />
+          <span>Parallel</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded" style={{ background: "#60a5fa" }} />
+          <span>Sequential</span>
+        </div>
+      </div>
+      
+      <div style={{ width: "100%", height: "600px" }}>
+        <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -205,36 +233,42 @@ export default function WorkflowVisualizer({
           }}
         />
         <Panel position="top-left">
-          <div className="bg-white p-4 rounded-lg shadow-lg">
-            <h3 className="font-bold text-lg mb-2">{workflow.name}</h3>
-            <p className="text-sm text-gray-600">{workflow.description}</p>
-            <div className="mt-2 text-xs text-gray-500">
-              Version: {workflow.version} | Nodes: {workflow.nodes.length}
-            </div>
-          </div>
+          <Card className="min-w-[250px]">
+            <CardHeader className="p-4">
+              <CardTitle className="text-base">{workflow.name}</CardTitle>
+              <CardDescription className="text-xs">
+                {workflow.description}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <div className="flex gap-2 text-xs">
+                <Badge variant="secondary">v{workflow.version}</Badge>
+                <Badge variant="outline">{workflow.nodes.length} nodes</Badge>
+              </div>
+            </CardContent>
+          </Card>
         </Panel>
         {executionResult && (
           <Panel position="top-right">
-            <div className="bg-white p-4 rounded-lg shadow-lg max-w-xs">
-              <h4 className="font-bold mb-2">Execution Stats</h4>
-              <div className="text-sm space-y-1">
-                <div>
-                  Nodes executed:{" "}
-                  <span className="font-semibold">
-                    {executionResult.nodesExecuted.length}
-                  </span>
+            <Card className="min-w-[200px]">
+              <CardHeader className="p-4">
+                <CardTitle className="text-base">Execution Stats</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Nodes:</span>
+                  <Badge variant="default">{executionResult.nodesExecuted.length}</Badge>
                 </div>
-                <div>
-                  Spans collected:{" "}
-                  <span className="font-semibold">
-                    {executionResult.spans.length}
-                  </span>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Spans:</span>
+                  <Badge variant="default">{executionResult.spans.length}</Badge>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </Panel>
         )}
       </ReactFlow>
+      </div>
     </div>
   );
 }

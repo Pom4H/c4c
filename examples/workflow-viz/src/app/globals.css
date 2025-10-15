@@ -1,30 +1,30 @@
 @import "tailwindcss";
+
+@plugin "tailwindcss-animate";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
   /* Modern OKLCH color system for light mode */
-  --background: oklch(0.98 0 0);
-  --foreground: oklch(0.15 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0 0);
+  --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0 0);
-  --primary: oklch(0.45 0.15 265);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.92 0 0);
-  --secondary-foreground: oklch(0.15 0 0);
-  --muted: oklch(0.94 0 0);
-  --muted-foreground: oklch(0.5 0 0);
-  --accent: oklch(0.55 0.2 220);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.55 0.22 25);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.88 0 0);
-  --input: oklch(0.88 0 0);
-  --ring: oklch(0.45 0.15 265);
-  
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+
   /* Workflow-specific colors */
   --workflow-graph: oklch(0.6 0.18 220);
   --workflow-gantt: oklch(0.55 0.2 160);
@@ -32,45 +32,65 @@
   --workflow-success: oklch(0.55 0.2 140);
   --workflow-error: oklch(0.55 0.22 25);
   --workflow-pending: oklch(0.6 0.15 265);
-  
+
   /* Chart colors for span visualization */
-  --chart-1: oklch(0.55 0.2 220);
-  --chart-2: oklch(0.6 0.18 160);
-  --chart-3: oklch(0.65 0.15 85);
-  --chart-4: oklch(0.5 0.22 300);
-  --chart-5: oklch(0.58 0.2 40);
-  
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+
   /* Span type colors */
   --span-procedure: oklch(0.55 0.2 140);
   --span-condition: oklch(0.65 0.2 70);
   --span-parallel: oklch(0.58 0.2 280);
   --span-sequential: oklch(0.55 0.18 220);
-  
-  --radius: 0.5rem;
+
+  --radius: 0.625rem;
+
+  --background: oklch(1 0 0);
+
+  --foreground: oklch(0.145 0 0);
+
+  --sidebar: oklch(0.985 0 0);
+
+  --sidebar-foreground: oklch(0.145 0 0);
+
+  --sidebar-primary: oklch(0.205 0 0);
+
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+
+  --sidebar-accent: oklch(0.97 0 0);
+
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+
+  --sidebar-border: oklch(0.922 0 0);
+
+  --sidebar-ring: oklch(0.708 0 0);
 }
 
 .dark {
   /* Modern OKLCH color system for dark mode */
-  --background: oklch(0.12 0 0);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.15 0 0);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.15 0 0);
-  --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.6 0.2 265);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.22 0 0);
-  --secondary-foreground: oklch(0.95 0 0);
-  --muted: oklch(0.2 0 0);
-  --muted-foreground: oklch(0.6 0 0);
-  --accent: oklch(0.55 0.2 220);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.5 0.22 25);
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.22 0 0);
-  --input: oklch(0.22 0 0);
-  --ring: oklch(0.6 0.2 265);
-  
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+
   /* Workflow-specific colors for dark mode */
   --workflow-graph: oklch(0.65 0.2 220);
   --workflow-gantt: oklch(0.6 0.22 160);
@@ -78,25 +98,33 @@
   --workflow-success: oklch(0.6 0.22 140);
   --workflow-error: oklch(0.5 0.22 25);
   --workflow-pending: oklch(0.65 0.18 265);
-  
+
   /* Chart colors for dark mode */
-  --chart-1: oklch(0.6 0.22 220);
-  --chart-2: oklch(0.65 0.2 160);
-  --chart-3: oklch(0.7 0.18 85);
-  --chart-4: oklch(0.55 0.24 300);
-  --chart-5: oklch(0.62 0.22 40);
-  
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+
   /* Span type colors for dark mode */
   --span-procedure: oklch(0.6 0.22 140);
   --span-condition: oklch(0.7 0.22 70);
   --span-parallel: oklch(0.62 0.22 280);
   --span-sequential: oklch(0.6 0.2 220);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
 }
 
 @theme inline {
   --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  
+
   /* Color mappings */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -117,14 +145,14 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  
+
   /* Chart colors */
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  
+
   /* Workflow colors */
   --color-workflow-graph: var(--workflow-graph);
   --color-workflow-gantt: var(--workflow-gantt);
@@ -132,119 +160,53 @@
   --color-workflow-success: var(--workflow-success);
   --color-workflow-error: var(--workflow-error);
   --color-workflow-pending: var(--workflow-pending);
-  
+
   /* Span colors */
   --color-span-procedure: var(--span-procedure);
   --color-span-condition: var(--span-condition);
   --color-span-parallel: var(--span-parallel);
   --color-span-sequential: var(--span-sequential);
-  
+
   /* Radius values */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  
+
   html {
     @apply antialiased;
   }
-  
+
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
-  
+
   /* Smooth transitions for theme changes */
   * {
     transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration: 150ms;
   }
-  
+
   /* Prevent flash of unstyled content during theme switching */
   html {
     color-scheme: light dark;
-  }
-}
-
-@layer components {
-  /* Workflow-specific component styles */
-  .workflow-card {
-    @apply bg-card text-card-foreground rounded-lg border border-border shadow-sm;
-  }
-  
-  .workflow-button-primary {
-    @apply bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg px-4 py-2 font-semibold transition-colors;
-  }
-  
-  .workflow-button-secondary {
-    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-lg px-4 py-2 font-medium transition-colors;
-  }
-  
-  .workflow-input {
-    @apply bg-background border border-input rounded-lg px-4 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring;
-  }
-  
-  .workflow-tab {
-    @apply px-6 py-3 font-medium text-sm text-muted-foreground hover:text-foreground transition-colors;
-  }
-  
-  .workflow-tab-active {
-    @apply border-b-2 border-primary text-primary;
-  }
-  
-  /* Span visualization styles */
-  .span-bar-procedure {
-    @apply bg-[var(--span-procedure)] hover:opacity-90 transition-opacity;
-  }
-  
-  .span-bar-condition {
-    @apply bg-[var(--span-condition)] hover:opacity-90 transition-opacity;
-  }
-  
-  .span-bar-parallel {
-    @apply bg-[var(--span-parallel)] hover:opacity-90 transition-opacity;
-  }
-  
-  .span-bar-sequential {
-    @apply bg-[var(--span-sequential)] hover:opacity-90 transition-opacity;
-  }
-  
-  .span-bar-error {
-    @apply bg-destructive hover:opacity-90 transition-opacity;
-  }
-  
-  /* Status indicators */
-  .status-success {
-    @apply bg-[var(--workflow-success)] text-white;
-  }
-  
-  .status-error {
-    @apply bg-[var(--workflow-error)] text-white;
-  }
-  
-  .status-pending {
-    @apply bg-[var(--workflow-pending)] text-white;
-  }
-  
-  /* Theme toggle styles */
-  .theme-toggle {
-    @apply flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-all duration-200;
-  }
-  
-  .theme-toggle:hover {
-    @apply transform scale-105 shadow-md;
-  }
-  
-  .theme-toggle-icon {
-    @apply transition-transform duration-200 group-hover:scale-110;
   }
 }
 
@@ -267,30 +229,30 @@
     scrollbar-width: thin;
     scrollbar-color: oklch(0.5 0 0 / 0.3) transparent;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background-color: oklch(0.5 0 0 / 0.3);
     border-radius: 4px;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background-color: oklch(0.5 0 0 / 0.5);
   }
-  
+
   /* Gradient backgrounds for workflow sections */
   .gradient-workflow {
     @apply bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-950 dark:to-indigo-950;
   }
-  
+
   .gradient-card {
     @apply bg-gradient-to-br from-card via-card to-muted;
   }
