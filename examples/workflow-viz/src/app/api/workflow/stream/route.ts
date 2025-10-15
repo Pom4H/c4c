@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
       }, 15000);
 
       // Dynamic import to avoid initializing core tracer too early
-      const { subscribeToExecution } = await import("@tsdev/workflow/src/events");
+      const { subscribeToExecution } = await import("@tsdev/workflow");
       const unsubscribe = subscribeToExecution(executionId, (evt: WorkflowEvent) => {
         send(evt);
         // We don't close immediately; we'll send final result below
