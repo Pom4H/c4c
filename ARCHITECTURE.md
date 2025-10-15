@@ -134,10 +134,11 @@ The registry automatically discovers all procedures:
 ```typescript
 import { collectRegistry } from '@tsdev/core';
 
-const registry = await collectRegistry("./src/handlers");
+const registry = await collectRegistry(["./src/handlers", "./procedures"]);
 ```
 
 This scans all TypeScript files in the `src/handlers/` directory and registers any exports that match the `Procedure` interface.
+You can also keep custom integrations under `procedures/` — multi-path collection is supported.
 
 **No manual registration required!**
 

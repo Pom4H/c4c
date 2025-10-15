@@ -8,7 +8,7 @@
 export type { Contract, Procedure, Handler, Registry, ExecutionContext, Policy } from "./types.js";
 
 // Registry
-export { collectRegistry, getProcedure, listProcedures, describeRegistry } from "./registry.js";
+export { collectRegistry, collectRegistryFromPaths, getProcedure, listProcedures, describeRegistry } from "./registry.js";
 
 // Executor
 export { executeProcedure, createExecutionContext, applyPolicies } from "./executor.js";

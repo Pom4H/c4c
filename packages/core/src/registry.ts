@@ -5,34 +5,46 @@ import type { Procedure, Registry } from "./types.js";
  * Collects all procedures from handlers directory
  * This implements the "zero boilerplate, maximum reflection" principle
  */
-export async function collectRegistry(handlersPath = "src/handlers"): Promise<Registry> {
-	const registry: Registry = new Map();
+export async function collectRegistry(handlersPath: string | string[] = "src/handlers"): Promise<Registry> {
+    const paths = Array.isArray(handlersPath) ? handlersPath : [handlersPath];
+    return await collectRegistryFromPaths(paths);
+}
 
-	// Find all TypeScript files in handlers directory
-	const handlerFiles = globSync(`${handlersPath}/**/*.ts`, {
-		absolute: true,
-		ignore: ["**/*.test.ts", "**/*.spec.ts"],
-	});
+/**
+ * Collect procedures from multiple directories (e.g., ['src/handlers', 'procedures'])
+ */
+export async function collectRegistryFromPaths(handlersPaths: string[] = ["src/handlers", "procedures"]): Promise<Registry> {
+    const registry: Registry = new Map();
 
-	for (const file of handlerFiles) {
-		try {
-			// Dynamic import of handler module
-			const module = await import(file);
+    for (const basePath of handlersPaths) {
+        // Find all TypeScript files in the directory
+        const handlerFiles = globSync(`${basePath}/**/*.ts`, {
+            absolute: true,
+            ignore: ["**/*.test.ts", "**/*.spec.ts"],
+        });
 
-			// Extract all exported procedures
-			for (const [exportName, exportValue] of Object.entries(module)) {
-				if (isProcedure(exportValue)) {
-					const procedureName = exportValue.contract.name || exportName;
-					registry.set(procedureName, exportValue as Procedure);
-					console.log(`[Registry] Registered procedure: ${procedureName}`);
-				}
-			}
-		} catch (error) {
-			console.error(`[Registry] Failed to load handler from ${file}:`, error);
-		}
-	}
+        for (const file of handlerFiles) {
+            try {
+                const module = await import(file);
 
-	return registry;
+                for (const [exportName, exportValue] of Object.entries(module)) {
+                    if (isProcedure(exportValue)) {
+                        const procedureName = (exportValue as Procedure).contract.name || exportName;
+                        // Last-write wins if duplicated across paths; log a warning
+                        if (registry.has(procedureName)) {
+                            console.warn(`[Registry] Duplicate procedure name '${procedureName}' discovered. Overwriting with definition from ${file}.`);
+                        }
+                        registry.set(procedureName, exportValue as Procedure);
+                        console.log(`[Registry] Registered procedure: ${procedureName}`);
+                    }
+                }
+            } catch (error) {
+                console.error(`[Registry] Failed to load handler from ${file}:`, error);
+            }
+        }
+    }
+
+    return registry;
 }
 
 /**

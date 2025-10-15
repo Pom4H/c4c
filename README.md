@@ -218,6 +218,22 @@ Release pipeline:
 - CI collects workflows from `workflows/**/*.{ts,js}` → validates → publishes as artifact/package.
 - Consumers can fetch workflows by id/version; agents can open PRs to evolve definitions.
 
+## 🧩 Custom procedures in repositories
+
+- Дополнительно к `src/handlers/*` можно хранить интеграции в `procedures/**/*.{ts,js}`.
+- `collectRegistry()` теперь поддерживает несколько путей, например:
+
+```ts
+import { collectRegistryFromPaths } from '@tsdev/core';
+
+const registry = await collectRegistryFromPaths([
+  'src/handlers',
+  'procedures',
+]);
+```
+
+- Это позволяет держать системные процедуры отдельно от доменных интеграций и подключать их по мере необходимости.
+
 ## 🔌 GitHub Integration (delivery via code/workflows and agent edits)
 
 - Use GitHub Actions to generate and publish API docs on each push:
