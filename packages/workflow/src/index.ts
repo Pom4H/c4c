@@ -32,3 +32,6 @@ export { subscribeToExecution } from "./events.js";
 
 // Re-export selected core types for app/example convenience
 export type { Registry, Procedure } from "@tsdev/core";
+
+// Workflow collection utilities
+export { collectWorkflows, listWorkflows, getWorkflowById } from "./workflow-collector.js";

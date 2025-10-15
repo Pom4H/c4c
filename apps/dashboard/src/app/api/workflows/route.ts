@@ -1,15 +1,9 @@
 import { NextResponse } from 'next/server';
-
-const RUNTIME_URL = process.env.RUNTIME_URL || 'http://localhost:3000';
+import { collectWorkflows, listWorkflows } from '@tsdev/workflow';
 
 export async function GET() {
-  // Placeholder: runtime may expose a workflow registry endpoint in future
-  // For now, return empty list or proxy to a custom endpoint when available
-  try {
-    const res = await fetch(`${RUNTIME_URL}/workflow/ui-config`, { cache: 'no-store' });
-    const json = await res.json();
-    return NextResponse.json({ uiConfig: json });
-  } catch {
-    return NextResponse.json({ uiConfig: { nodes: [], categories: [], connections: [] } });
-  }
+  // Load workflows from an example project in this monorepo
+  // Load from published example barrel file path
+  const map = await collectWorkflows('examples/workflows/src');
+  return NextResponse.json({ workflows: listWorkflows(map) });
 }
