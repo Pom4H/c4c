@@ -1,0 +1,66 @@
+# Fly.io configuration for tsdev API
+# Deploy with: fly launch / fly deploy
+
+app = "tsdev-api"
+primary_region = "iad"  # US East (Virginia)
+
+# Kill signal (SIGINT or SIGTERM)
+kill_signal = "SIGINT"
+kill_timeout = 10
+
+# Processes
+[processes]
+  app = "node --import tsx/esm src/apps/http.ts"
+
+# Build configuration
+[build]
+  [build.args]
+    NODE_VERSION = "20"
+
+# Environment variables
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+  LOG_LEVEL = "info"
+
+# HTTP service
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"    # Automatically stop when idle
+  auto_start_machines = true     # Automatically start when needed
+  min_machines_running = 0       # Can scale to 0
+  processes = ["app"]
+
+  # Concurrency limits
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+# Health checks
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/health"
+
+# VM resources
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
+
+# Autoscaling
+[metrics]
+  port = 9091
+  path = "/metrics"
+
+# Regions to deploy (multi-region)
+# [[regions]]
+#   name = "iad"  # US East
+# [[regions]]
+#   name = "lhr"  # London
+# [[regions]]
+#   name = "nrt"  # Tokyo

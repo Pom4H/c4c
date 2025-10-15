@@ -735,6 +735,8 @@ pnpm dev  # http://localhost:3000
 
 - [PHILOSOPHY.md](./PHILOSOPHY.md) - Why AI agents need this
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - Technical implementation
+- [DEPLOYMENT.md](./DEPLOYMENT.md) - How to deploy applications
+- [QUICK_DEPLOY.md](./QUICK_DEPLOY.md) - Quick deployment guide
 
 ---
 

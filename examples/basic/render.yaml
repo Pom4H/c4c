@@ -1,0 +1,38 @@
+# Render.com configuration
+# Deploy via dashboard or: render-cli deploy
+
+services:
+  - type: web
+    name: tsdev-api
+    runtime: node
+    region: oregon
+    plan: starter  # free, starter, standard, pro
+    branch: main
+    
+    # Build
+    buildCommand: pnpm install && pnpm --filter @tsdev/core build && pnpm --filter @tsdev/adapters build
+    
+    # Start
+    startCommand: node --import tsx/esm src/apps/http.ts
+    
+    # Health check
+    healthCheckPath: /health
+    
+    # Environment
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: LOG_LEVEL
+        value: info
+    
+    # Auto-deploy on push
+    autoDeploy: true
+    
+    # Scaling (for paid plans)
+    # scaling:
+    #   minInstances: 1
+    #   maxInstances: 3
+    #   targetMemoryPercent: 80
+    #   targetCPUPercent: 70

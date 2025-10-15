@@ -1,0 +1,200 @@
+# Serverless Framework configuration for AWS Lambda
+service: tsdev-api
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  memorySize: 512
+  timeout: 30
+  
+  environment:
+    NODE_ENV: production
+    STAGE: ${self:provider.stage}
+    LOG_LEVEL: ${env:LOG_LEVEL, 'info'}
+    
+  iam:
+    role:
+      statements:
+        # CloudWatch Logs
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: 
+            - 'arn:aws:logs:*:*:*'
+        
+        # X-Ray tracing
+        - Effect: Allow
+          Action:
+            - xray:PutTraceSegments
+            - xray:PutTelemetryRecords
+          Resource: '*'
+
+functions:
+  api:
+    handler: dist/lambda-handler.handler
+    description: tsdev API Lambda handler
+    events:
+      # HTTP API Gateway v2 (cheaper, recommended)
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+      
+      # GET /procedures
+      - httpApi:
+          path: /procedures
+          method: GET
+    
+    # Environment variables per function
+    environment:
+      FUNCTION_NAME: api
+    
+    # Reserved concurrency (optional, prevents runaway costs)
+    # reservedConcurrency: 10
+    
+    # Provisioned concurrency (for low latency, costs more)
+    # provisionedConcurrency: 2
+    
+    # VPC config (if accessing RDS, ElastiCache, etc)
+    # vpc:
+    #   securityGroupIds:
+    #     - sg-xxxxx
+    #   subnetIds:
+    #     - subnet-xxxxx
+    #     - subnet-yyyyy
+
+  # Separate function for workflows (if needed)
+  workflow:
+    handler: dist/workflow-lambda.handler
+    description: Workflow execution handler
+    timeout: 60  # Workflows may take longer
+    memorySize: 1024
+    events:
+      - httpApi:
+          path: /workflow/{proxy+}
+          method: ANY
+
+# Package configuration
+package:
+  individually: true
+  patterns:
+    # Include
+    - 'dist/**'
+    - 'node_modules/**'
+    # Exclude
+    - '!node_modules/.cache/**'
+    - '!node_modules/*/test/**'
+    - '!node_modules/*/tests/**'
+    - '!.git/**'
+    - '!.github/**'
+    - '!src/**'
+    - '!*.md'
+
+# Plugins
+plugins:
+  - serverless-esbuild
+  - serverless-offline  # For local testing
+
+custom:
+  # esbuild configuration
+  esbuild:
+    bundle: true
+    minify: true
+    sourcemap: true
+    target: 'node20'
+    platform: 'node'
+    format: 'cjs'
+    external:
+      - '@aws-sdk/*'
+    exclude:
+      - 'aws-sdk'
+    
+  # Serverless Offline configuration (local development)
+  serverless-offline:
+    httpPort: 3000
+    lambdaPort: 3002
+    
+  # Stages configuration
+  stages:
+    dev:
+      memorySize: 256
+      timeout: 15
+    staging:
+      memorySize: 512
+      timeout: 30
+    production:
+      memorySize: 1024
+      timeout: 30
+      provisionedConcurrency: 2
+
+# CloudFormation resources
+resources:
+  Resources:
+    # API Gateway Custom Domain (optional)
+    # ApiDomainName:
+    #   Type: AWS::ApiGatewayV2::DomainName
+    #   Properties:
+    #     DomainName: api.yourdomain.com
+    #     DomainNameConfigurations:
+    #       - EndpointType: REGIONAL
+    #         CertificateArn: arn:aws:acm:region:account:certificate/xxxxx
+    
+    # CloudWatch Log Group with retention
+    ApiLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /aws/lambda/${self:service}-${self:provider.stage}-api
+        RetentionInDays: 14
+    
+    WorkflowLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /aws/lambda/${self:service}-${self:provider.stage}-workflow
+        RetentionInDays: 14
+    
+    # CloudWatch Alarms
+    ApiErrorsAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmDescription: Alert when API errors exceed threshold
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        Statistic: Sum
+        Period: 300
+        EvaluationPeriods: 1
+        Threshold: 10
+        ComparisonOperator: GreaterThanThreshold
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-api
+    
+    ApiThrottlesAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmDescription: Alert when API throttles occur
+        MetricName: Throttles
+        Namespace: AWS/Lambda
+        Statistic: Sum
+        Period: 300
+        EvaluationPeriods: 1
+        Threshold: 5
+        ComparisonOperator: GreaterThanThreshold
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-api
+
+  Outputs:
+    ApiUrl:
+      Description: API Gateway endpoint URL
+      Value:
+        Fn::Sub: https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
+    
+    ApiId:
+      Description: API Gateway ID
+      Value:
+        Ref: HttpApi

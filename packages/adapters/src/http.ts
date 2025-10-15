@@ -21,12 +21,51 @@ export function createHttpServer(registry: Registry, port = 3000) {
 			return;
 		}
 
-		// Health check
-		if (req.url === "/health" && req.method === "GET") {
-			res.writeHead(200, { "Content-Type": "application/json" });
-			res.end(JSON.stringify({ status: "ok" }));
-			return;
-		}
+	// Health check (liveness probe)
+	if (req.url === "/health" && req.method === "GET") {
+		res.writeHead(200, { "Content-Type": "application/json" });
+		res.end(JSON.stringify({ 
+			status: "healthy",
+			timestamp: new Date().toISOString(),
+			uptime: process.uptime(),
+			version: process.env.npm_package_version || "unknown",
+		}));
+		return;
+	}
+
+	// Readiness check (readiness probe)
+	if (req.url === "/ready" && req.method === "GET") {
+		// Check if registry is ready
+		const isReady = registry.size > 0;
+		const statusCode = isReady ? 200 : 503;
+		
+		res.writeHead(statusCode, { "Content-Type": "application/json" });
+		res.end(JSON.stringify({ 
+			ready: isReady,
+			procedures: registry.size,
+			timestamp: new Date().toISOString(),
+		}));
+		return;
+	}
+
+	// Detailed status (for monitoring)
+	if (req.url === "/status" && req.method === "GET") {
+		res.writeHead(200, { "Content-Type": "application/json" });
+		res.end(JSON.stringify({ 
+			status: "operational",
+			timestamp: new Date().toISOString(),
+			uptime: process.uptime(),
+			memory: process.memoryUsage(),
+			version: process.env.npm_package_version || "unknown",
+			nodeVersion: process.version,
+			procedures: {
+				total: registry.size,
+				names: Array.from(registry.keys()),
+			},
+			environment: process.env.NODE_ENV || "development",
+		}));
+		return;
+	}
 
 		// List all procedures (introspection endpoint)
 		if (req.url === "/procedures" && req.method === "GET") {
