@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 import { executeWorkflow } from "@/lib/workflow/runtime";
-import { subscribeToExecution, type WorkflowEvent } from "@tsdev/workflow";
+import type { WorkflowEvent } from "@tsdev/workflow";
 import {
   mathWorkflow,
   conditionalWorkflow,
@@ -47,7 +47,9 @@ export async function GET(req: NextRequest) {
         controller.enqueue(encoder.encode(`: keep-alive\n\n`));
       }, 15000);
 
-      const unsubscribe = subscribeToExecution(executionId, (evt) => {
+      // Dynamic import to avoid initializing core tracer too early
+      const { subscribeToExecution } = await import("@tsdev/workflow/src/events");
+      const unsubscribe = subscribeToExecution(executionId, (evt: WorkflowEvent) => {
         send(evt);
         // We don't close immediately; we'll send final result below
       });

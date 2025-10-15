@@ -101,11 +101,7 @@ export default function Home() {
           es.close();
           eventSourceRef.current = null;
           setIsExecutingLive(false);
-        } else if (
-          data.type === "workflow.completed" ||
-          data.type === "workflow.failed" ||
-          data.type === "workflow.paused"
-        ) {
+        } else if (data.type === "workflow.failed") {
           es.close();
           eventSourceRef.current = null;
           setIsExecutingLive(false);
