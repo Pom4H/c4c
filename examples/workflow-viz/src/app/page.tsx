@@ -6,7 +6,7 @@
  * Pure UI component - all logic handled by framework hooks and API routes
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import WorkflowVisualizer from "@/components/WorkflowVisualizer";
 import TraceViewer from "@/components/TraceViewer";
 import SpanGanttChart from "@/components/SpanGanttChart";
@@ -21,17 +21,28 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CheckCircle2, XCircle, Loader2, Play, AlertTriangle } from "lucide-react";
+import type { WorkflowEvent, WorkflowExecutionResult, TraceSpan } from "@tsdev/workflow";
 
 export default function Home() {
 	const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>("");
 	const [activeTab, setActiveTab] = useState<"graph" | "trace" | "gantt">("graph");
+  const [liveNodesExecuted, setLiveNodesExecuted] = useState<string[]>([]);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const [finalResult, setFinalResult] = useState<WorkflowExecutionResult | null>(null);
+  const [isExecutingLive, setIsExecutingLive] = useState(false);
 
 	// Use framework hooks for workflow management
 	const { workflows, fetchWorkflows } = useWorkflows();
 	const { definition, fetchDefinition } = useWorkflowDefinition(selectedWorkflowId);
-	const { execute, result, isExecuting, error } = useWorkflow({
-		onSuccess: () => setActiveTab("graph"),
-	});
+  const { execute, result, isExecuting, error } = useWorkflow({
+    onSuccess: (res) => {
+      setFinalResult(res);
+      setActiveTab("graph");
+    },
+    onError: (err) => {
+      console.error(err);
+    },
+  });
 
 	const getErrorMessage = (err: unknown): string => {
 		if (err && typeof err === "object" && "message" in err) {
@@ -60,14 +71,64 @@ export default function Home() {
 		}
 	}, [selectedWorkflowId, fetchDefinition]);
 
-	const handleExecute = async () => {
-		if (!selectedWorkflowId) return;
-		try {
-			await execute(selectedWorkflowId);
-		} catch (err) {
-			console.error("Workflow execution failed:", err);
-		}
-	};
+  const handleExecute = async () => {
+    if (!selectedWorkflowId) return;
+    // Close previous stream if any
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    setLiveNodesExecuted([]);
+    setFinalResult(null);
+    setActiveTab("graph");
+    setIsExecutingLive(true);
+
+    const es = new EventSource(`/api/workflow/stream?id=${encodeURIComponent(selectedWorkflowId)}`);
+    eventSourceRef.current = es;
+
+    es.onmessage = () => {};
+
+    const onEvent = (evt: MessageEvent) => {
+      try {
+        const data: WorkflowEvent = JSON.parse(evt.data);
+        if (data.type === "node.started") {
+          setLiveNodesExecuted((prev) => (prev.includes(data.nodeId) ? prev : [...prev, data.nodeId]));
+        }
+        if (data.type === "workflow.result") {
+          // When SSE sends final result (with spans), update UI via existing hook contract
+          setFinalResult(data.result);
+          es.close();
+          eventSourceRef.current = null;
+          setIsExecutingLive(false);
+        } else if (
+          data.type === "workflow.completed" ||
+          data.type === "workflow.failed" ||
+          data.type === "workflow.paused"
+        ) {
+          es.close();
+          eventSourceRef.current = null;
+          setIsExecutingLive(false);
+        }
+      } catch (e) {
+        console.warn("Failed to parse SSE event", e);
+      }
+    };
+
+    // Register named events
+    const eventTypes = [
+      "workflow.started",
+      "workflow.completed",
+      "workflow.failed",
+      "workflow.paused",
+      "node.started",
+      "node.completed",
+      "workflow.result",
+    ];
+    for (const type of eventTypes) {
+      es.addEventListener(type, onEvent);
+    }
+  };
 
 	return (
 		<main className="min-h-screen gradient-workflow p-8">
@@ -116,14 +177,14 @@ export default function Home() {
 								</Select>
 							</div>
 
-							<div className="flex-shrink-0">
+                      <div className="flex-shrink-0">
 								<Button
 									onClick={handleExecute}
-									disabled={!selectedWorkflowId || isExecuting}
+                          disabled={!selectedWorkflowId || isExecuting || isExecutingLive}
 									className="mt-6"
 									size="lg"
 								>
-									{isExecuting ? (
+                          {isExecuting || isExecutingLive ? (
 										<>
 											<Loader2 className="mr-2 h-5 w-5 animate-spin" />
 											Executing...
@@ -139,30 +200,30 @@ export default function Home() {
 						</div>
 
 						{/* Execution status */}
-						{result && (
+                        {finalResult && (
 							<Alert
 								className="mt-4"
-								variant={result.status === "completed" ? "default" : "destructive"}
+                            variant={finalResult.status === "completed" ? "default" : "destructive"}
 							>
-								{result.status === "completed" ? (
+                            {finalResult.status === "completed" ? (
 									<CheckCircle2 className="h-5 w-5" />
 								) : (
 									<XCircle className="h-5 w-5" />
 								)}
 								<AlertTitle>
-									Execution {result.status}
+                              Execution {finalResult.status}
 								</AlertTitle>
 								<AlertDescription>
 									<div className="text-sm mt-1">
-										Duration: {result.executionTime}ms | Nodes executed:{" "}
-										{result.nodesExecuted.length} | Spans collected:{" "}
-										{result.spans?.length || 0}
+                                Duration: {finalResult.executionTime}ms | Nodes executed:{" "}
+                                {finalResult.nodesExecuted.length} | Spans collected:{" "}
+                                {finalResult.spans?.length || 0}
 									</div>
-									{result.error && (
+                              {finalResult.error && (
 								<div className="text-sm mt-2 flex items-start gap-2">
 									<AlertTriangle className="h-4 w-4 mt-0.5" />
 									<span>
-									  Error: {getErrorMessage(result.error)}
+                              Error: {getErrorMessage(finalResult.error)}
 									</span>
 								</div>
 									)}
@@ -171,7 +232,7 @@ export default function Home() {
 						)}
 
 						{/* Error display */}
-						{error && !result && (
+                        {error && !finalResult && (
 							<Alert variant="destructive" className="mt-4">
 								<XCircle className="h-5 w-5" />
 								<AlertTitle>Error</AlertTitle>
@@ -208,28 +269,32 @@ export default function Home() {
 						</TabsList>
 
 						<CardContent className="p-6">
-							<TabsContent value="graph" className="m-0">
+                  <TabsContent value="graph" className="m-0">
 								{definition && (
 									<WorkflowVisualizer
 										workflow={definition}
-										executionResult={
-											result
-												? {
-														nodesExecuted: result.nodesExecuted,
-														spans: result.spans || [],
-												  }
-												: undefined
-										}
+                        executionResult={
+                          finalResult
+                            ? {
+                                nodesExecuted: Array.from(
+                                  new Set([...(finalResult.nodesExecuted || []), ...liveNodesExecuted])
+                                ),
+                                spans: finalResult.spans || [],
+                              }
+                            : liveNodesExecuted.length > 0
+                            ? { nodesExecuted: liveNodesExecuted, spans: [] as TraceSpan[] }
+                            : undefined
+                        }
 									/>
 								)}
 							</TabsContent>
 
-							<TabsContent value="gantt" className="m-0">
-								<SpanGanttChart spans={result?.spans || []} />
+                  <TabsContent value="gantt" className="m-0">
+                    <SpanGanttChart spans={finalResult?.spans || []} />
 							</TabsContent>
 
-							<TabsContent value="trace" className="m-0">
-								<TraceViewer spans={result?.spans || []} />
+                  <TabsContent value="trace" className="m-0">
+                    <TraceViewer spans={finalResult?.spans || []} />
 							</TabsContent>
 						</CardContent>
 					</Tabs>
