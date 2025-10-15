@@ -224,6 +224,25 @@ const openapi = generateOpenAPISpec(registry, { title: "Service", version: "1.0.
 
 Outputs can be consumed by API gateways, clients, mock servers, and docs sites.
 
+## Workflows in Repositories
+
+Repositories follow a convention for storing workflow definitions for discovery and release:
+
+- Location: `workflows/**/*.{ts,js}` exporting `WorkflowDefinition` objects
+- Purpose: allow agents and developers to collaboratively evolve complex flows via PRs
+- Inference: the runtime discovers and registers workflows similarly to procedure registry
+- Composition: subworkflows are encouraged for decomposition and reuse
+
+Suggested helper (future):
+```ts
+// @tsdev/workflow
+export async function collectWorkflows(path = 'workflows'): Promise<Map<string, WorkflowDefinition>> { /* ... */ }
+```
+
+Release model:
+- CI validates workflows (`validateWorkflow`) and packages artifacts (JSON or ESM) with id/version
+- Downstream services fetch released workflows by id/version or pin to commit SHA
+
 ### Adapters (Transport Layer)
 
 Adapters bridge transports to the core:

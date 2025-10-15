@@ -190,6 +190,34 @@ pnpm dev:basic        # Basic HTTP/CLI example
 pnpm dev:workflows    # Workflow examples
 ```
 
+## 📁 Repository layout for workflows
+
+- Store composable, declarative workflows under `workflows/` in each repo.
+- Format: TypeScript modules exporting `WorkflowDefinition` objects (or JSON in future).
+- Agents primarily edit files in `workflows/*`, decomposing сложные процессы на подворкфлоу, рефакторя и детализируя.
+- The runtime/framework will infer and register workflows automatically alongside procedures.
+
+Example:
+```ts
+// workflows/onboarding.ts
+import type { WorkflowDefinition } from '@tsdev/workflow';
+
+export const onboarding: WorkflowDefinition = {
+  id: 'user.onboarding',
+  name: 'User Onboarding',
+  version: '1.0.0',
+  startNode: 'create',
+  nodes: [
+    { id: 'create', type: 'procedure', procedureName: 'users.create', next: 'email' },
+    { id: 'email', type: 'procedure', procedureName: 'emails.sendWelcome' }
+  ]
+};
+```
+
+Release pipeline:
+- CI collects workflows from `workflows/**/*.{ts,js}` → validates → publishes as artifact/package.
+- Consumers can fetch workflows by id/version; agents can open PRs to evolve definitions.
+
 ## 🔌 GitHub Integration (delivery via code/workflows and agent edits)
 
 - Use GitHub Actions to generate and publish API docs on each push:

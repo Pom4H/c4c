@@ -9,12 +9,14 @@
 - Add OpenTelemetry config presets and examples (console, OTLP exporter)
 - Improve examples: end-to-end flows across `basic`, `workflows`, `workflow-viz`, `chat-automation`
 - Documentation polish: Architecture, Philosophy, README alignment; add Generators and GitHub CI sections
+ - Repo convention: document `workflows/**/*` storage and validation flow
 
 ## 0.2.x — Developer experience (short-term)
 - CLI tooling: `tsdev` helper (scaffold contracts/handlers/apps, run servers)
 - Better runtime diagnostics: pretty errors, trace IDs in logs
 - Generators: improve OpenAPI output; JSON Schema export options; CLI command `tsdev generate openapi`
  - GitHub Runtime MVP: service that syncs repo and exposes agent tools (read/write, search, branch/PR)
+ - Workflows collector: `collectWorkflows()` helper; validation and listing APIs
 - React hooks: loading/error states, typed helpers, storybook examples
 - Policies: add `withCache`, `withTimeout`, `withCircuitBreaker`
 
@@ -22,6 +24,7 @@
 - New adapters: WebSocket (RPC over WS), background worker adapter
 - SDK generator (TypeScript) from registry/contracts; publish client library template
  - Git tools v2: PR review comments from agents; status events via SSE/WebSocket; policy guardrails
+ - Workflow packaging: emit versioned JSON/ESM artifacts; release notes generation
 - Graph visualization API for workflows (data model and serialization)
 - Contract evolution guidelines (breaking/backward-compatible changes)
 - Pluggable registry collectors (custom discovery strategies)
