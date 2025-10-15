@@ -3,252 +3,308 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue.svg)](https://www.typescriptlang.org/)
 [![Zod](https://img.shields.io/badge/Zod-Schema-green.svg)](https://zod.dev/)
 [![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-Enabled-orange.svg)](https://opentelemetry.io/)
-[![pnpm](https://img.shields.io/badge/pnpm-workspaces-yellow.svg)](https://pnpm.io/)
 
-> **Write once — describe forever.**  
-> Meta-level unification of application code through contracts, not transport or infrastructure.
+> **Write your business logic once.**  
+> Get HTTP API, CLI, OpenAPI docs, and visual workflows—automatically.
 
-## 🚀 Quick Start
+## What You Get
+
+Define a contract and handler:
+
+```typescript
+// contracts/math.ts
+export const addContract = {
+  name: "math.add",
+  input: z.object({ a: z.number(), b: z.number() }),
+  output: z.object({ result: z.number() })
+};
+
+// handlers/math.ts
+export const add: Procedure = {
+  contract: addContract,
+  handler: async (input) => ({ result: input.a + input.b })
+};
+```
+
+**Automatically available as:**
 
 ```bash
-# Install pnpm
-npm install -g pnpm
+# HTTP RPC
+curl -X POST http://localhost:3000/rpc/math.add \
+  -d '{"a": 5, "b": 3}'
 
-# Install dependencies
-pnpm install
+# REST (convention-based)
+# math.add → no REST equivalent (not CRUD)
 
-# Run example
-pnpm dev
+# CLI
+tsdev math.add --a 5 --b 3
+
+# Workflow node (visual composition)
+{
+  id: "add-step",
+  type: "procedure",
+  procedureName: "math.add"
+}
 ```
 
-Open http://localhost:3000 to see the workflow visualization example.
+**Plus:**
+- ✅ OpenAPI spec at `/openapi.json`
+- ✅ Swagger UI at `/docs`
+- ✅ Input/output validation (runtime)
+- ✅ Full OpenTelemetry tracing
+- ✅ Type safety (compile-time)
 
-## 📦 Monorepo Structure
+## Quick Start
 
-```
-tsdev/
-├── packages/
-│   ├── core/              # @tsdev/core - Core framework
-│   │   ├── types.ts       # Contract, Procedure, Registry
-│   │   ├── registry.ts    # Auto-discovery via collectRegistry()
-│   │   └── executor.ts    # Procedure execution
-│   │
-│   ├── workflow/          # @tsdev/workflow - Workflow system
-│   │   ├── types.ts       # WorkflowDefinition, WorkflowNode
-│   │   ├── runtime.ts     # executeWorkflow() with OpenTelemetry
-│   │   └── react/         # @tsdev/workflow/react - React hooks
-│   │       └── useWorkflow.ts
-│   │
-│   ├── adapters/          # @tsdev/adapters - Transport adapters
-│   │   ├── http.ts        # HTTP/RPC server
-│   │   ├── rest.ts        # RESTful routing
-│   │   └── cli.ts         # CLI interface
-│   │
-│   ├── policies/          # @tsdev/policies - Composable policies
-│   │   ├── withSpan.ts    # OpenTelemetry tracing
-│   │   ├── withRetry.ts   # Retry logic
-│   │   ├── withLogging.ts # Logging
-│   │   └── withRateLimit.ts
-│   │
-│   └── generators/        # @tsdev/generators - Code generation
-│       └── openapi.ts     # OpenAPI spec generation
-│
-└── examples/
-    ├── basic/             # Basic usage example
-    │   ├── contracts/     # Contract definitions
-    │   ├── handlers/      # Handler implementations
-    │   └── apps/          # HTTP server & CLI
-    │
-    ├── workflows/         # Workflow examples
-    │   └── src/           # Mock procedures & workflow definitions
-    │
-    └── workflow-viz/      # Next.js workflow visualization
-        └── src/           # React Flow visualization demo
-```
-
-## 🎯 Features
-
-- 🎯 **Contracts-first**: single source of truth for all interfaces
-- 🔄 **Transport-agnostic**: one handler works via RPC, REST, CLI, SDK, agents
-- 📝 **Self-describing**: automatic introspection and documentation
-- 📊 **Telemetry by design**: OpenTelemetry built into the domain model
-- 🔀 **Visual Workflows**: procedures become workflow nodes automatically
-- 🧩 **Composable**: extensibility through function composition
-- 📐 **Convention-driven**: code structure determines automation
-
-## 🏗️ Architecture
-
-### Core Framework (`@tsdev/core`)
-
-```typescript
-import { collectRegistry, executeProcedure, type Procedure, type Registry } from '@tsdev/core';
-```
-
-### Workflow System (`@tsdev/workflow`)
-
-```typescript
-import { executeWorkflow, type WorkflowDefinition } from '@tsdev/workflow';
-```
-
-### React Integration (`@tsdev/workflow/react`)
-
-```typescript
-import { useWorkflow } from '@tsdev/workflow/react';
-```
-
-### Transport Adapters (`@tsdev/adapters`)
-
-```typescript
-import { createHttpServer, runCli } from '@tsdev/adapters';
-```
-
-### Composable Policies (`@tsdev/policies`)
-
-```typescript
-import { withSpan, withRetry, withLogging, withRateLimit } from '@tsdev/policies';
-```
-
-## 📖 Documentation
-
-- [PHILOSOPHY.md](./PHILOSOPHY.md) - Core principles and design philosophy
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - System architecture and design
-
-## 🎨 Example Applications
-
-### Basic Example
-Demonstrates contracts-first development:
-```bash
-cd examples/basic
-pnpm install
-pnpm dev  # HTTP server on :3000
-```
-
-### Workflow Example
-Demonstrates workflow execution:
-```bash
-cd examples/workflows
-pnpm install
-pnpm dev  # Workflow server on :3001
-```
-
-### Workflow Visualization
-Next.js app with React Flow visualization:
-```bash
-cd examples/workflow-viz
-pnpm install
-pnpm dev  # Next.js on :3000
-```
-
-## 🛠️ Development
-
-### Install Dependencies
 ```bash
 pnpm install
+pnpm dev              # Workflow visualization (port 3000)
+pnpm dev:basic        # Basic HTTP/CLI example (port 3000)
 ```
 
-### Build All Packages
-```bash
-pnpm build
-```
+## Core Value Proposition
 
-### Lint
-```bash
-pnpm lint
-pnpm lint:fix
-```
+**Problem:** Building an API requires:
+- Defining routes/endpoints
+- Writing handlers
+- Adding validation
+- Creating documentation
+- Building CLI tools
+- Setting up tracing
+- Maintaining consistency across transports
 
-### Run Examples
-```bash
-pnpm dev              # Workflow visualization
-pnpm dev:basic        # Basic HTTP/CLI example
-pnpm dev:workflows    # Workflow examples
-```
+**Solution:** Define contracts once, get everything else automatically.
 
-## 📦 Package Exports
+### How It Works
 
-### `@tsdev/core`
-| Import | Module |
-|--------|--------|
-| `@tsdev/core` | Core types, registry, executor |
+1. **Auto-discovery via reflection**
+   ```typescript
+   const registry = await collectRegistry("./handlers");
+   // Scans handlers/*.ts and finds all Procedure exports
+   ```
 
-### `@tsdev/workflow`
-| Import | Module |
-|--------|--------|
-| `@tsdev/workflow` | Workflow runtime with OpenTelemetry |
-| `@tsdev/workflow/react` | React hooks for workflows |
+2. **Convention-based routing**
+   ```typescript
+   // Naming convention → REST endpoints
+   "users.create" → POST /users
+   "users.list"   → GET /users
+   "users.get"    → GET /users/:id
+   "users.update" → PUT /users/:id
+   "users.delete" → DELETE /users/:id
+   ```
 
-### `@tsdev/adapters`
-| Import | Module |
-|--------|--------|
-| `@tsdev/adapters` | HTTP, REST, CLI adapters |
+3. **Transport adapters**
+   ```typescript
+   createHttpServer(registry, 3000);  // HTTP + REST
+   runCli(registry);                  // CLI
+   executeWorkflow(workflow, registry); // Workflows
+   ```
 
-### `@tsdev/policies`
-| Import | Module |
-|--------|--------|
-| `@tsdev/policies` | Retry, logging, tracing, rate limiting |
+## Real-World Example
 
-### `@tsdev/generators`
-| Import | Module |
-|--------|--------|
-| `@tsdev/generators` | OpenAPI spec generation |
-
-## 🏆 Key Benefits
-
-### Contracts-First
 ```typescript
-// Define contract once
-const contract = {
+// contracts/users.ts
+export const createUserContract = {
   name: "users.create",
-  input: z.object({ name: z.string(), email: z.string() }),
-  output: z.object({ id: z.string(), name: z.string() }),
+  input: z.object({
+    name: z.string(),
+    email: z.string().email()
+  }),
+  output: z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string()
+  })
 };
 
-// Use everywhere: REST, CLI, SDK, Workflows
-```
-
-### Transport-Agnostic
-```typescript
-// Same handler, multiple transports
-const handler = async (input) => {
-  return await createUser(input);
+// handlers/users.ts
+export const createUser: Procedure = {
+  contract: createUserContract,
+  handler: async (input, context) => {
+    const user = await db.users.create(input);
+    return user;
+  }
 };
-
-// Available via:
-// - REST: POST /users
-// - CLI: tsdev users.create --name Alice
-// - Workflow: procedure node
-// - SDK: client.users.create()
 ```
 
-### OpenTelemetry by Design
+**Start server:**
 ```typescript
-// Automatic tracing in workflows
-const workflow = {
+// apps/http.ts
+const registry = await collectRegistry("./handlers");
+createHttpServer(registry, 3000);
+```
+
+**Available endpoints:**
+```bash
+# RPC style
+POST /rpc/users.create
+
+# REST style (auto-generated from name)
+POST /users
+
+# Documentation
+GET /docs            # Swagger UI
+GET /openapi.json    # OpenAPI spec
+GET /procedures      # List all procedures
+```
+
+## Workflows: Visual Composition
+
+Turn procedures into workflow nodes:
+
+```typescript
+const workflow: WorkflowDefinition = {
+  id: "user-onboarding",
+  name: "User Onboarding",
+  version: "1.0.0",
+  startNode: "create-user",
   nodes: [
-    { type: "procedure", procedureName: "users.create" },
-    { type: "procedure", procedureName: "emails.send" }
+    {
+      id: "create-user",
+      type: "procedure",
+      procedureName: "users.create",  // References your procedure
+      next: "send-welcome-email"
+    },
+    {
+      id: "send-welcome-email",
+      type: "procedure",
+      procedureName: "emails.sendWelcome",
+      next: "check-premium"
+    },
+    {
+      id: "check-premium",
+      type: "condition",
+      config: {
+        expression: "isPremium === true",
+        trueBranch: "premium-setup",
+        falseBranch: "basic-setup"
+      }
+    }
+    // ... more nodes
   ]
 };
 
-// Creates span hierarchy automatically
+const result = await executeWorkflow(workflow, registry);
+// Full OpenTelemetry tracing automatically
 ```
 
-## 🎯 Philosophy
+**Features:**
+- Sequential, parallel, and conditional execution
+- Pause/resume workflows
+- Full OpenTelemetry span hierarchy
+- Visual workflow editor (Next.js example included)
 
-1. **Contracts-first** - Contracts are the source of truth
-2. **Transport-agnostic** - One handler, multiple adapters
-3. **Self-describing** - Automatic introspection for SDKs and agents
-4. **Telemetry by default** - Every call is observable
-5. **Composable** - Behavior extends via functions, not framework
-6. **Convention-driven** - Structure → introspection → automation
+## Composability
 
-## 📚 Related
+Add cross-cutting concerns via function composition:
 
-- [OpenTelemetry](https://opentelemetry.io/) - Observability framework
-- [Zod](https://zod.dev/) - Schema validation
-- [pnpm](https://pnpm.io/) - Fast, disk space efficient package manager
+```typescript
+import { applyPolicies } from '@tsdev/core';
+import { withRetry, withLogging, withSpan, withRateLimit } from '@tsdev/policies';
 
-## 📄 License
+const handler = applyPolicies(
+  baseHandler,
+  withRetry({ maxAttempts: 3 }),
+  withLogging("users.create"),
+  withSpan("users.create"),
+  withRateLimit({ maxTokens: 10 })
+);
+```
+
+Policies are pure functions—no framework magic, no decorators, no classes.
+
+## Project Structure
+
+```
+your-app/
+├── src/
+│   ├── contracts/       # Contract definitions
+│   │   ├── users.ts
+│   │   └── math.ts
+│   │
+│   ├── handlers/        # Handler implementations
+│   │   ├── users.ts     # Export Procedure objects
+│   │   └── math.ts
+│   │
+│   └── apps/
+│       ├── http.ts      # HTTP server
+│       └── cli.ts       # CLI app
+│
+└── package.json
+```
+
+**That's it.** No controllers, no decorators, no route files.
+
+## Packages
+
+```
+@tsdev/core           # Contract, Procedure, Registry, Executor
+@tsdev/workflow       # Workflow runtime with OpenTelemetry
+@tsdev/adapters       # HTTP, REST, CLI adapters
+@tsdev/policies       # withRetry, withLogging, withSpan, etc.
+@tsdev/generators     # OpenAPI generation
+```
+
+## Examples
+
+### Basic Example
+Full HTTP + CLI app with math operations:
+```bash
+cd examples/basic
+pnpm install
+pnpm dev
+```
+
+### Workflows Example
+Workflow execution with mock procedures:
+```bash
+cd examples/workflows
+pnpm install
+pnpm dev
+```
+
+### Workflow Visualization
+Next.js + React Flow visual workflow editor:
+```bash
+cd examples/workflow-viz
+pnpm install
+pnpm dev
+```
+
+## Why tsdev?
+
+| Traditional Approach | tsdev Approach |
+|---------------------|----------------|
+| Define routes manually | Auto-generated from contracts |
+| Write OpenAPI by hand | Generated from Zod schemas |
+| Separate CLI implementation | Same handler for HTTP + CLI |
+| Add tracing to each function | OpenTelemetry built-in |
+| Maintain docs separately | Self-documenting contracts |
+| Build workflows from scratch | Compose procedures visually |
+
+## Philosophy
+
+**Contracts-first, not API-first.**
+
+Most frameworks design APIs as transport layers (REST/gRPC/GraphQL).  
+We design domain contracts—Zod schemas expressing business logic.
+
+**From contracts, everything else is derived:**
+- REST endpoints
+- CLI commands
+- OpenAPI specs
+- SDK clients
+- Workflow nodes
+- Agent interfaces
+
+See [PHILOSOPHY.md](./PHILOSOPHY.md) for deeper insights.
+
+## Documentation
+
+- [PHILOSOPHY.md](./PHILOSOPHY.md) - Why and how tsdev works
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - Technical deep dive
+
+## License
 
 MIT
 

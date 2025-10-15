@@ -1,343 +1,995 @@
 # tsdev Architecture
 
-This document explains the internal architecture of the tsdev framework.
+This document explains how tsdev is implemented internally.
 
-## Monorepo Structure
+---
+
+## System Overview
 
 ```
-tsdev/
-├── packages/
-│   ├── core/                    # @tsdev/core
-│   │   ├── src/
-│   │   │   ├── types.ts         # Contract, Procedure, Registry, Policy
-│   │   │   ├── registry.ts      # collectRegistry(), getProcedure()
-│   │   │   ├── executor.ts      # executeProcedure(), applyPolicies()
-│   │   │   └── index.ts
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   │
-│   ├── workflow/                # @tsdev/workflow
-│   │   ├── src/
-│   │   │   ├── types.ts         # WorkflowDefinition, WorkflowNode
-│   │   │   ├── runtime.ts       # executeWorkflow() with OpenTelemetry
-│   │   │   └── index.ts
-│   │   ├── react/               # @tsdev/workflow/react (sub-package)
-│   │   │   ├── src/
-│   │   │   │   ├── useWorkflow.ts  # React hooks
-│   │   │   │   └── index.ts
-│   │   │   ├── package.json
-│   │   │   └── tsconfig.json
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   │
-│   ├── adapters/                # @tsdev/adapters
-│   │   ├── src/
-│   │   │   ├── http.ts          # HTTP/RPC server
-│   │   │   ├── rest.ts          # RESTful routing
-│   │   │   ├── cli.ts           # CLI interface
-│   │   │   ├── workflow-http.ts # Workflow HTTP endpoints
-│   │   │   └── index.ts
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   │
-│   ├── policies/                # @tsdev/policies
-│   │   ├── src/
-│   │   │   ├── withSpan.ts      # OpenTelemetry tracing
-│   │   │   ├── withRetry.ts     # Retry logic
-│   │   │   ├── withLogging.ts   # Logging
-│   │   │   ├── withRateLimit.ts # Rate limiting
-│   │   │   └── index.ts
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   │
-│   └── generators/              # @tsdev/generators
-│       ├── src/
-│       │   ├── openapi.ts       # OpenAPI spec generation
-│       │   └── index.ts
-│       ├── package.json
-│       └── tsconfig.json
-│
-└── examples/
-    ├── basic/                   # Basic usage example
-    │   ├── src/
-    │   │   ├── contracts/       # Contract definitions
-    │   │   ├── handlers/        # Handler implementations
-    │   │   └── apps/            # HTTP server & CLI
-    │   ├── package.json
-    │   └── tsconfig.json
-    │
-    ├── workflows/               # Workflow examples
-    │   ├── src/
-    │   │   ├── mock-procedures.ts
-    │   │   ├── examples.ts
-    │   │   └── server.ts
-    │   ├── package.json
-    │   └── tsconfig.json
-    │
-    └── workflow-viz/            # Next.js visualization
-        └── src/                 # React Flow demo
+┌─────────────────────────────────────────────────────────┐
+│                    Transport Layer                       │
+│  (HTTP, CLI, WebSocket, gRPC, Message Queue, etc.)      │
+└───────────────┬─────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────┐
+│                    Adapter Layer                         │
+│        (@tsdev/adapters - thin translation)             │
+│  • Parse transport-specific input                        │
+│  • Create ExecutionContext                               │
+│  • Call executeProcedure()                               │
+│  • Format output                                         │
+└───────────────┬─────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────┐
+│                      Core Layer                          │
+│              (@tsdev/core - framework)                   │
+│  • Contract validation (Zod)                             │
+│  • Procedure execution                                   │
+│  • Policy composition                                    │
+│  • Registry management                                   │
+└───────────────┬─────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────┐
+│                   Business Logic                         │
+│               (your handlers/)                           │
+│  • Pure functions: input → output                        │
+│  • No transport awareness                                │
+│  • Fully testable in isolation                           │
+└─────────────────────────────────────────────────────────┘
 ```
 
-## Core Concepts
+---
 
-### Contracts (Single Source of Truth)
+## Core Types
 
-Contracts are Zod schemas that define:
-- **Input schema**: What data the procedure accepts
-- **Output schema**: What data the procedure returns
-- **Metadata**: Tags, rate limits, descriptions, etc.
+### Contract
+
+The foundation of everything:
 
 ```typescript
-import { z } from 'zod';
-import type { Contract } from '@tsdev/core';
-
-const createUserContract: Contract = {
-  name: "users.create",
-  description: "Create a new user",
-  input: z.object({
-    name: z.string(),
-    email: z.string().email(),
-  }),
-  output: z.object({
-    id: z.string(),
-    name: z.string(),
-    email: z.string(),
-    createdAt: z.string(),
-  }),
-  metadata: {
-    tags: ["users", "write"],
-  },
-};
-```
-
-### Procedures (Contract + Handler)
-
-A procedure combines a contract with a handler function:
-
-```typescript
-import type { Procedure } from '@tsdev/core';
-
-const createUser: Procedure = {
-  contract: createUserContract,
-  handler: async (input, context) => {
-    // Business logic here
-    return { id: "...", name: input.name, ... };
-  },
-};
-```
-
-### Registry (Self-Describing)
-
-The registry automatically discovers all procedures:
-
-```typescript
-import { collectRegistry } from '@tsdev/core';
-
-const registry = await collectRegistry("./handlers");
-```
-
-This scans all TypeScript files in the `handlers/` directory and registers any exports that match the `Procedure` interface.
-
-**No manual registration required!**
-
-### Execution Context
-
-Every procedure receives a context:
-
-```typescript
-interface ExecutionContext {
-  requestId: string;      // Unique request ID
-  timestamp: Date;        // Request timestamp
-  metadata: Record<...>;  // Transport-specific metadata
+interface Contract<TInput = unknown, TOutput = unknown> {
+  name: string;              // e.g., "users.create"
+  description?: string;
+  input: z.ZodType<TInput>;  // Zod schema
+  output: z.ZodType<TOutput>;
+  metadata?: Record<string, unknown>;  // Arbitrary metadata
 }
 ```
 
-The adapter populates metadata with transport-specific information (HTTP headers, CLI args, etc.).
+**What it enables:**
+- Runtime validation: `contract.input.parse(data)`
+- Type inference: `z.infer<typeof contract.input>`
+- OpenAPI generation: `zodToJsonSchema(contract.input)`
+- Documentation: `contract.description`
+- Introspection: `contract.metadata`
 
-### Policies (Composable)
+### Handler
 
-Policies are functions that wrap handlers to add cross-cutting concerns:
+Business logic function:
 
 ```typescript
-import { applyPolicies } from '@tsdev/core';
-import { withLogging, withSpan, withRetry, withRateLimit } from '@tsdev/policies';
+type Handler<TInput = unknown, TOutput = unknown> = (
+  input: TInput,
+  context: ExecutionContext
+) => Promise<TOutput> | TOutput;
+```
 
+**Characteristics:**
+- Pure function (given input, return output)
+- Receives validated input
+- Returns unvalidated output (validated by framework)
+- Transport-agnostic
+
+### Procedure
+
+Contract + Handler:
+
+```typescript
+interface Procedure<TInput = unknown, TOutput = unknown> {
+  contract: Contract<TInput, TOutput>;
+  handler: Handler<TInput, TOutput>;
+}
+```
+
+**This is what you export from handlers/:**
+
+```typescript
+export const createUser: Procedure = {
+  contract: createUserContract,
+  handler: async (input, context) => {
+    // Business logic
+  }
+};
+```
+
+### Registry
+
+Map of procedures:
+
+```typescript
+type Registry = Map<string, Procedure>;
+```
+
+**Created via auto-discovery:**
+
+```typescript
+const registry = await collectRegistry("./handlers");
+// Key: contract.name (e.g., "users.create")
+// Value: Procedure object
+```
+
+### Policy
+
+Function that wraps handlers:
+
+```typescript
+type Policy = <TInput, TOutput>(
+  handler: Handler<TInput, TOutput>
+) => Handler<TInput, TOutput>;
+```
+
+**Example:**
+
+```typescript
+const withRetry: Policy = (handler) => {
+  return async (input, context) => {
+    for (let i = 0; i < 3; i++) {
+      try {
+        return await handler(input, context);
+      } catch (error) {
+        if (i === 2) throw error;
+      }
+    }
+  };
+};
+```
+
+---
+
+## Core Mechanisms
+
+### 1. Auto-Discovery (collectRegistry)
+
+**Location:** `packages/core/src/registry.ts`
+
+**How it works:**
+
+```typescript
+export async function collectRegistry(handlersPath = "src/handlers"): Promise<Registry> {
+  const registry: Registry = new Map();
+
+  // 1. Find all TypeScript files
+  const handlerFiles = globSync(`${handlersPath}/**/*.ts`, {
+    absolute: true,
+    ignore: ["**/*.test.ts", "**/*.spec.ts"],
+  });
+
+  for (const file of handlerFiles) {
+    // 2. Dynamic import
+    const module = await import(file);
+
+    // 3. Check each export
+    for (const [exportName, exportValue] of Object.entries(module)) {
+      if (isProcedure(exportValue)) {
+        const procedureName = exportValue.contract.name || exportName;
+        registry.set(procedureName, exportValue as Procedure);
+      }
+    }
+  }
+
+  return registry;
+}
+
+function isProcedure(value: unknown): value is Procedure {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "contract" in value &&
+    "handler" in value &&
+    typeof (value as any).handler === "function"
+  );
+}
+```
+
+**Key points:**
+- Uses `globSync` to find files
+- Dynamic `import()` for each file
+- Runtime type checking to identify Procedures
+- No decorators, no manual registration
+
+### 2. Execution Flow (executeProcedure)
+
+**Location:** `packages/core/src/executor.ts`
+
+**How it works:**
+
+```typescript
+export async function executeProcedure<TInput, TOutput>(
+  procedure: Procedure<TInput, TOutput>,
+  input: unknown,
+  context: ExecutionContext
+): Promise<TOutput> {
+  // 1. Validate input against contract
+  const validatedInput = procedure.contract.input.parse(input);
+
+  // 2. Execute handler (with validated input)
+  const result = await procedure.handler(validatedInput, context);
+
+  // 3. Validate output against contract
+  const validatedOutput = procedure.contract.output.parse(result);
+
+  return validatedOutput;
+}
+```
+
+**Validation guarantees:**
+- Input is validated before handler runs
+- Output is validated before returning
+- Type safety at runtime AND compile-time
+- Throws `ZodError` if validation fails
+
+### 3. Policy Composition (applyPolicies)
+
+**Location:** `packages/core/src/executor.ts`
+
+**How it works:**
+
+```typescript
+export function applyPolicies<TInput, TOutput>(
+  handler: Handler<TInput, TOutput>,
+  ...policies: Policy[]
+): Handler<TInput, TOutput> {
+  return policies.reduce((h, policy) => policy(h), handler);
+}
+```
+
+**Execution order (right to left):**
+
+```typescript
 const handler = applyPolicies(
   baseHandler,
-  withLogging("procedure.name"),
-  withSpan("procedure.name"),
-  withRetry({ maxAttempts: 3 }),
-  withRateLimit({ maxTokens: 10 })
+  withLogging,    // 3. Outer wrapper
+  withSpan,       // 2. Middle wrapper
+  withRetry       // 1. Inner wrapper (executes first)
 );
 ```
 
-Policies are applied right-to-left (inner to outer):
-1. Rate limit check
-2. Retry wrapper
-3. Tracing span
-4. Logging
-
-### Workflows (Composable Procedures)
-
-Workflows compose procedures into visual graphs with OpenTelemetry tracing:
+**Equivalent to:**
 
 ```typescript
-import { executeWorkflow, type WorkflowDefinition } from '@tsdev/workflow';
+withLogging(withSpan(withRetry(baseHandler)))
+```
 
-const workflow: WorkflowDefinition = {
-  id: "user-onboarding",
-  name: "User Onboarding Flow",
-  version: "1.0.0",
-  startNode: "create-user",
-  nodes: [
-    {
-      id: "create-user",
-      type: "procedure",
-      procedureName: "users.create",
-      config: { /* input */ },
-      next: "send-email"
-    },
-    {
-      id: "send-email",
-      type: "procedure",
-      procedureName: "emails.sendWelcome",
-      next: undefined
-    }
-  ]
+**Call stack:**
+
+```
+withLogging → start
+  withSpan → start
+    withRetry → start
+      baseHandler → execute
+    withRetry → end
+  withSpan → end
+withLogging → end
+```
+
+---
+
+## Adapters in Detail
+
+Adapters translate transport → core.
+
+### HTTP Adapter
+
+**Location:** `packages/adapters/src/http.ts`
+
+**RPC Endpoint:**
+
+```typescript
+// POST /rpc/:procedureName
+if (req.method === "POST" && req.url?.startsWith("/rpc/")) {
+  const procedureName = req.url.slice(5);
+  
+  // 1. Parse JSON body
+  const body = await parseBody(req);
+  const input = JSON.parse(body);
+  
+  // 2. Get procedure
+  const procedure = registry.get(procedureName);
+  if (!procedure) {
+    res.writeHead(404);
+    res.end(JSON.stringify({ error: "Procedure not found" }));
+    return;
+  }
+  
+  // 3. Create execution context
+  const context = createExecutionContext({
+    transport: "http",
+    method: req.method,
+    url: req.url,
+    userAgent: req.headers["user-agent"],
+  });
+  
+  // 4. Execute procedure
+  const result = await executeProcedure(procedure, input, context);
+  
+  // 5. Return JSON response
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(result));
+}
+```
+
+**Key points:**
+- Thin translation layer
+- No business logic
+- Calls `executeProcedure()` from core
+
+### REST Adapter
+
+**Location:** `packages/adapters/src/rest.ts`
+
+**Convention-based routing:**
+
+```typescript
+function matchProcedure(
+  procedureName: string,
+  urlParts: string[],
+  method: string
+): Record<string, string> | null {
+  const [resource, action] = procedureName.split(".");
+  
+  switch (action) {
+    case "create":
+      // POST /resource
+      if (method === "POST" && urlParts.length === 1 && urlParts[0] === resource) {
+        return {};
+      }
+      break;
+      
+    case "list":
+      // GET /resource
+      if (method === "GET" && urlParts.length === 1 && urlParts[0] === resource) {
+        return {};
+      }
+      break;
+      
+    case "get":
+      // GET /resource/:id
+      if (method === "GET" && urlParts.length === 2 && urlParts[0] === resource) {
+        return { id: urlParts[1] };
+      }
+      break;
+      
+    case "update":
+      // PUT /resource/:id
+      if (method === "PUT" && urlParts.length === 2 && urlParts[0] === resource) {
+        return { id: urlParts[1] };
+      }
+      break;
+      
+    case "delete":
+      // DELETE /resource/:id
+      if (method === "DELETE" && urlParts.length === 2 && urlParts[0] === resource) {
+        return { id: urlParts[1] };
+      }
+      break;
+  }
+  
+  return null;
+}
+```
+
+**Mapping table:**
+
+| Procedure Name | HTTP Method | REST Path |
+|---------------|-------------|-----------|
+| `users.create` | `POST` | `/users` |
+| `users.list` | `GET` | `/users` |
+| `users.get` | `GET` | `/users/:id` |
+| `users.update` | `PUT` | `/users/:id` |
+| `users.delete` | `DELETE` | `/users/:id` |
+
+**Input building:**
+
+```typescript
+// Merge params, query, and body
+const input = {
+  ...match.params,      // { id: "123" }
+  ...match.query,       // { limit: "10" }
+  ...bodyData           // { name: "Alice" }
 };
-
-const result = await executeWorkflow(workflow, registry);
 ```
 
-### Adapters (Transport Layer)
+### CLI Adapter
 
-Adapters bridge transports to the core:
+**Location:** `packages/adapters/src/cli.ts`
 
-1. **Parse transport-specific input** (HTTP body, CLI args)
-2. **Create ExecutionContext** with transport metadata
-3. **Call executeProcedure()** with the procedure, input, and context
-4. **Format output** for the transport (JSON response, CLI output)
+**Argument parsing:**
 
-Adapters are **thin layers** - all business logic lives in handlers.
+```typescript
+function parseCliArgs(args: string[]): Record<string, unknown> {
+  const input: Record<string, unknown> = {};
+  
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    
+    if (arg.startsWith("--")) {
+      const key = arg.slice(2);
+      
+      // --key=value format
+      if (key.includes("=")) {
+        const [k, ...valueParts] = key.split("=");
+        input[k] = parseValue(valueParts.join("="));
+      }
+      // --key value format
+      else {
+        const value = args[i + 1];
+        if (value && !value.startsWith("--")) {
+          input[key] = parseValue(value);
+          i++;
+        } else {
+          input[key] = true;  // Boolean flag
+        }
+      }
+    }
+  }
+  
+  return input;
+}
 
-## Package Dependencies
-
-```
-@tsdev/core (no dependencies on other @tsdev packages)
-    ↑
-    ├── @tsdev/workflow (depends on @tsdev/core)
-    │   └── @tsdev/workflow/react (depends on @tsdev/workflow, react)
-    ├── @tsdev/adapters (depends on @tsdev/core, @tsdev/workflow, @tsdev/generators)
-    ├── @tsdev/policies (depends on @tsdev/core)
-    └── @tsdev/generators (depends on @tsdev/core, @tsdev/workflow)
-```
-
-## Data Flow
-
-### HTTP Request Flow
-
-```
-HTTP Request
-  ↓
-HTTP Adapter (@tsdev/adapters)
-  ↓
-Parse JSON body
-  ↓
-Create ExecutionContext { transport: "http", ... }
-  ↓
-executeProcedure(@tsdev/core)
-  ↓
-Validate input (Zod)
-  ↓
-Apply policies (rate limit, retry, span, logging)
-  ↓
-Execute handler (business logic)
-  ↓
-Validate output (Zod)
-  ↓
-Return result
-  ↓
-HTTP Adapter formats as JSON
-  ↓
-HTTP Response
-```
-
-### Workflow Execution Flow
-
-```
-executeWorkflow(@tsdev/workflow)
-  ↓
-Create workflow-level OpenTelemetry span
-  ↓
-For each node in workflow:
-  ├─→ procedure node → executeProcedure(@tsdev/core)
-  ├─→ condition node → evaluate expression → branch
-  ├─→ parallel node → execute branches concurrently
-  └─→ sequential node → pass through
-  ↓
-Collect all spans
-  ↓
-Return WorkflowExecutionResult with spans
+function parseValue(value: string): unknown {
+  // Try number
+  if (!isNaN(Number(value))) {
+    return Number(value);
+  }
+  
+  // Try boolean
+  if (value === "true") return true;
+  if (value === "false") return false;
+  
+  // Try JSON
+  if (value.startsWith("{") || value.startsWith("[")) {
+    try {
+      return JSON.parse(value);
+    } catch {}
+  }
+  
+  return value;
+}
 ```
 
-## Key Principles in Action
+**Usage:**
 
-### 1. Contracts-first
+```bash
+tsdev users.create --name Alice --email alice@example.com
+# Parsed as: { name: "Alice", email: "alice@example.com" }
 
-Every procedure starts with a contract. The contract defines the API surface, not the transport.
+tsdev math.add --a 5 --b 3
+# Parsed as: { a: 5, b: 3 }
 
-### 2. Transport-agnostic
+tsdev users.create --json '{"name":"Alice","email":"alice@example.com"}'
+# Parsed as: { name: "Alice", email: "alice@example.com" }
+```
 
-The handler doesn't know if it was called via HTTP, CLI, or future transports (WebSocket, gRPC, message queue, etc.).
+---
 
-### 3. Zero boilerplate
+## Workflow System
 
-No decorators, no manual registration. Export a `Procedure` object and it's automatically discovered.
+### Workflow Runtime
 
-### 4. Self-describing
+**Location:** `packages/workflow/src/runtime.ts`
 
-The registry contains all metadata needed for:
-- Documentation generation
-- OpenAPI spec generation
-- SDK generation
-- Agent introspection
+**Core execution:**
 
-### 5. Composable
+```typescript
+export async function executeWorkflow(
+  workflow: WorkflowDefinition,
+  registry: Registry,
+  initialInput: Record<string, unknown> = {}
+): Promise<WorkflowExecutionResult> {
+  // Create workflow-level OpenTelemetry span
+  return tracer.startActiveSpan("workflow.execute", async (workflowSpan) => {
+    const context: WorkflowContext = {
+      workflowId: workflow.id,
+      executionId: generateExecutionId(),
+      variables: { ...workflow.variables, ...initialInput },
+      nodeOutputs: new Map(),
+      startTime: new Date(),
+    };
+    
+    let currentNodeId = workflow.startNode;
+    const nodesExecuted: string[] = [];
+    
+    // Execute nodes sequentially
+    while (currentNodeId) {
+      const node = workflow.nodes.find(n => n.id === currentNodeId);
+      if (!node) throw new Error(`Node ${currentNodeId} not found`);
+      
+      nodesExecuted.push(currentNodeId);
+      
+      // Execute node (creates its own span)
+      const nextNodeId = await executeNode(node, context, registry, workflow);
+      
+      currentNodeId = nextNodeId;
+    }
+    
+    // Return results
+    return {
+      executionId: context.executionId,
+      status: "completed",
+      outputs: Object.fromEntries(context.nodeOutputs),
+      executionTime: Date.now() - context.startTime.getTime(),
+      nodesExecuted,
+    };
+  });
+}
+```
 
-Policies compose via pure functions. No framework magic, no class inheritance.
+### Node Types
 
-### 6. Observable
+**Procedure Node:**
 
-Every procedure runs in a tracing span. Business-level attributes (user_id, org_id, etc.) are added to spans for rich observability.
+```typescript
+async function executeProcedureNode(
+  node: WorkflowNode,
+  context: WorkflowContext,
+  registry: Registry
+): Promise<string | undefined> {
+  // Get procedure
+  const procedure = registry.get(node.procedureName);
+  
+  // Build input from node config + context variables
+  const input = {
+    ...node.config,
+    ...context.variables
+  };
+  
+  // Execute procedure
+  const execContext = createExecutionContext({
+    transport: "workflow",
+    workflowId: context.workflowId,
+    executionId: context.executionId,
+    nodeId: node.id,
+  });
+  
+  const output = await executeProcedure(procedure, input, execContext);
+  
+  // Store output
+  context.nodeOutputs.set(node.id, output);
+  
+  // Merge output into variables (for next nodes)
+  Object.assign(context.variables, output);
+  
+  // Return next node
+  return node.next;
+}
+```
 
-## Extending the Framework
+**Condition Node:**
+
+```typescript
+async function executeConditionNode(
+  node: WorkflowNode,
+  context: WorkflowContext
+): Promise<string | undefined> {
+  const config = node.config as ConditionConfig;
+  
+  // Evaluate JavaScript expression with context variables
+  const result = evaluateExpression(config.expression, context.variables);
+  
+  // Return appropriate branch
+  return result ? config.trueBranch : config.falseBranch;
+}
+
+function evaluateExpression(expression: string, variables: Record<string, unknown>): boolean {
+  // Create function with variables as parameters
+  const func = new Function(...Object.keys(variables), `return ${expression}`);
+  return func(...Object.values(variables));
+}
+```
+
+**Parallel Node:**
+
+```typescript
+async function executeParallelNode(
+  node: WorkflowNode,
+  context: WorkflowContext,
+  registry: Registry,
+  workflow: WorkflowDefinition
+): Promise<string | undefined> {
+  const config = node.config as ParallelConfig;
+  
+  // Execute all branches in parallel
+  const branchPromises = config.branches.map(async (branchNodeId) => {
+    const branchNode = workflow.nodes.find(n => n.id === branchNodeId);
+    return executeNode(branchNode, context, registry, workflow);
+  });
+  
+  if (config.waitForAll) {
+    await Promise.all(branchPromises);
+  } else {
+    await Promise.race(branchPromises);
+  }
+  
+  return node.next;
+}
+```
+
+### OpenTelemetry Integration
+
+**Span hierarchy:**
+
+```
+workflow.execute (parent span)
+├── workflow.node.procedure (node: create-user)
+│   └── procedure.users.create (from withSpan policy)
+│       └── withRetry (from withRetry policy)
+├── workflow.node.condition (node: check-premium)
+└── workflow.node.procedure (node: send-email)
+    └── procedure.emails.send
+```
+
+**Attributes added:**
+
+```typescript
+workflowSpan.setAttributes({
+  "workflow.id": workflow.id,
+  "workflow.name": workflow.name,
+  "workflow.version": workflow.version,
+  "workflow.execution_id": executionId,
+  "workflow.start_node": workflow.startNode,
+  "workflow.node_count": workflow.nodes.length,
+  "workflow.status": "completed",
+  "workflow.execution_time_ms": executionTime,
+});
+
+nodeSpan.setAttributes({
+  "workflow.id": workflow.id,
+  "workflow.execution_id": executionId,
+  "node.id": node.id,
+  "node.type": node.type,
+  "node.procedure": node.procedureName,
+  "node.status": "completed",
+});
+```
+
+---
+
+## OpenAPI Generation
+
+**Location:** `packages/generators/src/openapi.ts`
+
+**How it works:**
+
+```typescript
+export function generateOpenAPISpec(registry: Registry): OpenAPISpec {
+  const spec: OpenAPISpec = {
+    openapi: "3.0.0",
+    info: { title: "tsdev API", version: "1.0.0" },
+    paths: {},
+  };
+  
+  for (const [name, procedure] of registry.entries()) {
+    // Convert Zod schemas to JSON Schema
+    const inputSchema = zodToJsonSchema(procedure.contract.input);
+    const outputSchema = zodToJsonSchema(procedure.contract.output);
+    
+    // RPC endpoint
+    spec.paths[`/rpc/${name}`] = {
+      post: {
+        operationId: name,
+        summary: procedure.contract.description,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: inputSchema }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Success",
+            content: {
+              "application/json": { schema: outputSchema }
+            }
+          }
+        }
+      }
+    };
+    
+    // REST endpoint (if applicable)
+    const restPath = generateRESTPath(procedure.contract);
+    if (restPath) {
+      Object.assign(spec.paths, restPath);
+    }
+  }
+  
+  return spec;
+}
+```
+
+**Key dependencies:**
+- `zod-to-json-schema`: Converts Zod schemas to JSON Schema
+- Runs at runtime (can be saved to file)
+
+---
+
+## Policy Implementation
+
+### withRetry
+
+**Location:** `packages/policies/src/withRetry.ts`
+
+```typescript
+export function withRetry(options: RetryOptions = {}): Policy {
+  const { maxAttempts = 3, delayMs = 100, backoffMultiplier = 2 } = options;
+  
+  return (handler) => {
+    return async (input, context) => {
+      let lastError: Error | undefined;
+      let currentDelay = delayMs;
+      
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          return await handler(input, context);
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          
+          if (attempt === maxAttempts) break;
+          
+          await sleep(currentDelay);
+          currentDelay *= backoffMultiplier;  // Exponential backoff
+        }
+      }
+      
+      throw lastError;
+    };
+  };
+}
+```
+
+### withLogging
+
+**Location:** `packages/policies/src/withLogging.ts`
+
+```typescript
+export function withLogging(procedureName: string): Policy {
+  return (handler) => {
+    return async (input, context) => {
+      console.log(`[${procedureName}] Starting execution`, {
+        requestId: context.requestId,
+        timestamp: context.timestamp.toISOString(),
+      });
+      
+      const startTime = performance.now();
+      
+      try {
+        const result = await handler(input, context);
+        const duration = performance.now() - startTime;
+        
+        console.log(`[${procedureName}] Completed successfully`, {
+          requestId: context.requestId,
+          durationMs: duration.toFixed(2),
+        });
+        
+        return result;
+      } catch (error) {
+        const duration = performance.now() - startTime;
+        
+        console.error(`[${procedureName}] Failed with error`, {
+          requestId: context.requestId,
+          durationMs: duration.toFixed(2),
+          error: error instanceof Error ? error.message : String(error),
+        });
+        
+        throw error;
+      }
+    };
+  };
+}
+```
+
+### withSpan
+
+**Location:** `packages/policies/src/withSpan.ts`
+
+```typescript
+import { trace } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("tsdev.procedures");
+
+export function withSpan(procedureName: string): Policy {
+  return (handler) => {
+    return async (input, context) => {
+      // Create OpenTelemetry span
+      return tracer.startActiveSpan(procedureName, async (span) => {
+        try {
+          // Add attributes
+          span.setAttributes({
+            "procedure.name": procedureName,
+            "request.id": context.requestId,
+            "input": JSON.stringify(input),
+          });
+          
+          // Execute handler
+          const result = await handler(input, context);
+          
+          // Add output attributes
+          span.setAttributes({
+            "output": JSON.stringify(result),
+          });
+          
+          span.setStatus({ code: SpanStatusCode.OK });
+          
+          return result;
+        } catch (error) {
+          // Record exception
+          span.recordException(error instanceof Error ? error : new Error(String(error)));
+          span.setStatus({ code: SpanStatusCode.ERROR });
+          
+          throw error;
+        } finally {
+          span.end();
+        }
+      });
+    };
+  };
+}
+```
+
+---
+
+## Package Structure
+
+### Monorepo Setup
+
+Uses pnpm workspaces:
+
+```json
+// pnpm-workspace.yaml
+packages:
+  - "packages/*"
+  - "examples/*"
+```
+
+### Package Dependencies
+
+```
+@tsdev/core (base)
+  ↓ depends on
+  └── zod
+
+@tsdev/workflow
+  ↓ depends on
+  ├── @tsdev/core
+  └── @opentelemetry/api
+
+@tsdev/adapters
+  ↓ depends on
+  ├── @tsdev/core
+  ├── @tsdev/workflow
+  └── @tsdev/generators
+
+@tsdev/policies
+  ↓ depends on
+  ├── @tsdev/core
+  └── @opentelemetry/api
+
+@tsdev/generators
+  ↓ depends on
+  ├── @tsdev/core
+  └── zod-to-json-schema
+```
+
+### Build Order
+
+```bash
+# 1. Build core first (no deps)
+cd packages/core && pnpm build
+
+# 2. Build workflow and policies (depend on core)
+cd packages/workflow && pnpm build
+cd packages/policies && pnpm build
+
+# 3. Build generators (depends on core)
+cd packages/generators && pnpm build
+
+# 4. Build adapters (depends on core, workflow, generators)
+cd packages/adapters && pnpm build
+```
+
+---
+
+## Performance Characteristics
+
+### Registry Collection
+
+**Happens once at startup:**
+
+```typescript
+const registry = await collectRegistry("./handlers");
+```
+
+**Cost:**
+- File system scan: O(n) where n = number of files
+- Dynamic imports: One per file
+- Type checking: One per export
+
+**Typical startup time:** < 100ms for 100 procedures
+
+### Procedure Execution
+
+**Per request:**
+
+1. Input validation (Zod): ~0.1-1ms
+2. Handler execution: Depends on business logic
+3. Output validation (Zod): ~0.1-1ms
+4. Policy overhead: ~0.01ms per policy
+
+**Total framework overhead:** < 2ms
+
+### Policy Composition
+
+**Applied at startup:**
+
+```typescript
+const handler = applyPolicies(baseHandler, ...policies);
+```
+
+**Runtime cost:** Just function calls (negligible)
+
+### OpenTelemetry
+
+**Span creation:** ~10μs per span  
+**Attribute setting:** ~1μs per attribute
+
+**Negligible overhead in production** (sampled traces)
+
+---
+
+## Extension Points
 
 ### Adding a New Transport
 
-1. Create an adapter in a new package or in `@tsdev/adapters`:
+Create an adapter:
 
 ```typescript
 import { createExecutionContext, executeProcedure, type Registry } from '@tsdev/core';
 
-export async function createWebSocketServer(registry: Registry) {
-  // Parse WebSocket messages
-  // Create ExecutionContext
-  // Call executeProcedure()
-  // Send result back via WebSocket
+export function createWebSocketServer(registry: Registry) {
+  const wss = new WebSocketServer({ port: 8080 });
+  
+  wss.on('connection', (ws) => {
+    ws.on('message', async (message) => {
+      const { procedure, input } = JSON.parse(message);
+      
+      const proc = registry.get(procedure);
+      if (!proc) {
+        ws.send(JSON.stringify({ error: "Procedure not found" }));
+        return;
+      }
+      
+      const context = createExecutionContext({
+        transport: "websocket",
+        connectionId: generateConnectionId(),
+      });
+      
+      try {
+        const result = await executeProcedure(proc, input, context);
+        ws.send(JSON.stringify({ result }));
+      } catch (error) {
+        ws.send(JSON.stringify({ error: error.message }));
+      }
+    });
+  });
 }
 ```
 
-2. Use it in your application
-
-**That's it!** All existing handlers now work via WebSocket.
-
 ### Adding a New Policy
 
-1. Create a policy in `@tsdev/policies` or your own package:
-
 ```typescript
-import type { Policy } from '@tsdev/core';
-
 export function withCache(ttl: number): Policy {
   const cache = new Map();
   
@@ -360,96 +1012,174 @@ export function withCache(ttl: number): Policy {
 }
 ```
 
-2. Use it in any handler:
+### Adding Workflow Node Types
 
 ```typescript
-import { applyPolicies } from '@tsdev/core';
-import { withCache } from './policies/withCache.js';
-
-const handler = applyPolicies(
-  baseHandler,
-  withCache(60000), // 1 minute cache
-);
+// In executeNode()
+switch (node.type) {
+  case "procedure":
+    return executeProcedureNode(node, context, registry);
+  case "condition":
+    return executeConditionNode(node, context);
+  case "parallel":
+    return executeParallelNode(node, context, registry, workflow);
+  case "custom-type":  // Your custom type
+    return executeCustomNode(node, context);
+}
 ```
 
-### Adding a New Procedure
-
-1. Define contract in your `contracts/` directory
-2. Implement handler in `handlers/` directory
-3. Export the procedure
-
-**It's automatically discovered and available via all transports!**
+---
 
 ## Testing Strategy
 
-### Unit Tests
-
-Test handlers in isolation:
+### Unit Testing Handlers
 
 ```typescript
-const result = await createUser.handler(
-  { name: "Test", email: "test@example.com" },
-  createExecutionContext()
-);
+import { createExecutionContext } from '@tsdev/core';
+import { createUser } from './handlers/users';
 
-expect(result).toMatchObject({
-  id: expect.any(String),
-  name: "Test",
-  email: "test@example.com",
+test('createUser creates a user', async () => {
+  const input = { name: "Alice", email: "alice@example.com" };
+  const context = createExecutionContext();
+  
+  const result = await createUser.handler(input, context);
+  
+  expect(result).toMatchObject({
+    id: expect.any(String),
+    name: "Alice",
+    email: "alice@example.com",
+  });
 });
 ```
 
-### Integration Tests
-
-Test via adapters:
+### Integration Testing Adapters
 
 ```typescript
 import { collectRegistry } from '@tsdev/core';
 import { createHttpServer } from '@tsdev/adapters';
 
-const registry = await collectRegistry("./handlers");
-const server = createHttpServer(registry, 3001);
-
-const response = await fetch("http://localhost:3001/rpc/users.create", {
-  method: "POST",
-  body: JSON.stringify({ name: "Test", email: "test@example.com" }),
+test('HTTP server executes procedures', async () => {
+  const registry = await collectRegistry("./handlers");
+  const server = createHttpServer(registry, 3001);
+  
+  const response = await fetch("http://localhost:3001/rpc/users.create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Test", email: "test@example.com" }),
+  });
+  
+  expect(response.ok).toBe(true);
+  
+  const result = await response.json();
+  expect(result).toHaveProperty("id");
+  
+  server.close();
 });
-
-expect(response.ok).toBe(true);
 ```
 
-## Performance Considerations
+### Testing Workflows
 
-### Registry Collection
+```typescript
+import { executeWorkflow } from '@tsdev/workflow';
 
-Registry collection happens once at startup (not per-request). It uses dynamic imports to load handlers.
+test('workflow executes all nodes', async () => {
+  const workflow = { /* ... */ };
+  const registry = await collectRegistry("./handlers");
+  
+  const result = await executeWorkflow(workflow, registry);
+  
+  expect(result.status).toBe("completed");
+  expect(result.nodesExecuted).toEqual(["node1", "node2", "node3"]);
+});
+```
 
-### Policy Overhead
+---
 
-Policies add minimal overhead (function calls). They're applied at startup, not per-request.
+## Future Architecture Enhancements
 
-### Validation
+### 1. SDK Generation
 
-Zod validation happens twice per request (input and output). For high-performance scenarios, you can disable output validation in production.
+```typescript
+// Generate TypeScript SDK
+generateSDK(registry, {
+  language: "typescript",
+  output: "./sdk/client.ts"
+});
 
-### Tracing
+// Usage
+import { TsdevClient } from "./sdk/client";
 
-OpenTelemetry spans have minimal overhead (~microseconds) and are sampled in production.
+const client = new TsdevClient("http://localhost:3000");
+const user = await client.users.create({ name: "Alice", email: "alice@example.com" });
+```
 
-## Future Enhancements
+### 2. Contract Versioning
 
-Potential additions that maintain the philosophy:
+```typescript
+const createUserContractV2 = {
+  name: "users.create",
+  version: "2.0.0",
+  input: z.object({
+    name: z.string(),
+    email: z.string(),
+    phone: z.string().optional(),  // New field
+  }),
+  // ...
+};
 
-1. **SDK Generator**: Generate TypeScript/Python SDKs from contracts
-2. **GraphQL Adapter**: Expose procedures via GraphQL
-3. **gRPC Adapter**: Expose procedures via gRPC
-4. **Message Queue Adapter**: Consume procedures from queues
-5. **Agent Interface**: Let LLMs call procedures directly
-6. **Schema Registry**: Central registry for contract versioning
-7. **Contract Evolution**: Backward-compatible contract changes
+// Registry supports multiple versions
+registry.set("users.create@1.0.0", procedureV1);
+registry.set("users.create@2.0.0", procedureV2);
+```
 
-All of these maintain the core principle: **write the contract once, derive everything else**.
+### 3. Distributed Workflow Execution
 
-## License
+```typescript
+// Execute workflow nodes across multiple machines
+executeWorkflow(workflow, registry, {
+  executor: "distributed",
+  workers: ["worker1:8080", "worker2:8080"],
+});
+```
 
-MIT
+### 4. gRPC Adapter
+
+```typescript
+createGrpcServer(registry, {
+  port: 50051,
+  // Auto-generate protobuf from Zod schemas
+});
+```
+
+---
+
+## Conclusion
+
+tsdev architecture is built on:
+
+1. **Separation of concerns**
+   - Core: Framework logic
+   - Adapters: Transport translation
+   - Handlers: Business logic
+
+2. **Auto-discovery via reflection**
+   - No manual registration
+   - Runtime introspection
+
+3. **Convention-driven automation**
+   - Naming → REST routes
+   - File structure → registry
+
+4. **Function composition**
+   - Policies as pure functions
+   - No framework magic
+
+5. **Built-in observability**
+   - OpenTelemetry everywhere
+   - Business-level spans
+
+**Result:** Simple, extensible, observable system with minimal boilerplate.
+
+---
+
+See [PHILOSOPHY.md](./PHILOSOPHY.md) for design principles.

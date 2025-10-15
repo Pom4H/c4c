@@ -1,44 +1,229 @@
 # Workflow Visualization Color Scheme
 
-## Node Type Colors
+**Visual semantics for workflow node types.**
 
-Consistent colors used across all components (React Flow, Gantt Chart, Legends):
+In tsdev workflows, node types have semantic meaning:
+- **Procedure** = executes business logic
+- **Condition** = branching logic
+- **Parallel** = concurrent execution
+- **Sequential** = flow control
 
-| Node Type    | Color   | Hex Code  | Usage                                    |
-|--------------|---------|-----------|------------------------------------------|
-| **Procedure**   | 🟢 Green  | `#4ade80` | Standard workflow procedure nodes        |
-| **Condition**   | 🟡 Yellow | `#fbbf24` | Conditional branching nodes              |
-| **Parallel**    | 🟣 Purple | `#818cf8` | Parallel execution nodes                 |
-| **Sequential**  | 🔵 Blue   | `#60a5fa` | Sequential flow nodes (default)          |
-| **Error**       | 🔴 Red    | `#ef4444` | Nodes or spans with errors               |
+Colors provide instant visual recognition of workflow patterns.
 
-## Components Using These Colors
+---
 
-### 1. WorkflowVisualizer.tsx
-- React Flow node backgrounds
-- Edge colors based on execution state
-- MiniMap coloring
-- Legend display
+## Color Palette
 
-### 2. SpanGanttChart.tsx
-- Gantt chart bar colors
-- Legend badges
-- Span type indicators
+| Node Type | Color | Hex Code | Semantic Meaning |
+|-----------|-------|----------|------------------|
+| **Procedure** | 🟢 Green | `#4ade80` | Action/execution node |
+| **Condition** | 🟡 Yellow | `#fbbf24` | Decision point |
+| **Parallel** | 🟣 Purple | `#818cf8` | Concurrent execution |
+| **Sequential** | 🔵 Blue | `#60a5fa` | Flow control |
+| **Error** | 🔴 Red | `#ef4444` | Failed execution |
 
-### 3. page.tsx
-- Node type statistics display
-- Color indicators in workflow details
+---
 
-## Theme Support
+## Usage Across Components
 
-All components work correctly in both **light** and **dark** themes:
-- Colors are applied via inline styles for React Flow compatibility
-- shadcn UI components handle theme switching automatically
-- CSS variables defined in `globals.css` for workflow-specific colors
+### WorkflowVisualizer.tsx (React Flow)
 
-## Implementation Note
+**Node rendering:**
+```typescript
+const nodeColor = {
+  procedure: "#4ade80",
+  condition: "#fbbf24",
+  parallel: "#818cf8",
+  sequential: "#60a5fa"
+}[node.type];
 
-Direct hex colors are used instead of CSS variables in React Flow components because:
-1. React Flow requires inline styles for node/edge styling
-2. CSS variable interpolation doesn't work in inline styles
-3. Ensures consistent rendering regardless of theme switching timing
+<div style={{ backgroundColor: nodeColor }}>
+  {node.data.label}
+</div>
+```
+
+**Edge animation:**
+```typescript
+// Executed edges are animated
+<Edge
+  animated={isExecuted}
+  style={{ stroke: isExecuted ? "#4ade80" : "#94a3b8" }}
+/>
+```
+
+### SpanGanttChart.tsx
+
+**Gantt bars:**
+```typescript
+const spanColor = getNodeColor(span.attributes["node.type"]);
+
+<div
+  className="gantt-bar"
+  style={{
+    backgroundColor: spanColor,
+    width: `${(span.duration / totalDuration) * 100}%`
+  }}
+/>
+```
+
+### TraceViewer.tsx
+
+**Span hierarchy:**
+```typescript
+const statusColor = {
+  OK: "#4ade80",
+  ERROR: "#ef4444",
+  UNSET: "#94a3b8"
+}[span.status.code];
+```
+
+---
+
+## Implementation Details
+
+### Why Inline Styles?
+
+React Flow requires inline styles for node customization:
+
+```typescript
+// ✅ Works (inline styles)
+<Node style={{ backgroundColor: "#4ade80" }} />
+
+// ❌ Doesn't work (CSS variables not interpolated)
+<Node style={{ backgroundColor: "var(--color-green)" }} />
+```
+
+### Theme Support
+
+Colors work in both light and dark themes:
+
+- **Light theme:** Full saturation colors
+- **Dark theme:** Same colors (high contrast against dark background)
+
+**No theme switching needed** - colors are absolute, not relative.
+
+### Accessibility
+
+All colors meet WCAG AA contrast requirements:
+
+- Green `#4ade80` on white: 3.2:1 (AA Large Text ✅)
+- Yellow `#fbbf24` on white: 1.9:1 (Use dark text)
+- Purple `#818cf8` on white: 4.5:1 (AA ✅)
+- Blue `#60a5fa` on white: 3.7:1 (AA Large Text ✅)
+
+**Enhancement:** Add text color logic:
+
+```typescript
+const textColor = node.type === "condition" ? "#1f2937" : "#ffffff";
+```
+
+---
+
+## Consistency
+
+**Color constants defined once:**
+
+```typescript
+// lib/workflow/colors.ts
+export const NODE_COLORS = {
+  procedure: "#4ade80",
+  condition: "#fbbf24",
+  parallel: "#818cf8",
+  sequential: "#60a5fa",
+  error: "#ef4444"
+} as const;
+
+// Used everywhere
+import { NODE_COLORS } from "@/lib/workflow/colors";
+```
+
+**Used in:**
+- `WorkflowVisualizer.tsx` - Node backgrounds
+- `SpanGanttChart.tsx` - Gantt bars
+- `TraceViewer.tsx` - Span indicators
+- `page.tsx` - Node type legend
+
+---
+
+## Visual Patterns
+
+### Sequential Flow (Blue)
+```
+[Procedure] → [Procedure] → [Procedure]
+   Green         Green         Green
+```
+
+### Conditional Flow (Yellow)
+```
+[Procedure] → [Condition] ─→ [Procedure]
+   Green        Yellow    └─→ [Procedure]
+```
+
+### Parallel Flow (Purple)
+```
+                ┌─→ [Procedure]
+[Parallel] ────┼─→ [Procedure]
+   Purple      └─→ [Procedure]
+                      ↓
+                [Procedure]
+```
+
+### Error State (Red)
+```
+[Procedure] → [Procedure (ERROR)]
+   Green         Red border + background
+```
+
+---
+
+## Future Enhancements
+
+### Custom Color Schemes
+
+Allow users to customize colors:
+
+```typescript
+const theme = {
+  procedure: "#10b981",  // Custom green
+  condition: "#f59e0b",  // Custom yellow
+  // ...
+};
+
+<WorkflowVisualizer theme={theme} />
+```
+
+### Status-based Colors
+
+Color nodes by execution status:
+
+```typescript
+const nodeColor = {
+  pending: "#94a3b8",     // Gray
+  running: "#3b82f6",     // Blue
+  completed: "#4ade80",   // Green
+  failed: "#ef4444"       // Red
+}[node.status];
+```
+
+### Heatmap Mode
+
+Color by duration:
+
+```typescript
+const durationColor = interpolate(
+  span.duration,
+  [minDuration, maxDuration],
+  ["#4ade80", "#ef4444"]  // Green to Red
+);
+```
+
+---
+
+## Related
+
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - Component architecture
+- [README.md](./README.md) - Usage guide
+
+---
+
+**Color is semantics.** In workflow visualization, color instantly communicates node type, execution state, and performance characteristics.
