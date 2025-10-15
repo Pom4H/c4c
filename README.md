@@ -36,8 +36,10 @@ tsdev/
 │   ├── workflow/          # @tsdev/workflow - Workflow system
 │   │   ├── types.ts       # WorkflowDefinition, WorkflowNode
 │   │   ├── runtime.ts     # executeWorkflow() with OpenTelemetry
-│   │   └── react/         # @tsdev/workflow/react - React hooks
-│   │       └── useWorkflow.ts
+│   │   └── index.ts
+│   │
+│   ├── workflow-react/    # @tsdev/workflow-react - React hooks
+│   │   └── useWorkflow.ts
 │   │
 │   ├── adapters/          # @tsdev/adapters - Transport adapters
 │   │   ├── http.ts        # HTTP/RPC server
@@ -55,12 +57,15 @@ tsdev/
 │
 └── examples/
     ├── basic/             # Basic usage example
-    │   ├── contracts/     # Contract definitions
-    │   ├── handlers/      # Handler implementations
-    │   └── apps/          # HTTP server & CLI
+    │   ├── src/contracts/ # Contract definitions
+    │   ├── src/handlers/  # Handler implementations
+    │   └── src/apps/      # HTTP server & CLI
     │
     ├── workflows/         # Workflow examples
     │   └── src/           # Mock procedures & workflow definitions
+    │
+    ├── chat-automation/   # Workflow-driven automation server
+    │   └── src/           # System workflow + mock registry
     │
     └── workflow-viz/      # Next.js workflow visualization
         └── src/           # React Flow visualization demo
@@ -90,10 +95,10 @@ import { collectRegistry, executeProcedure, type Procedure, type Registry } from
 import { executeWorkflow, type WorkflowDefinition } from '@tsdev/workflow';
 ```
 
-### React Integration (`@tsdev/workflow/react`)
+### React Integration (`@tsdev/workflow-react`)
 
 ```typescript
-import { useWorkflow } from '@tsdev/workflow/react';
+import { useWorkflow } from '@tsdev/workflow-react';
 ```
 
 ### Transport Adapters (`@tsdev/adapters`)
@@ -139,6 +144,14 @@ pnpm install
 pnpm dev  # Next.js on :3000
 ```
 
+### Chat Automation Example
+Demonstrates workflow-driven automation:
+```bash
+cd examples/chat-automation
+pnpm install
+pnpm dev  # Server on :3002
+```
+
 ## 🛠️ Development
 
 ### Install Dependencies
@@ -175,7 +188,11 @@ pnpm dev:workflows    # Workflow examples
 | Import | Module |
 |--------|--------|
 | `@tsdev/workflow` | Workflow runtime with OpenTelemetry |
-| `@tsdev/workflow/react` | React hooks for workflows |
+
+### `@tsdev/workflow-react`
+| Import | Module |
+|--------|--------|
+| `@tsdev/workflow-react` | React hooks for workflows |
 
 ### `@tsdev/adapters`
 | Import | Module |

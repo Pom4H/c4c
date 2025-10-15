@@ -21,12 +21,13 @@ tsdev/
 │   │   │   ├── types.ts         # WorkflowDefinition, WorkflowNode
 │   │   │   ├── runtime.ts       # executeWorkflow() with OpenTelemetry
 │   │   │   └── index.ts
-│   │   ├── react/               # @tsdev/workflow/react (sub-package)
-│   │   │   ├── src/
-│   │   │   │   ├── useWorkflow.ts  # React hooks
-│   │   │   │   └── index.ts
-│   │   │   ├── package.json
-│   │   │   └── tsconfig.json
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── workflow-react/          # @tsdev/workflow-react
+│   │   ├── src/
+│   │   │   ├── useWorkflow.ts   # React hooks
+│   │   │   └── index.ts
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
@@ -133,10 +134,10 @@ The registry automatically discovers all procedures:
 ```typescript
 import { collectRegistry } from '@tsdev/core';
 
-const registry = await collectRegistry("./handlers");
+const registry = await collectRegistry("./src/handlers");
 ```
 
-This scans all TypeScript files in the `handlers/` directory and registers any exports that match the `Procedure` interface.
+This scans all TypeScript files in the `src/handlers/` directory and registers any exports that match the `Procedure` interface.
 
 **No manual registration required!**
 
@@ -226,7 +227,7 @@ Adapters are **thin layers** - all business logic lives in handlers.
 @tsdev/core (no dependencies on other @tsdev packages)
     ↑
     ├── @tsdev/workflow (depends on @tsdev/core)
-    │   └── @tsdev/workflow/react (depends on @tsdev/workflow, react)
+    │   └── @tsdev/workflow-react (depends on @tsdev/workflow, react)
     ├── @tsdev/adapters (depends on @tsdev/core, @tsdev/workflow, @tsdev/generators)
     ├── @tsdev/policies (depends on @tsdev/core)
     └── @tsdev/generators (depends on @tsdev/core, @tsdev/workflow)
