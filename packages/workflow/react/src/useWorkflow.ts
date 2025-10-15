@@ -8,7 +8,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { WorkflowExecutionResult } from "tsdev/core/workflow";
+import type { WorkflowExecutionResult } from "@tsdev/workflow";
 
 export interface UseWorkflowOptions {
 	apiBaseUrl?: string;

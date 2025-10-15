@@ -14,6 +14,10 @@ export type {
   WorkflowUIConfig,
   ConditionConfig,
   ParallelConfig,
-} from "@tsdev/workflow";
+  SubWorkflowConfig,
+  WorkflowResumeState,
+} from "./types.js";
 
-export { executeWorkflow, validateWorkflow } from "./runtime.js";
+export { executeWorkflow, validateWorkflow, resumeWorkflow, PauseSignal } from "./runtime.js";
+
+export { createSubworkflowProcedure } from "./subworkflow.js";

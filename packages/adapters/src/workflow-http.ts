@@ -4,7 +4,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Registry } from "@tsdev/core";
-import { executeWorkflow, validateWorkflow, type WorkflowDefinition } from "@tsdev/workflow";
+import { executeWorkflow, validateWorkflow, resumeWorkflow, type WorkflowDefinition, type WorkflowResumeState } from "@tsdev/workflow";
 
 // TODO: Move workflow generators to @tsdev/generators or @tsdev/workflow
 // For now, stub these out
@@ -61,6 +61,39 @@ export async function handleWorkflowRequest(
 
 			// Execute workflow
 			const result = await executeWorkflow(workflow, registry, input);
+
+			res.writeHead(200, { "Content-Type": "application/json" });
+			res.end(JSON.stringify(result, null, 2));
+			return true;
+		} catch (error) {
+			res.writeHead(500, { "Content-Type": "application/json" });
+			res.end(
+				JSON.stringify({
+					error: error instanceof Error ? error.message : String(error),
+				})
+			);
+			return true;
+		}
+	}
+
+	// Resume workflow
+	if (url === "/workflow/resume" && req.method === "POST") {
+		try {
+			const body = await parseBody(req);
+			const { workflow, resumeState, variablesDelta } = JSON.parse(body) as {
+				workflow: WorkflowDefinition;
+				resumeState: WorkflowResumeState;
+				variablesDelta?: Record<string, unknown>;
+			};
+
+			// Validate that resumeState workflow id matches
+			if (resumeState.workflowId !== workflow.id) {
+				res.writeHead(400, { "Content-Type": "application/json" });
+				res.end(JSON.stringify({ error: "resumeState.workflowId does not match workflow.id" }));
+				return true;
+			}
+
+			const result = await resumeWorkflow(workflow, registry, resumeState, variablesDelta ?? {});
 
 			res.writeHead(200, { "Content-Type": "application/json" });
 			res.end(JSON.stringify(result, null, 2));

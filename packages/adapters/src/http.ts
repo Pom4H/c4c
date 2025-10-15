@@ -167,6 +167,7 @@ export function createHttpServer(registry: Registry, port = 3000) {
 		console.log(`   UI Config:        http://localhost:${port}/workflow/ui-config`);
 		console.log(`   Execute:          POST http://localhost:${port}/workflow/execute`);
 		console.log(`   Validate:         POST http://localhost:${port}/workflow/validate`);
+		console.log(`   Resume:           POST http://localhost:${port}/workflow/resume`);
 		console.log(`\n🔧 Endpoints:`);
 		console.log(`   RPC:  POST http://localhost:${port}/rpc/:procedureName`);
 		console.log(`   REST: http://localhost:${port}/:resource (conventional)`);

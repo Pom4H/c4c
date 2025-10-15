@@ -49,12 +49,13 @@ export interface WorkflowContext {
  */
 export interface WorkflowExecutionResult {
 	executionId: string;
-	status: "completed" | "failed" | "cancelled";
+  status: "completed" | "failed" | "cancelled" | "paused";
 	outputs: Record<string, unknown>;
 	error?: Error;
 	executionTime: number;
 	nodesExecuted: string[];
-	spans?: TraceSpan[]; // Optional: for visualization purposes
+  spans?: TraceSpan[]; // Optional: for visualization purposes
+  resumeState?: WorkflowResumeState; // Present when status === "paused"
 }
 
 /**
@@ -115,6 +116,18 @@ export interface WorkflowUIConfig {
 }
 
 /**
+ * Serialized state required to resume a paused workflow
+ */
+export interface WorkflowResumeState {
+  workflowId: string;
+  executionId: string;
+  currentNode: string; // Node ID to resume from next
+  variables: Record<string, unknown>;
+  nodeOutputs: Record<string, unknown>; // Flattened Map<string, unknown>
+  nodesExecuted: string[];
+}
+
+/**
  * Condition node configuration
  */
 export interface ConditionConfig {
@@ -129,4 +142,13 @@ export interface ConditionConfig {
 export interface ParallelConfig {
 	branches: string[]; // Node IDs to execute in parallel
 	waitForAll: boolean; // Wait for all branches or first completion
+}
+
+/**
+ * Sub-workflow runner configuration (for procedure-based subworkflow node)
+ */
+export interface SubWorkflowConfig {
+  workflowId: string;
+  input?: Record<string, unknown>;
+  mergeOutputs?: boolean; // if true, return child outputs directly
 }
