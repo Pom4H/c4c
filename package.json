@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter workflow-viz dev",
+    "dev:dashboard": "pnpm --filter tsdev-dashboard dev",
     "dev:basic": "pnpm --filter basic-example dev",
     "dev:workflows": "pnpm --filter workflows-example dev",
     "build": "pnpm -r build",

@@ -69,6 +69,9 @@ tsdev/
     │
     └── workflow-viz/      # Next.js workflow visualization
         └── src/           # React Flow visualization demo
+
+apps/
+  └── dashboard/           # Optional Next.js dashboard for runtime
 ```
 
 ## 🎯 Features

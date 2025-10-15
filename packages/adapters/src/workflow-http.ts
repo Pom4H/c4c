@@ -24,7 +24,9 @@ export async function handleWorkflowRequest(
 	res: ServerResponse,
 	registry: Registry
 ): Promise<boolean> {
-	const url = req.url || "";
+    const url = req.url || "";
+    const [pathname, queryString] = url.split("?");
+    const query = new URLSearchParams(queryString || "");
 
 	// Workflow node palette (visual UI)
 	if (url === "/workflow/palette" && req.method === "GET") {
@@ -35,7 +37,7 @@ export async function handleWorkflowRequest(
 	}
 
 	// Workflow UI configuration (JSON)
-	if (url === "/workflow/ui-config" && req.method === "GET") {
+    if (pathname === "/workflow/ui-config" && req.method === "GET") {
 		const config = generateWorkflowUI(registry);
 		res.writeHead(200, { "Content-Type": "application/json" });
 		res.end(JSON.stringify(config, null, 2));
@@ -43,7 +45,7 @@ export async function handleWorkflowRequest(
 	}
 
 	// Execute workflow
-	if (url === "/workflow/execute" && req.method === "POST") {
+    if (pathname === "/workflow/execute" && req.method === "POST") {
 		try {
 			const body = await parseBody(req);
 			const { workflow, input } = JSON.parse(body) as {
@@ -76,8 +78,92 @@ export async function handleWorkflowRequest(
 		}
 	}
 
+    // Execute workflow asynchronously and return executionId immediately
+    if (pathname === "/workflow/execute-async" && req.method === "POST") {
+        try {
+            const body = await parseBody(req);
+            const { workflow, input } = JSON.parse(body) as {
+                workflow: WorkflowDefinition;
+                input?: Record<string, unknown>;
+            };
+
+            // Validate workflow
+            const errors = validateWorkflow(workflow, registry);
+            if (errors.length > 0) {
+                res.writeHead(400, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ errors }));
+                return true;
+            }
+
+            const executionId = `wf_exec_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+            // Fire-and-forget execution
+            executeWorkflow(workflow, registry, input ?? {}, { executionId }).catch((err) => {
+                // Errors will be published via events by runtime
+                console.error("[Workflow] Async execution failed:", err);
+            });
+
+            res.writeHead(202, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ executionId }));
+            return true;
+        } catch (error) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(
+                JSON.stringify({
+                    error: error instanceof Error ? error.message : String(error),
+                })
+            );
+            return true;
+        }
+    }
+
+    // Server-Sent Events: subscribe to workflow execution events
+    if (pathname === "/workflow/events" && req.method === "GET") {
+        const executionId = query.get("executionId");
+        if (!executionId) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "executionId is required" }));
+            return true;
+        }
+
+        // Set SSE headers
+        res.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+            "X-Accel-Buffering": "no",
+        });
+
+        const send = (event: unknown) => {
+            res.write(`data: ${JSON.stringify(event)}\n\n`);
+        };
+
+        // Heartbeat
+        const heartbeat = setInterval(() => {
+            res.write(`: keep-alive\n\n`);
+        }, 15000);
+
+        // Dynamic import to avoid tight coupling
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        import("@tsdev/workflow/src/events").then(({ subscribeToExecution }) => {
+            const unsubscribe = subscribeToExecution(executionId, (evt: unknown) => send(evt));
+
+            const cleanup = () => {
+                clearInterval(heartbeat);
+                try { unsubscribe(); } catch {}
+                res.end();
+            };
+
+            req.on("close", cleanup);
+            req.on("end", cleanup);
+        });
+
+        return true;
+    }
+
 	// Resume workflow
-	if (url === "/workflow/resume" && req.method === "POST") {
+    if (pathname === "/workflow/resume" && req.method === "POST") {
 		try {
 			const body = await parseBody(req);
 			const { workflow, resumeState, variablesDelta } = JSON.parse(body) as {
