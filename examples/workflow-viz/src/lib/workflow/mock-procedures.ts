@@ -18,6 +18,16 @@ export const mockProcedures: Record<
     return { result: a + b };
   },
   
+  "math.divide": async (input: Record<string, unknown>) => {
+    await new Promise((resolve) => setTimeout(resolve, 550));
+    const a = input.a as number;
+    const b = (input.b as number | undefined) ?? (input.result as number | undefined) ?? 1;
+    if (b === 0) {
+      throw new Error("Division by zero");
+    }
+    return { result: a / b };
+  },
+  
   "math.multiply": async (input: Record<string, unknown>) => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     const a = input.a as number;
@@ -53,5 +63,11 @@ export const mockProcedures: Record<
   "data.save": async () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
     return { saved: true, timestamp: Date.now() };
+  },
+  
+  // Procedure that always fails — useful for error demos
+  "data.fail": async () => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    throw new Error("Intentional failure in data.fail");
   },
 };

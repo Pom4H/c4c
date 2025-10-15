@@ -10,6 +10,7 @@ import {
 	conditionalWorkflow,
 	parallelWorkflow,
 	complexWorkflow,
+	errorWorkflow,
 } from "@/lib/workflow/examples";
 
 const workflows = {
@@ -17,6 +18,7 @@ const workflows = {
 	"conditional-processing": conditionalWorkflow,
 	"parallel-tasks": parallelWorkflow,
 	"complex-workflow": complexWorkflow,
+	"error-demo": errorWorkflow,
 };
 
 export async function GET() {
