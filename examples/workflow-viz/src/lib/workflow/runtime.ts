@@ -21,7 +21,8 @@ const mockRegistry = createMockRegistry();
  */
 export async function executeWorkflow(
   workflow: WorkflowDefinition,
-  initialInput: Record<string, unknown> = {}
+  initialInput: Record<string, unknown> = {},
+  options?: { executionId?: string }
 ): Promise<WorkflowExecutionResult> {
   const collector = new SpanCollector();
   // Bind OTEL exporter to our collector and ensure provider is installed
@@ -31,7 +32,7 @@ export async function executeWorkflow(
     // Dynamically import core after installing provider so tracer binds correctly
     const { executeWorkflow: coreExecuteWorkflow } = await import("@tsdev/workflow");
     // Execute using framework core runtime
-    const result = await coreExecuteWorkflow(workflow, mockRegistry, initialInput);
+    const result = await coreExecuteWorkflow(workflow, mockRegistry, initialInput, options);
     // Ensure all spans are flushed
     await forceFlush();
     clearActiveCollector();

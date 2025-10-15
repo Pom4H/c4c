@@ -16,6 +16,7 @@ import type {
 	ParallelConfig,
   WorkflowResumeState,
 } from "./types.js";
+import { publish } from "./events.js";
 
 const tracer = trace.getTracer("tsdev.workflow");
 
@@ -37,9 +38,10 @@ export class PauseSignal extends Error {
 export async function executeWorkflow(
 	workflow: WorkflowDefinition,
 	registry: Registry,
-	initialInput: Record<string, unknown> = {}
+	initialInput: Record<string, unknown> = {},
+	options?: { executionId?: string }
 ): Promise<WorkflowExecutionResult> {
-	const executionId = `wf_exec_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+	const executionId = options?.executionId ?? `wf_exec_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 	const startTime = Date.now();
 
 	// Create workflow-level span
@@ -66,6 +68,14 @@ export async function executeWorkflow(
 
 			const nodesExecuted: string[] = [];
 
+			// Publish workflow started
+			publish({
+				type: "workflow.started",
+				workflowId: workflow.id,
+				executionId,
+				startTime,
+			});
+
 			try {
 				// Start execution from start node
 				let currentNodeId: string | undefined = workflow.startNode;
@@ -87,8 +97,29 @@ export async function executeWorkflow(
 						"workflow.nodes_executed": nodesExecuted.length,
 					});
 
+					// Publish node started
+					publish({
+						type: "node.started",
+						workflowId: workflow.id,
+						executionId,
+						nodeId: currentNodeId,
+						nodeIndex,
+						timestamp: Date.now(),
+					});
+
 					// Execute node (creates its own span)
 					const nextNodeId = await executeNode(node, workflowContext, registry, workflow);
+
+					// Publish node completed
+					publish({
+						type: "node.completed",
+						workflowId: workflow.id,
+						executionId,
+						nodeId: node.id,
+						nodeIndex,
+						nextNodeId: nextNodeId,
+						timestamp: Date.now(),
+					});
 					currentNodeId = nextNodeId;
 					nodeIndex++;
 				}
@@ -112,6 +143,15 @@ export async function executeWorkflow(
 				console.log(
 					`[Workflow] ✅ Completed: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`
 				);
+
+				// Publish workflow completed
+				publish({
+					type: "workflow.completed",
+					workflowId: workflow.id,
+					executionId,
+					executionTime,
+					nodesExecuted,
+				});
 
 				return {
 					executionId,
@@ -142,7 +182,7 @@ export async function executeWorkflow(
 						`[Workflow] ⏸️ Paused: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes) — ${error.reason}`
 					);
 
-					const resumeState: WorkflowResumeState = {
+                    const resumeState: WorkflowResumeState = {
 						workflowId: workflow.id,
 						executionId,
 						currentNode: workflowContext.currentNode || workflow.startNode,
@@ -150,6 +190,16 @@ export async function executeWorkflow(
 						nodeOutputs: Object.fromEntries(workflowContext.nodeOutputs.entries()),
 						nodesExecuted: [...nodesExecuted],
 					};
+
+                    // Publish workflow paused (after resumeState is defined)
+                    publish({
+                        type: "workflow.paused",
+                        workflowId: workflow.id,
+                        executionId,
+                        executionTime,
+                        nodesExecuted,
+                        resumeState,
+                    });
 
 					return {
 						executionId,
@@ -179,6 +229,16 @@ export async function executeWorkflow(
 					`[Workflow] ❌ Failed: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`,
 					error
 				);
+
+				// Publish workflow failed
+				publish({
+					type: "workflow.failed",
+					workflowId: workflow.id,
+					executionId,
+					executionTime,
+					nodesExecuted,
+					error: error instanceof Error ? error.message : String(error),
+				});
 
 				return {
 					executionId,
@@ -375,6 +435,15 @@ async function executeNode(
 					`[Workflow] 🔷 Executing node: ${node.id} (type: ${node.type}${node.procedureName ? `, procedure: ${node.procedureName}` : ""})`
 				);
 
+				// Publish started for any node (including parallel branches)
+				publish({
+					type: "node.started",
+					workflowId: workflow.id,
+					executionId: context.executionId,
+					nodeId: node.id,
+					timestamp: Date.now(),
+				});
+
 				let nextNodeId: string | undefined;
 
 				switch (node.type) {
@@ -402,6 +471,16 @@ async function executeNode(
 				nodeSpan.setStatus({ code: SpanStatusCode.OK });
 
 				console.log(`[Workflow] ✅ Node completed: ${node.id}${nextNodeId ? ` → ${nextNodeId}` : " (end)"}`);
+
+				// Publish completed for any node
+				publish({
+					type: "node.completed",
+					workflowId: workflow.id,
+					executionId: context.executionId,
+					nodeId: node.id,
+					nextNodeId,
+					timestamp: Date.now(),
+				});
 
 				return nextNodeId;
 			} catch (error) {

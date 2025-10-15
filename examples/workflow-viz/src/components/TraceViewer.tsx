@@ -40,8 +40,8 @@ export default function TraceViewer({ spans }: TraceViewerProps) {
       <div className="space-y-2">
         {sortedSpans.map((span) => {
           const relativeStart = span.startTime - minStartTime;
-          const leftPercent = (relativeStart / totalDuration) * 100;
-          const widthPercent = (span.duration / totalDuration) * 100;
+          const leftPercent = totalDuration > 0 ? (relativeStart / totalDuration) * 100 : 0;
+          const widthPercent = totalDuration > 0 ? Math.max((span.duration / totalDuration) * 100, 0.5) : 100;
 
           const isError = span.status.code === "ERROR";
           const indent = (span.name.match(/\./g) || []).length * 20;
