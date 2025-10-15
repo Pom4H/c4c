@@ -80,7 +80,7 @@ export default function WorkflowVisualizer({
                 )}
               </div>
               {nodeSpan && (
-                <div className="text-xs mt-1 text-primary">
+              <div className="text-xs mt-1 text-primary">
                   {nodeSpan.duration}ms
                 </div>
               )}
@@ -91,7 +91,7 @@ export default function WorkflowVisualizer({
           background: isExecuted
             ? getNodeTypeColor(node.type)
             : "#e5e7eb",
-          border: `2px solid ${nodeSpan?.status.code === "ERROR" ? "#ef4444" : "#1e40af"}`,
+          border: `2px solid ${nodeSpan && nodeSpan.status.code === "ERROR" ? "#ef4444" : "#1e40af"}`,
           borderRadius: "8px",
           padding: "10px",
           width: 180,

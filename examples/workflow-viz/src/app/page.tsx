@@ -130,6 +130,16 @@ export default function Home() {
     }
   };
 
+  // Cleanup SSE on unmount
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, []);
+
 	return (
 		<main className="min-h-screen gradient-workflow p-8">
 			<div className="max-w-7xl mx-auto animate-slide-in">

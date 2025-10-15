@@ -182,17 +182,7 @@ export async function executeWorkflow(
 						`[Workflow] ⏸️ Paused: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes) — ${error.reason}`
 					);
 
-					// Publish workflow paused
-					publish({
-						type: "workflow.paused",
-						workflowId: workflow.id,
-						executionId,
-						executionTime,
-						nodesExecuted,
-						resumeState,
-					});
-
-					const resumeState: WorkflowResumeState = {
+                    const resumeState: WorkflowResumeState = {
 						workflowId: workflow.id,
 						executionId,
 						currentNode: workflowContext.currentNode || workflow.startNode,
@@ -200,6 +190,16 @@ export async function executeWorkflow(
 						nodeOutputs: Object.fromEntries(workflowContext.nodeOutputs.entries()),
 						nodesExecuted: [...nodesExecuted],
 					};
+
+                    // Publish workflow paused (after resumeState is defined)
+                    publish({
+                        type: "workflow.paused",
+                        workflowId: workflow.id,
+                        executionId,
+                        executionTime,
+                        nodesExecuted,
+                        resumeState,
+                    });
 
 					return {
 						executionId,
