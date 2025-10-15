@@ -6,7 +6,7 @@
  */
 
 import { useMemo, useState } from "react";
-import type { TraceSpan } from "@/lib/workflow/types";
+import type { TraceSpan } from "@tsdev/workflow";
 
 interface SpanGanttChartProps {
   spans: TraceSpan[];

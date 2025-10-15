@@ -17,7 +17,7 @@ import {
   Panel,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { WorkflowDefinition, TraceSpan } from "@/lib/workflow/types";
+import type { WorkflowDefinition, TraceSpan } from "@tsdev/workflow";
 
 interface WorkflowVisualizerProps {
   workflow: WorkflowDefinition;

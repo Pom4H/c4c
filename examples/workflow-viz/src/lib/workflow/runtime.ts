@@ -5,9 +5,8 @@
  */
 
 import { createMockRegistry } from "./mock-registry";
-import { SpanCollector } from "./span-collector";
-import { bindCollector, forceFlush, clearActiveCollector } from "./otel";
-import type { WorkflowDefinition, WorkflowExecutionResult } from "./types";
+import { SpanCollector, bindCollector, forceFlush, clearActiveCollector } from "@tsdev/workflow";
+import type { WorkflowDefinition, WorkflowExecutionResult } from "@tsdev/workflow";
 
 // Create singleton mock registry
 const mockRegistry = createMockRegistry();
@@ -40,9 +39,8 @@ export async function executeWorkflow(
     // Add collected spans for UI visualization
     return {
       ...result,
-      error: result.error ? (result.error instanceof Error ? result.error.message : String(result.error)) : undefined,
       spans: collector.getSpans(),
-    };
+    } as WorkflowExecutionResult & { spans: NonNullable<WorkflowExecutionResult['spans']> };
   } catch (error) {
     await forceFlush();
     clearActiveCollector();

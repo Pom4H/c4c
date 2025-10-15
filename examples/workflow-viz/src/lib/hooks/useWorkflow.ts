@@ -8,7 +8,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { WorkflowExecutionResult } from "@tsdev/workflow";
+import type { WorkflowExecutionResult, WorkflowDefinition } from "@tsdev/workflow";
 
 export interface UseWorkflowOptions {
 	apiBaseUrl?: string;
@@ -143,11 +143,11 @@ export function useWorkflows(options: { apiBaseUrl?: string } = {}) {
  * Hook for fetching workflow definition
  */
 export function useWorkflowDefinition(
-	workflowId: string | null,
-	options: { apiBaseUrl?: string } = {}
+    workflowId: string | null,
+    options: { apiBaseUrl?: string } = {}
 ) {
 	const { apiBaseUrl = "/api/workflow" } = options;
-	const [definition, setDefinition] = useState<any>(null);
+    const [definition, setDefinition] = useState<WorkflowDefinition | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
 

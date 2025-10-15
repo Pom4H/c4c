@@ -2,7 +2,7 @@
  * Example workflow definitions
  */
 
-import type { WorkflowDefinition } from "./types";
+import type { WorkflowDefinition } from "@tsdev/workflow";
 
 /**
  * Simple math calculation workflow

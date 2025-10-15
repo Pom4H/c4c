@@ -307,7 +307,7 @@ export default function Home() {
 										</tr>
 									</thead>
 									<tbody className="divide-y divide-border">
-										{definition.nodes.map((node: any) => (
+                    {definition.nodes.map((node: { id: string; type: string; procedureName?: string; next?: string | string[] }) => (
 											<tr
 												key={node.id}
 												className="hover:bg-muted/50 transition-colors"

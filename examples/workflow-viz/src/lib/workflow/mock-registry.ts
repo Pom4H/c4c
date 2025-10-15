@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import type { Registry, Procedure } from "@tsdev/core";
+import type { Registry, Procedure } from "@tsdev/workflow";
 import { mockProcedures } from "./mock-procedures";
 
 /**

@@ -1,19 +1,15 @@
 /**
- * Simple in-memory trace collector for visualization
- * 
- * This is a demo utility that collects OTEL spans for UI display.
- * In production, you would use an OTEL exporter (Jaeger, Zipkin, etc.)
+ * Simple in-memory trace collector for visualization and tests.
  */
-
-import type { TraceSpan } from "./types";
+import type { TraceSpan } from "./types.js";
 
 export class SpanCollector {
   private spans: TraceSpan[] = [];
   private currentSpanId = 0;
   private traceId: string;
 
-  constructor() {
-    this.traceId = `trace_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+  constructor(traceId?: string) {
+    this.traceId = traceId ?? `trace_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   startSpan(

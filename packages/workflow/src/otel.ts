@@ -1,51 +1,34 @@
 /**
- * OpenTelemetry setup for the example app
+ * OpenTelemetry setup & exporter for the framework.
  *
- * We install a lightweight OTEL tracer provider with a custom exporter that
- * forwards finished spans to the in-memory `SpanCollector` used by the UI.
- *
- * Design notes:
- * - Uses BasicTracerProvider + SimpleSpanProcessor (from sdk-trace-base)
- * - Uses AsyncLocalStorageContextManager for proper async context propagation
- * - Maintains a traceId → SpanCollector map so all child spans are routed to
- *   the correct collector instance for the current execution
+ * Exposes helpers to bind a SpanCollector for the current execution so that
+ * spans produced by the runtime and procedures can be visualized in apps.
  */
 
-import type { TraceSpan } from "./types";
-import { SpanCollector } from "./span-collector";
+import type { TraceSpan } from "./types.js";
+import { SpanCollector } from "./span-collector.js";
+import type { SpanExporter, ReadableSpan } from "@opentelemetry/sdk-trace-base";
 
-// These imports are runtime-only (server). Keep them inside try/catch in case
-// the example is built without server modules in some environments.
 let api: typeof import("@opentelemetry/api");
 let sdk: typeof import("@opentelemetry/sdk-trace-base");
 let asyncHooks: typeof import("@opentelemetry/context-async-hooks");
 
-// Global singletons
 let provider: import("@opentelemetry/sdk-trace-base").BasicTracerProvider | undefined;
 let isInstalled = false;
 
-// Map traceId → collector. This lets the exporter route spans correctly when
-// multiple executions occur over time.
 const traceIdToCollector = new Map<string, SpanCollector>();
-
-// Fallback active collector (set before each execution). When the root span for
-// a new trace is seen, we bind its traceId to this collector.
 let currentActiveCollector: SpanCollector | undefined;
 
-/** Convert OTEL HrTime to epoch milliseconds */
 function hrTimeToMs(hr: [number, number]): number {
   return hr[0] * 1_000 + Math.floor(hr[1] / 1_000_000);
 }
 
-/** Map SpanStatusCode number to string code in our TraceSpan */
-function statusCodeToString(code: number): "OK" | "ERROR" | "UNSET" {
-  // 0=UNSET, 1=OK, 2=ERROR in OTEL API
+function statusCodeToString(code: number | undefined): "OK" | "ERROR" | "UNSET" {
   if (code === 1) return "OK";
   if (code === 2) return "ERROR";
   return "UNSET";
 }
 
-/** Map OTEL SpanKind number to string */
 function spanKindToString(kind: number): string {
   switch (kind) {
     case 0:
@@ -63,29 +46,23 @@ function spanKindToString(kind: number): string {
   }
 }
 
-/** Custom exporter that forwards spans to the in-memory SpanCollector */
-class CollectorSpanExporter implements import("@opentelemetry/sdk-trace-base").SpanExporter {
+class CollectorSpanExporter implements SpanExporter {
   export(
-    spans: import("@opentelemetry/sdk-trace-base").ReadableSpan[],
-    resultCallback: (result: import("@opentelemetry/sdk-trace-base").ExportResult) => void
+    spans: ReadableSpan[],
+    resultCallback: (result: { code: number; error?: Error }) => void
   ): void {
     try {
       for (const span of spans) {
         const spanContext = span.spanContext();
         const traceId = spanContext.traceId;
 
-        // Bind trace to active collector on first seen root span if needed
         if (!traceIdToCollector.has(traceId) && currentActiveCollector) {
           traceIdToCollector.set(traceId, currentActiveCollector);
         }
 
         const collector = traceIdToCollector.get(traceId);
-        if (!collector) {
-          // No collector registered for this trace; skip exporting
-          continue;
-        }
+        if (!collector) continue;
 
-        // Convert span to our TraceSpan model
         const startTime = hrTimeToMs(span.startTime as [number, number]);
         const endTime = hrTimeToMs(span.endTime as [number, number]);
         const duration = Math.max(0, endTime - startTime);
@@ -100,7 +77,6 @@ class CollectorSpanExporter implements import("@opentelemetry/sdk-trace-base").S
           ) {
             attributes[key] = value;
           } else if (value != null) {
-            // stringify arrays/objects for display
             try {
               attributes[key] = JSON.stringify(value);
             } catch {
@@ -109,15 +85,14 @@ class CollectorSpanExporter implements import("@opentelemetry/sdk-trace-base").S
           }
         }
 
-        const events: TraceSpan["events"] = (span.events || []).map((evt) => ({
+        const events: TraceSpan["events"] = (span.events || []).map((evt: any) => ({
           name: evt.name,
           timestamp: hrTimeToMs(evt.time as [number, number]),
           attributes: evt.attributes,
         }));
 
         // Push as a complete span by starting and ending immediately in collector
-        const spanId = collector.startSpan(span.name, attributes, span.parentSpanId);
-        // Overwrite IDs/times to match OTEL
+        collector.startSpan(span.name, attributes, span.parentSpanId);
         const spansRef = (collector as any).spans as TraceSpan[];
         const created = spansRef[spansRef.length - 1];
         created.spanId = spanContext.spanId;
@@ -127,30 +102,23 @@ class CollectorSpanExporter implements import("@opentelemetry/sdk-trace-base").S
         created.endTime = endTime;
         created.duration = duration;
         created.status = {
-          code: statusCodeToString((status.code as unknown as number) ?? 0),
-          message: status.message,
+          code: statusCodeToString(status?.code as unknown as number),
+          message: status?.message,
         };
-        if (events && events.length > 0) {
-          created.events = events;
-        }
+        if (events && events.length > 0) created.events = events;
       }
-      resultCallback({ code: 0 }); // ExportResultCode.SUCCESS
+      resultCallback({ code: 0 });
     } catch (err) {
-      // Report failure but don't throw
       resultCallback({ code: 1, error: err as Error });
     }
   }
-
   shutdown(): Promise<void> {
     return Promise.resolve();
   }
 }
 
-/** Install OTEL provider once for the process */
 async function ensureProviderInstalled(): Promise<void> {
   if (isInstalled) return;
-
-  // Lazy dynamic imports to avoid client bundling
   const apiModule = await import("@opentelemetry/api");
   api = apiModule as unknown as typeof import("@opentelemetry/api");
   const sdkModule = await import("@opentelemetry/sdk-trace-base");
@@ -165,38 +133,22 @@ async function ensureProviderInstalled(): Promise<void> {
   provider = new BasicTracerProvider();
   provider.addSpanProcessor(new SimpleSpanProcessor(new CollectorSpanExporter()));
 
-  // Install context manager for async propagation
   context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
-
-  // Make this the global tracer provider
   api.trace.setGlobalTracerProvider(provider);
-
   isInstalled = true;
 }
 
-/**
- * Bind a collector for the upcoming execution. The exporter will attach the
- * first seen traceId to this collector and route all subsequent spans.
- */
 export async function bindCollector(collector: SpanCollector): Promise<void> {
   await ensureProviderInstalled();
   currentActiveCollector = collector;
 }
 
-/** Force-flush all pending spans */
 export async function forceFlush(): Promise<void> {
-  if (provider) {
-    await provider.forceFlush();
-  }
+  if (provider) await provider.forceFlush();
 }
 
-/** Clear the temporary active collector after use */
 export function clearActiveCollector(): void {
   currentActiveCollector = undefined;
 }
 
-/** Expose for tests: reset all mappings */
-export function __resetForTests(): void {
-  traceIdToCollector.clear();
-  currentActiveCollector = undefined;
-}
+export { SpanCollector };

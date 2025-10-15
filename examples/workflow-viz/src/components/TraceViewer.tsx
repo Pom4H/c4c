@@ -4,7 +4,7 @@
  * OpenTelemetry Trace Viewer Component
  */
 
-import type { TraceSpan } from "@/lib/workflow/types";
+import type { TraceSpan } from "@tsdev/workflow";
 
 interface TraceViewerProps {
   spans: TraceSpan[];
