@@ -14,9 +14,21 @@ import type {
 	WorkflowNode,
 	ConditionConfig,
 	ParallelConfig,
+  WorkflowResumeState,
 } from "./types.js";
 
 const tracer = trace.getTracer("tsdev.workflow");
+
+/**
+ * Signal to pause workflow execution gracefully.
+ * Throw this from a procedure to pause and persist state for later resume.
+ */
+export class PauseSignal extends Error {
+  constructor(readonly reason: string, readonly data?: unknown) {
+    super(reason);
+    this.name = "PauseSignal";
+  }
+}
 
 /**
  * Execute a workflow with full OpenTelemetry tracing
@@ -109,6 +121,45 @@ export async function executeWorkflow(
 					nodesExecuted,
 				};
 			} catch (error) {
+				if (error instanceof PauseSignal) {
+					const executionTime = Date.now() - startTime;
+					// Prepare partial outputs
+					const outputs: Record<string, unknown> = {};
+					for (const [nodeId, output] of workflowContext.nodeOutputs.entries()) {
+						outputs[nodeId] = output;
+					}
+
+					// Mark span as paused
+					workflowSpan.setAttributes({
+						"workflow.status": "paused",
+						"workflow.nodes_executed_total": nodesExecuted.length,
+						"workflow.execution_time_ms": executionTime,
+						"workflow.pause.reason": error.reason,
+					});
+					workflowSpan.setStatus({ code: SpanStatusCode.UNSET });
+
+					console.log(
+						`[Workflow] ⏸️ Paused: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes) — ${error.reason}`
+					);
+
+					const resumeState: WorkflowResumeState = {
+						workflowId: workflow.id,
+						executionId,
+						currentNode: workflowContext.currentNode || workflow.startNode,
+						variables: { ...workflowContext.variables },
+						nodeOutputs: Object.fromEntries(workflowContext.nodeOutputs.entries()),
+						nodesExecuted: [...nodesExecuted],
+					};
+
+					return {
+						executionId,
+						status: "paused" as const,
+						outputs,
+						executionTime,
+						nodesExecuted,
+						resumeState,
+					};
+				}
 				const executionTime = Date.now() - startTime;
 
 				// Set error attributes
@@ -142,6 +193,159 @@ export async function executeWorkflow(
 			}
 		}
 	);
+}
+
+/**
+ * Resume a previously paused workflow from a serialized state
+ */
+export async function resumeWorkflow(
+  workflow: WorkflowDefinition,
+  registry: Registry,
+  resumeState: WorkflowResumeState,
+  variablesDelta: Record<string, unknown> = {}
+): Promise<WorkflowExecutionResult> {
+  const startTime = Date.now();
+
+  return tracer.startActiveSpan(
+    `workflow.resume`,
+    {
+      attributes: {
+        "workflow.id": workflow.id,
+        "workflow.name": workflow.name,
+        "workflow.version": workflow.version,
+        "workflow.execution_id": resumeState.executionId,
+        "workflow.start_node": resumeState.currentNode,
+        "workflow.node_count": workflow.nodes.length,
+      },
+    },
+    async (workflowSpan: Span) => {
+      const workflowContext: WorkflowContext = {
+        workflowId: workflow.id,
+        executionId: resumeState.executionId,
+        variables: { ...workflow.variables, ...resumeState.variables, ...variablesDelta },
+        nodeOutputs: new Map(Object.entries(resumeState.nodeOutputs || {})),
+        startTime: new Date(),
+        currentNode: resumeState.currentNode,
+      };
+
+      const nodesExecuted: string[] = [...(resumeState.nodesExecuted || [])];
+
+      try {
+        let currentNodeId: string | undefined = resumeState.currentNode;
+        let nodeIndex = nodesExecuted.length;
+
+        while (currentNodeId) {
+          const node = workflow.nodes.find((n) => n.id === currentNodeId);
+          if (!node) {
+            throw new Error(`Node ${currentNodeId} not found in workflow`);
+          }
+
+          workflowContext.currentNode = currentNodeId;
+          nodesExecuted.push(currentNodeId);
+
+          workflowSpan.setAttributes({
+            "workflow.current_node": currentNodeId,
+            "workflow.current_node_index": nodeIndex,
+            "workflow.nodes_executed": nodesExecuted.length,
+          });
+
+          const nextNodeId = await executeNode(node, workflowContext, registry, workflow);
+          currentNodeId = nextNodeId;
+          nodeIndex++;
+        }
+
+        const outputs: Record<string, unknown> = {};
+        for (const [nodeId, output] of workflowContext.nodeOutputs.entries()) {
+          outputs[nodeId] = output;
+        }
+
+        const executionTime = Date.now() - startTime;
+
+        workflowSpan.setAttributes({
+          "workflow.status": "completed",
+          "workflow.nodes_executed_total": nodesExecuted.length,
+          "workflow.execution_time_ms": executionTime,
+        });
+        workflowSpan.setStatus({ code: SpanStatusCode.OK });
+
+        console.log(
+          `[Workflow] ▶️ Resumed and completed: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`
+        );
+
+        return {
+          executionId: resumeState.executionId,
+          status: "completed" as const,
+          outputs,
+          executionTime,
+          nodesExecuted,
+        };
+      } catch (error) {
+        if (error instanceof PauseSignal) {
+          const executionTime = Date.now() - startTime;
+          const outputs: Record<string, unknown> = {};
+          for (const [nodeId, output] of workflowContext.nodeOutputs.entries()) {
+            outputs[nodeId] = output;
+          }
+
+          workflowSpan.setAttributes({
+            "workflow.status": "paused",
+            "workflow.nodes_executed_total": nodesExecuted.length,
+            "workflow.execution_time_ms": executionTime,
+            "workflow.pause.reason": error.reason,
+          });
+          workflowSpan.setStatus({ code: SpanStatusCode.UNSET });
+
+          const newResumeState: WorkflowResumeState = {
+            workflowId: workflow.id,
+            executionId: resumeState.executionId,
+            currentNode: workflowContext.currentNode || resumeState.currentNode,
+            variables: { ...workflowContext.variables },
+            nodeOutputs: Object.fromEntries(workflowContext.nodeOutputs.entries()),
+            nodesExecuted: [...nodesExecuted],
+          };
+
+          console.log(
+            `[Workflow] ⏸️ Paused after resume: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes) — ${error.reason}`
+          );
+
+          return {
+            executionId: resumeState.executionId,
+            status: "paused" as const,
+            outputs,
+            executionTime,
+            nodesExecuted,
+            resumeState: newResumeState,
+          };
+        }
+
+        const executionTime = Date.now() - startTime;
+        workflowSpan.setAttributes({
+          "workflow.status": "failed",
+          "workflow.nodes_executed_total": nodesExecuted.length,
+          "workflow.execution_time_ms": executionTime,
+          "workflow.error": error instanceof Error ? error.message : String(error),
+        });
+        workflowSpan.recordException(error instanceof Error ? error : new Error(String(error)));
+        workflowSpan.setStatus({ code: SpanStatusCode.ERROR, message: error instanceof Error ? error.message : String(error) });
+
+        console.error(
+          `[Workflow] ❌ Failed after resume: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`,
+          error
+        );
+
+        return {
+          executionId: resumeState.executionId,
+          status: "failed" as const,
+          outputs: {},
+          error: error instanceof Error ? error : new Error(String(error)),
+          executionTime,
+          nodesExecuted,
+        };
+      } finally {
+        workflowSpan.end();
+      }
+    }
+  );
 }
 
 /**
@@ -259,6 +463,7 @@ async function executeProcedureNode(
 		executionId: context.executionId,
 		nodeId: node.id,
 		nodeProcedure: node.procedureName,
+		registry, // expose registry to procedures (e.g., subworkflow runner)
 	});
 
 	// Add workflow-level attributes to the execution context

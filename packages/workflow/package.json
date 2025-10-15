@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "build": "tsc && cd react && tsc",
+    "build": "tsc",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
   },
