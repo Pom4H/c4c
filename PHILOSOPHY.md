@@ -1,638 +1,715 @@
 # tsdev Philosophy
 
-> **The framework that gets out of your way.**  
-> Write business logic, not boilerplate.
-
-This document explains the design principles behind tsdev and why they matter.
+> **AI agents should build with procedures, not prompts.**  
+> Workflows are the compiled logic agents reuse instead of re-thinking.
 
 ---
 
-## The Core Insight
+## The Core Problem
 
-**Traditional frameworks bind you to transport layers.**
+**AI agents are stateless problem-solvers.**
 
-- Express: HTTP-first
-- GraphQL: Query-language-first
-- gRPC: Protocol-first
-- CLI frameworks: Command-first
+Every interaction, they:
+1. Re-read available context
+2. Re-reason about the task
+3. Re-compose the solution
+4. Re-execute similar patterns
 
-**tsdev is domain-first.**
+**This is wasteful.**
 
-You define what your system does (contracts), not how it's accessed (transport).
+If an agent successfully completes "create user → send email → track analytics", why should it re-solve this next time?
 
----
-
-## 1. Contracts as the Single Source of Truth
-
-### The Problem
-
-In typical applications:
-
-```typescript
-// OpenAPI definition (YAML)
-paths:
-  /users:
-    post:
-      requestBody: { ... }
-      
-// TypeScript types
-interface CreateUserInput { ... }
-
-// Runtime validation
-app.post('/users', (req, res) => {
-  if (!req.body.name) throw new Error('...');
-});
-
-// CLI
-program.command('create-user')
-  .option('--name <name>')
-  
-// Documentation
-/** Creates a user with the given name... */
-```
-
-**Five places to maintain the same information.**
-
-### The Solution
-
-```typescript
-export const createUserContract = {
-  name: "users.create",
-  description: "Creates a new user",
-  input: z.object({
-    name: z.string(),
-    email: z.string().email()
-  }),
-  output: z.object({
-    id: z.string(),
-    name: z.string(),
-    email: z.string()
-  })
-};
-```
-
-**One contract. Everything else derives from it:**
-
-- TypeScript types: `z.infer<typeof contract.input>`
-- Runtime validation: `contract.input.parse(data)`
-- OpenAPI schema: `zodToJsonSchema(contract.input)`
-- CLI arguments: Auto-parsed from schema
-- Documentation: `contract.description`
-- REST routes: Naming convention (`users.create` → `POST /users`)
+**What if agents could cache solutions as executable workflows?**
 
 ---
 
-## 2. Transport Agnosticism
+## 1. Procedures as Agent Building Blocks
 
-### The Principle
+### Traditional Approach: Documentation
 
-Business logic doesn't care about transport.
+Agents read human documentation:
 
-Whether called from:
-- HTTP request
-- CLI command
-- Message queue
-- Workflow node
-- Test suite
-- AI agent
+```markdown
+# Users API
 
-**The behavior is identical.**
+## Create User
+POST /api/users
 
-### How It Works
+**Request:**
+{
+  "name": "string",
+  "email": "string"
+}
 
-Every handler receives:
-
-```typescript
-handler(input: TInput, context: ExecutionContext)
-```
-
-Where:
-- `input`: Already validated against contract
-- `context`: Transport-agnostic metadata
-
-```typescript
-interface ExecutionContext {
-  requestId: string;
-  timestamp: Date;
-  metadata: Record<string, unknown>;  // Transport-specific details
+**Response:**
+{
+  "id": "string",
+  "name": "string",
+  "email": "string"
 }
 ```
 
-Handlers never see `req`, `res`, `process.argv`, or transport specifics.
+**Problems:**
+- Documentation drifts from reality
+- Agents must parse unstructured text
+- No validation schema
+- No introspection
+- No compositional semantics
 
-**Adapters handle transport → core translation:**
+### tsdev Approach: Machine-Readable Contracts
 
-```typescript
-// HTTP Adapter
-const input = JSON.parse(req.body);
-const context = createExecutionContext({
-  transport: "http",
-  method: req.method,
-  url: req.url
-});
-const result = await executeProcedure(procedure, input, context);
-res.json(result);
-
-// CLI Adapter
-const input = parseCliArgs(process.argv);
-const context = createExecutionContext({
-  transport: "cli",
-  args: process.argv
-});
-const result = await executeProcedure(procedure, input, context);
-console.log(JSON.stringify(result, null, 2));
-```
-
-**Same `executeProcedure()`, different adapters.**
-
----
-
-## 3. Zero Configuration Through Reflection
-
-### The Problem
-
-Traditional frameworks require registration:
+Agents introspect structured contracts:
 
 ```typescript
-// Express
-app.post('/users', createUserHandler);
-app.get('/users', listUsersHandler);
-
-// tRPC
-const appRouter = router({
-  users: {
-    create: procedure.input(...).mutation(...),
-    list: procedure.input(...).query(...),
-  }
-});
-```
-
-**Manual registration = boilerplate + mistakes.**
-
-### The Solution
-
-```typescript
-// handlers/users.ts
-export const createUser: Procedure = { contract, handler };
-export const listUsers: Procedure = { contract, handler };
-```
-
-**That's it.** No registration.
-
-The framework discovers procedures via reflection:
-
-```typescript
-const registry = await collectRegistry("./handlers");
-// 1. Finds all *.ts files in handlers/
-// 2. Dynamic imports each file
-// 3. Extracts exports matching Procedure interface
-// 4. Registers by contract.name
-```
-
-**Benefits:**
-- No route files
-- No manual registration
-- Can't forget to register
-- Self-documenting (introspection)
-
----
-
-## 4. Convention-Driven Automation
-
-### Naming Convention → REST API
-
-Procedure names follow `resource.action` pattern:
-
-```
-users.create  → POST /users
-users.list    → GET /users
-users.get     → GET /users/:id
-users.update  → PUT /users/:id
-users.delete  → DELETE /users/:id
-```
-
-**Write the procedure once, get both RPC and REST:**
-
-```bash
-# RPC style
-POST /rpc/users.create
-
-# REST style (auto-generated)
-POST /users
-```
-
-### File Structure → Registry
-
-```
-handlers/
-├── users.ts        # All user procedures
-├── products.ts     # All product procedures
-└── orders.ts       # All order procedures
-```
-
-**Structure becomes the organization.**
-
-No need for:
-- Route files
-- Controller classes
-- Service registries
-
-**The file system IS the registry.**
-
----
-
-## 5. Composability Over Inheritance
-
-### The Problem
-
-Traditional frameworks use classes and inheritance:
-
-```typescript
-class UserController extends BaseController {
-  @Post()
-  @UseGuards(AuthGuard)
-  @UseInterceptors(LoggingInterceptor)
-  async createUser() { ... }
-}
-```
-
-**Issues:**
-- Tight coupling to framework
-- Magic decorators
-- Hard to test in isolation
-- Framework lock-in
-
-### The Solution
-
-Pure function composition:
-
-```typescript
-import { applyPolicies } from '@tsdev/core';
-
-const handler = applyPolicies(
-  baseHandler,
-  withRetry({ maxAttempts: 3 }),
-  withLogging("users.create"),
-  withSpan("users.create")
-);
-```
-
-**Policies are just functions:**
-
-```typescript
-export function withRetry(options): Policy {
-  return (handler) => async (input, context) => {
-    for (let i = 0; i < options.maxAttempts; i++) {
-      try {
-        return await handler(input, context);
-      } catch (error) {
-        if (i === options.maxAttempts - 1) throw error;
-        await sleep(100 * Math.pow(2, i));
-      }
+// GET /procedures
+{
+  "name": "users.create",
+  "description": "Creates a new user account",
+  "input": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "description": "User's full name" },
+      "email": { "type": "string", "format": "email" }
+    },
+    "required": ["name", "email"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "name": { "type": "string" },
+      "email": { "type": "string" }
     }
-  };
+  },
+  "metadata": {
+    "tags": ["users", "write"],
+    "rateLimit": { "maxTokens": 10, "windowMs": 60000 }
+  }
 }
 ```
 
 **Benefits:**
-- No framework magic
-- Testable in isolation
-- Standard JavaScript
-- Easy to understand
-- Easy to extend
+- ✅ Always accurate (generated from code)
+- ✅ Structured (JSON schema)
+- ✅ Validated (runtime + compile-time)
+- ✅ Introspectable (agents discover automatically)
+- ✅ Composable (procedures → workflows)
 
 ---
 
-## 6. Observability as a First-Class Citizen
+## 2. Workflows as Cached Agent Logic
 
 ### The Insight
 
-**Observability is part of the domain model, not infrastructure.**
+**Workflows are compiled agent reasoning.**
 
-When you execute a workflow, you care about:
-- Which user triggered it?
-- Which organization?
-- Which workflow step failed?
-- What were the inputs?
+When an agent successfully solves a task, that solution is valuable:
+- It works (proven by execution)
+- It's optimized (debugged through iterations)
+- It's reusable (same pattern recurs)
 
-**This is business-level telemetry, not just logs.**
+**Why not save it?**
 
-### Implementation
+### Workflow as DSL
 
-Every procedure execution happens in an OpenTelemetry span:
-
-```typescript
-export function withSpan(name: string): Policy {
-  return (handler) => async (input, context) => {
-    return tracer.startActiveSpan(name, async (span) => {
-      // Add business attributes
-      span.setAttributes({
-        "procedure.name": name,
-        "user.id": context.metadata.userId,
-        "org.id": context.metadata.orgId,
-        "input": JSON.stringify(input)
-      });
-      
-      const result = await handler(input, context);
-      
-      span.setAttributes({
-        "output": JSON.stringify(result)
-      });
-      
-      return result;
-    });
-  };
-}
-```
-
-**Workflows create span hierarchies automatically:**
-
-```
-workflow.execute
-├── node.procedure (users.create)
-│   └── withSpan(users.create)
-│       └── withRetry(users.create)
-└── node.procedure (emails.send)
-    └── withSpan(emails.send)
-```
-
-**You get Jaeger/Zipkin traces without instrumentation code.**
-
----
-
-## 7. Self-Describing for Humans and AI
-
-### The Problem
-
-Traditional APIs require:
-- Human-written documentation
-- SDK generation tools
-- API clients
-- Integration guides
-
-**And they go out of sync.**
-
-### The Solution
-
-Contracts are machine-readable:
+Agents compose procedures into workflows:
 
 ```typescript
-const contract = {
-  name: "users.create",
-  description: "Creates a new user account",
-  input: z.object({
-    name: z.string().describe("User's full name"),
-    email: z.string().email().describe("User's email address")
-  }),
-  output: z.object({
-    id: z.string().describe("Generated user ID"),
-    name: z.string(),
-    email: z.string()
-  }),
-  metadata: {
-    tags: ["users", "write"],
-    rateLimit: { maxTokens: 10, windowMs: 60000 }
-  }
-};
-```
+// Agent's internal reasoning:
+// "To onboard user, I need to:
+//  1. Create account
+//  2. Send welcome email
+//  3. Track signup event"
 
-**From this, generate:**
-
-```typescript
-// OpenAPI spec
-GET /openapi.json
-
-// Swagger UI
-GET /docs
-
-// Procedure list (for agents)
-GET /procedures
-
-// TypeScript SDK
-// (future: auto-generated from contracts)
-
-// Python SDK
-// (future: auto-generated from contracts)
-```
-
-**AI agents can introspect procedures:**
-
-```typescript
-const procedures = await fetch('/procedures').then(r => r.json());
-// LLM sees:
-// - Available procedures
-// - Input/output schemas
-// - Descriptions
-// - Can call via /rpc/:name
-```
-
----
-
-## 8. Workflows as First-Class Citizens
-
-### The Insight
-
-Most workflow engines are separate systems:
-- Temporal
-- Apache Airflow
-- AWS Step Functions
-
-**They require:**
-- Learning a new DSL
-- Deploying separate infrastructure
-- Translating business logic to workflow syntax
-
-### The Solution
-
-**Procedures ARE workflow nodes.**
-
-```typescript
-const workflow: WorkflowDefinition = {
+// Agent generates:
+const workflow = {
+  id: "user-onboarding",
   nodes: [
     {
-      id: "create-user",
+      id: "create-account",
       type: "procedure",
-      procedureName: "users.create",  // Reference to your procedure
+      procedureName: "users.create",
       next: "send-email"
     },
     {
       id: "send-email",
       type: "procedure",
-      procedureName: "emails.send",
-      next: undefined
+      procedureName: "emails.sendWelcome",
+      config: {
+        userId: "{{ createAccount.id }}"  // Reference previous output
+      },
+      next: "track-event"
+    },
+    {
+      id: "track-event",
+      type: "procedure",
+      procedureName: "analytics.track",
+      config: {
+        event: "user.signup",
+        userId: "{{ createAccount.id }}"
+      }
     }
   ]
 };
 ```
 
-**Benefits:**
-- No DSL to learn
-- Same validation as direct calls
-- Same tracing as direct calls
-- Visual composition
-- Pause/resume built-in
+**This is executable code.**
 
-**Execution creates OpenTelemetry spans:**
+The agent can:
+- Execute it: `POST /workflow/execute`
+- Save it: Commit to git
+- Reuse it: Load from git next time
+- Improve it: Edit JSON, commit changes
 
-```typescript
-const result = await executeWorkflow(workflow, registry);
-// Creates:
-// - workflow.execute span (parent)
-//   - workflow.node.procedure (create-user)
-//     - procedure.users.create
-//       - withRetry
-//       - withLogging
-//   - workflow.node.procedure (send-email)
-//     - procedure.emails.send
+### Performance Impact
+
+**Without workflow caching:**
+```
+Task: "Onboard user Alice"
+Agent reasoning: 30s
+API calls: 1.5min
+Total: 2min
 ```
 
-**You get distributed tracing for free.**
+**With workflow caching:**
+```
+Task: "Onboard user Alice"
+Load workflow: 0.1s
+Execute workflow: 5s
+Total: 5s
+```
+
+**40x speedup** by reusing compiled logic.
 
 ---
 
-## Design Principles Summary
+## 3. Git as Workflow Evolution Layer
 
-| Principle | Traditional Approach | tsdev Approach |
-|-----------|---------------------|----------------|
-| **Source of Truth** | Split across types, validation, docs | Single contract |
-| **Transport** | Framework-specific (Express, GraphQL) | Transport-agnostic core |
-| **Registration** | Manual route/controller setup | Auto-discovery via reflection |
-| **Cross-cutting** | Decorators, middleware, classes | Function composition |
-| **Observability** | Added after the fact | Built into domain model |
-| **Documentation** | Written separately | Generated from contracts |
-| **Workflows** | Separate system (Temporal, Airflow) | Procedures as nodes |
+### Workflows are Code
 
----
+Workflows are declarative JSON:
+- **Version controlled** - Track changes over time
+- **Reviewable** - PR workflow for changes
+- **Testable** - Validate before merge
+- **Deployable** - CI/CD integration
 
-## What This Enables
+### Agent + Human Collaboration
 
-### For Developers
+**Workflow lifecycle:**
 
-- Write business logic once
-- Get HTTP, CLI, workflows automatically
-- Change transport without changing logic
-- Compose behavior via pure functions
-- Full observability by default
+```
+1. Agent discovers task pattern
+   ↓
+2. Agent composes initial workflow
+   ↓
+3. Agent commits to git (branch)
+   ↓
+4. Human reviews PR
+   ↓
+5. Human suggests improvements:
+   - Add error handling
+   - Optimize parallel execution
+   - Add monitoring
+   ↓
+6. Agent or human updates workflow
+   ↓
+7. Merge to main → workflow deployed
+   ↓
+8. Agent uses improved workflow
+```
 
-### For Organizations
+**This is collaborative intelligence:**
+- Agents contribute automation
+- Humans contribute domain expertise
+- Both iterate on shared codebase
 
-- Consistent API across all services
-- Self-documenting systems
-- Easy to build internal tools (CLI, admin panels)
-- Future-proof (new transports = new adapters)
-- AI-ready (machine-readable contracts)
+### Decomposition at Scale
 
-### For AI Agents
+Complex workflows decompose into sub-workflows:
 
-- Introspectable procedures (`GET /procedures`)
-- Clear input/output schemas
-- Can call via RPC (`POST /rpc/:name`)
-- No need to parse human docs
+```
+workflows/
+├── e-commerce/
+│   ├── order-processing.json        # Main workflow
+│   ├── payment-flow.json            # Sub-workflow
+│   ├── inventory-check.json         # Sub-workflow
+│   └── fraud-detection.json         # Sub-workflow
+│
+├── user-management/
+│   ├── user-onboarding.json
+│   ├── user-offboarding.json
+│   └── password-reset.json
+│
+└── data-pipelines/
+    ├── etl-main.json
+    ├── extract-users.json
+    ├── transform-events.json
+    └── load-warehouse.json
+```
 
----
-
-## Anti-Patterns We Avoid
-
-### ❌ Framework Magic
-
-No decorators, no reflection on classes, no runtime type generation.
-
-**Just TypeScript + Zod.**
-
-### ❌ Inheritance Hierarchies
-
-No `extends BaseController`, no `implements IService`.
-
-**Just functions and composition.**
-
-### ❌ Global State
-
-No singleton registries that require initialization order.
-
-**Pass registry explicitly.**
-
-### ❌ Transport Coupling
-
-No `req` / `res` in business logic.
-
-**Pure input → output functions.**
-
-### ❌ Separate Documentation
-
-No hand-written OpenAPI that goes stale.
-
-**Generated from contracts.**
+**Benefits:**
+- Each workflow focused on one task
+- Reusable across different contexts
+- Independently versioned
+- Easier to review and test
 
 ---
 
-## When NOT to Use tsdev
+## 4. OpenTelemetry as Agent Feedback
 
-tsdev is designed for:
-- Backend APIs
-- Internal tools
-- Workflow automation
-- Multi-transport systems
+### Workflows Create Traces Automatically
 
-**Not ideal for:**
-- Frontend-only apps (use Next.js, etc.)
-- Pure data processing (no need for contracts)
-- Real-time collaborative editing (use CRDTs)
-- Extremely high-performance systems where reflection overhead matters
+Every workflow execution produces:
+- **Span hierarchy** - Shows execution flow
+- **Timing data** - Reveals bottlenecks
+- **Error details** - Explains failures
+- **Input/output** - Validates behavior
+
+**Example trace:**
+
+```
+workflow.execute (2.5s)
+├── workflow.node.procedure: create-account (1.2s)
+│   └── procedure.users.create (1.1s)
+│       ├── attribute: input = {"name":"Alice","email":"..."}
+│       └── attribute: output = {"id":"user_123",...}
+├── workflow.node.procedure: send-email (800ms)
+│   └── procedure.emails.send (750ms)
+│       └── attribute: status = "sent"
+└── workflow.node.procedure: track-event (150ms)
+    └── procedure.analytics.track (100ms)
+```
+
+### Agents Learn from Traces
+
+Agents can:
+
+**1. Detect bottlenecks**
+```typescript
+// Agent analyzes trace
+const slowestNode = trace.spans
+  .filter(s => s.name.includes('workflow.node'))
+  .sort((a, b) => b.duration - a.duration)[0];
+
+if (slowestNode.duration > 1000) {
+  // Agent suggests: "send-email is slow, add async processing"
+  suggestWorkflowImprovement({
+    node: "send-email",
+    optimization: "make-async"
+  });
+}
+```
+
+**2. Detect failures**
+```typescript
+// Agent sees error pattern
+const failedSpans = trace.spans.filter(s => s.status.code === 'ERROR');
+
+if (failedSpans.length > 0) {
+  // Agent suggests: "payment-charge fails, add retry policy"
+  suggestWorkflowImprovement({
+    node: "payment-charge",
+    fix: "add-retry",
+    policy: { maxAttempts: 3, backoff: "exponential" }
+  });
+}
+```
+
+**3. Optimize execution**
+```typescript
+// Agent detects independent nodes
+const nodeA = workflow.nodes.find(n => n.id === 'send-email');
+const nodeB = workflow.nodes.find(n => n.id === 'track-analytics');
+
+if (!nodeB.dependsOn(nodeA)) {
+  // Agent suggests: "execute in parallel"
+  suggestWorkflowImprovement({
+    change: "parallelize",
+    nodes: ["send-email", "track-analytics"]
+  });
+}
+```
+
+**Agents evolve workflows based on production data.**
 
 ---
 
-## Future Vision
+## 5. Convention-Driven Discovery
 
-The contract-first approach enables:
+### Zero Configuration
 
-1. **Auto-generated SDKs**
-   ```bash
-   tsdev generate sdk --language python --output ./sdk
-   ```
+Agents don't need configuration files or setup:
 
-2. **Agent-first APIs**
-   ```typescript
-   // AI agent discovers and calls procedures
-   const procedures = await agent.introspect();
-   const result = await agent.call("users.create", { ... });
-   ```
+```typescript
+// Agent starts exploring
+const response = await fetch('http://api/procedures');
+const { procedures } = await response.json();
 
-3. **Contract Evolution**
-   ```typescript
-   // Version 2 adds optional field
-   input: z.object({
-     name: z.string(),
-     email: z.string(),
-     phone: z.string().optional()  // Backward compatible
-   })
-   ```
+// Agent now knows everything available
+procedures.forEach(proc => {
+  agent.knowledgeBase.add({
+    name: proc.name,
+    capability: proc.description,
+    interface: { input: proc.input, output: proc.output },
+    constraints: proc.metadata
+  });
+});
+```
 
-4. **Visual Programming**
-   - Drag-and-drop workflow editor
-   - Connect procedures visually
-   - Execute with full tracing
+### Naming Conventions as Semantics
 
-**All while keeping the core simple: Contract + Handler.**
+Procedure names encode meaning:
+
+```
+users.create     → Creates a user
+users.get        → Retrieves a user
+users.update     → Updates a user
+users.delete     → Deletes a user
+
+emails.send      → Sends an email
+emails.template  → Renders email template
+
+payments.charge  → Charges payment
+payments.refund  → Refunds payment
+```
+
+**Agents infer relationships:**
+
+```typescript
+// Agent reasoning:
+// - "users.create" creates a resource
+// - "emails.send" is an action
+// - After creating user, sending email makes sense
+// - Compose workflow: users.create → emails.send
+```
+
+**Convention eliminates documentation.**
+
+---
+
+## 6. Composability Over Coupling
+
+### Procedures are Pure Functions
+
+```typescript
+type Procedure = (input: Input, context: Context) => Promise<Output>
+```
+
+**No side-channel dependencies:**
+- No global state
+- No implicit context
+- No framework coupling
+- Just input → output
+
+**This enables:**
+- Testing in isolation
+- Composition via workflows
+- Parallel execution
+- Caching/memoization
+
+### Policies as Composition
+
+Cross-cutting concerns compose via policies:
+
+```typescript
+import { applyPolicies } from '@tsdev/core';
+import { withRetry, withLogging, withSpan, withRateLimit } from '@tsdev/policies';
+
+const handler = applyPolicies(
+  baseHandler,
+  withRetry({ maxAttempts: 3 }),
+  withLogging("users.create"),
+  withSpan("users.create"),
+  withRateLimit({ maxTokens: 10 })
+);
+```
+
+**Agents can suggest policies:**
+
+```typescript
+// Agent analyzes failure trace
+if (error.type === 'NetworkError') {
+  suggestPolicy("withRetry", { maxAttempts: 3 });
+}
+
+if (trace.duration > SLA_THRESHOLD) {
+  suggestPolicy("withCache", { ttl: 3600 });
+}
+```
+
+---
+
+## 7. Self-Describing Systems
+
+### The Agent's View
+
+Traditional API:
+```
+Agent: "What can I do?"
+System: "Read the docs at /docs"
+Agent: *parses HTML*
+Agent: *hopes docs are current*
+```
+
+tsdev API:
+```
+Agent: "What can I do?"
+System: GET /procedures → [{ name, input, output, description }]
+Agent: *structured data*
+Agent: *guaranteed accurate*
+```
+
+### Introspection as First-Class Feature
+
+Endpoints for agent discovery:
+
+```typescript
+GET /procedures              // All available procedures
+GET /procedures/:name        // Specific procedure details
+GET /openapi.json            // OpenAPI spec (for compatibility)
+GET /workflow/list           // Available workflows
+GET /workflow/:id/definition // Workflow structure
+GET /workflow/:id/history    // Past executions
+```
+
+**Agents build mental models:**
+
+```typescript
+class AgentKnowledge {
+  procedures: Map<string, ProcedureContract>;
+  workflows: Map<string, WorkflowDefinition>;
+  executionHistory: ExecutionTrace[];
+  
+  async learn() {
+    // Discover procedures
+    const procs = await fetch('/procedures').then(r => r.json());
+    procs.forEach(p => this.procedures.set(p.name, p));
+    
+    // Discover workflows
+    const workflows = await fetch('/workflow/list').then(r => r.json());
+    workflows.forEach(w => this.workflows.set(w.id, w));
+    
+    // Analyze past executions
+    const history = await fetch('/workflow/history').then(r => r.json());
+    this.executionHistory = history;
+  }
+  
+  findWorkflowForTask(task: string): WorkflowDefinition | null {
+    // Agent matches task to existing workflow
+    for (const [id, workflow] of this.workflows) {
+      if (this.matchesTask(workflow, task)) {
+        return workflow;
+      }
+    }
+    return null;
+  }
+  
+  composeNewWorkflow(task: string): WorkflowDefinition {
+    // Agent creates new workflow from procedures
+    const relevantProcs = this.findRelevantProcedures(task);
+    return this.combineIntoWorkflow(relevantProcs);
+  }
+}
+```
+
+---
+
+## 8. Transport Agnostic = Future Proof
+
+### Same Logic, Different Interfaces
+
+Procedures work across any transport:
+
+```typescript
+// HTTP
+POST /rpc/users.create
+
+// CLI
+tsdev users.create --name Alice --email alice@example.com
+
+// Workflow
+{ type: "procedure", procedureName: "users.create" }
+
+// SDK (future)
+client.users.create({ name: "Alice", email: "alice@example.com" })
+
+// GraphQL (future)
+mutation { createUser(name: "Alice", email: "alice@example.com") { id } }
+
+// gRPC (future)
+UsersService.Create({ name: "Alice", email: "alice@example.com" })
+```
+
+**Agent doesn't care about transport.**
+
+Agent just knows:
+- Procedure name
+- Input schema
+- Output schema
+
+**Execute via any adapter.**
+
+---
+
+## Design Principles
+
+| Principle | Meaning | Agent Benefit |
+|-----------|---------|---------------|
+| **Contracts-first** | Procedures defined by schema | Introspectable interface |
+| **Workflow caching** | Save successful compositions | Reuse instead of re-think |
+| **Git versioning** | Workflows as code | Evolve logic over time |
+| **OpenTelemetry** | Automatic tracing | Learn from production data |
+| **Convention-driven** | Names encode semantics | Infer relationships |
+| **Composable** | Pure functions + policies | Safe to combine |
+| **Self-describing** | Built-in introspection | Zero configuration |
+| **Transport-agnostic** | Logic independent of API | Future-proof |
+
+---
+
+## Agent Workflow Lifecycle
+
+```
+┌─────────────────────────────────────────────────┐
+│ 1. Agent explores available procedures         │
+│    GET /procedures                              │
+└─────────────┬───────────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────────────────────────┐
+│ 2. Agent receives task                          │
+│    "Onboard new user with premium features"     │
+└─────────────┬───────────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────────────────────────┐
+│ 3. Agent checks: Do I have workflow for this?  │
+│    git ls workflows/user-*                      │
+└─────────────┬───────────────────────────────────┘
+              │
+         ┌────┴────┐
+         │         │
+    Found?      Not Found
+         │         │
+         ▼         ▼
+    ┌────────┐  ┌──────────────────────────┐
+    │ Reuse  │  │ 4. Compose new workflow  │
+    │ existing│  │    - Select procedures   │
+    │ workflow│  │    - Define order        │
+    └────┬───┘  │    - Add error handling  │
+         │      └────────┬─────────────────┘
+         │               │
+         │               ▼
+         │      ┌──────────────────────────┐
+         │      │ 5. Validate workflow     │
+         │      │    POST /workflow/validate│
+         │      └────────┬─────────────────┘
+         │               │
+         └───────┬───────┘
+                 │
+                 ▼
+        ┌──────────────────────────┐
+        │ 6. Execute workflow      │
+        │    POST /workflow/execute │
+        └────────┬─────────────────┘
+                 │
+                 ▼
+        ┌──────────────────────────┐
+        │ 7. Analyze trace         │
+        │    - Check for errors    │
+        │    - Measure performance │
+        │    - Suggest improvements│
+        └────────┬─────────────────┘
+                 │
+                 ▼
+        ┌──────────────────────────┐
+        │ 8. Commit workflow       │
+        │    git add workflows/    │
+        │    git commit            │
+        │    git push              │
+        └────────┬─────────────────┘
+                 │
+                 ▼
+        ┌──────────────────────────┐
+        │ 9. Next task uses        │
+        │    cached workflow       │
+        └──────────────────────────┘
+```
+
+---
+
+## Real-World Impact
+
+### Before tsdev
+
+```
+Agent task: "Process customer order"
+
+Agent reasoning (30s):
+- Need to validate order
+- Check inventory
+- Process payment
+- Create shipment
+- Send confirmation
+
+Agent execution (90s):
+- Call validation API
+- Call inventory API
+- Call payment API
+- Call shipping API
+- Call email API
+
+Total: 2 minutes per order
+```
+
+### After tsdev
+
+```
+Agent task: "Process customer order"
+
+Agent checks: workflows/order-processing.json exists
+
+Agent execution (5s):
+- Load workflow
+- Execute with order data
+- Return result
+
+Total: 5 seconds per order
+```
+
+**24x faster for repeated tasks.**
+
+### Scaling to 100 Agents
+
+**Without workflow caching:**
+- Each agent re-solves same tasks
+- 100 agents = 100x duplicated work
+- No knowledge transfer
+
+**With workflow caching:**
+- First agent solves task → commits workflow
+- Other 99 agents reuse workflow
+- Knowledge compounds across agents
+
+**This is how agent systems scale.**
 
 ---
 
 ## Conclusion
 
-tsdev is built on one core belief:
+tsdev is built on one insight:
 
-**Define your domain once, derive everything else.**
+**Agents should compose with procedures, not prompts.**
 
-Contracts are the source of truth.  
-Everything else—routes, validation, docs, CLI, workflows—is generated.
+When agents can:
+- Discover procedures automatically
+- Compose workflows declaratively
+- Cache successful solutions in git
+- Learn from execution traces
+- Evolve workflows over time
 
-This isn't magic. It's systematic application of:
-- Type-driven development (Zod)
-- Function composition (policies)
-- Convention over configuration (naming)
-- Reflection (auto-discovery)
-- Observability by design (OpenTelemetry)
+**They become 10-100x more effective.**
 
-**The result: You write less, get more, and stay flexible.**
+The framework doesn't just serve agents—it turns them into software engineers who commit their work to version control.
 
 ---
 

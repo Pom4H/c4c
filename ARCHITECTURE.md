@@ -1,45 +1,69 @@
 # tsdev Architecture
 
-This document explains how tsdev is implemented internally.
+**Implementation details for AI agent integration and workflow management.**
+
+This document explains the internals of tsdev with focus on:
+- Agent discovery mechanisms
+- Workflow composition and validation
+- Git-based workflow versioning
+- OpenTelemetry feedback loop
 
 ---
 
 ## System Overview
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Transport Layer                       │
-│  (HTTP, CLI, WebSocket, gRPC, Message Queue, etc.)      │
-└───────────────┬─────────────────────────────────────────┘
-                │
-                ▼
-┌─────────────────────────────────────────────────────────┐
-│                    Adapter Layer                         │
-│        (@tsdev/adapters - thin translation)             │
-│  • Parse transport-specific input                        │
-│  • Create ExecutionContext                               │
-│  • Call executeProcedure()                               │
-│  • Format output                                         │
-└───────────────┬─────────────────────────────────────────┘
-                │
-                ▼
-┌─────────────────────────────────────────────────────────┐
-│                      Core Layer                          │
-│              (@tsdev/core - framework)                   │
+┌──────────────────────────────────────────────────────────┐
+│                      AI Agent                            │
+│  • Introspects procedures (GET /procedures)              │
+│  • Composes workflows (JSON DSL)                         │
+│  • Validates workflows (POST /workflow/validate)         │
+│  • Executes workflows (POST /workflow/execute)           │
+│  • Analyzes traces (OpenTelemetry spans)                 │
+│  • Commits workflows (git)                               │
+└────────────────┬─────────────────────────────────────────┘
+                 │
+                 ▼
+┌──────────────────────────────────────────────────────────┐
+│                  Transport Layer                         │
+│  HTTP Server with introspection endpoints                │
+│  • GET /procedures       - Agent discovery               │
+│  • GET /openapi.json     - OpenAPI spec                  │
+│  • POST /rpc/:name       - Direct procedure calls        │
+│  • POST /workflow/*      - Workflow operations           │
+└────────────────┬─────────────────────────────────────────┘
+                 │
+                 ▼
+┌──────────────────────────────────────────────────────────┐
+│                    Core Layer                            │
+│  @tsdev/core - Registry & Execution                      │
+│  • Auto-discovery via collectRegistry()                  │
 │  • Contract validation (Zod)                             │
-│  • Procedure execution                                   │
-│  • Policy composition                                    │
-│  • Registry management                                   │
-└───────────────┬─────────────────────────────────────────┘
-                │
-                ▼
-┌─────────────────────────────────────────────────────────┐
-│                   Business Logic                         │
-│               (your handlers/)                           │
+│  • Procedure execution with policies                     │
+│                                                          │
+│  @tsdev/workflow - Workflow Runtime                      │
+│  • Workflow validation                                   │
+│  • Node execution (procedure, condition, parallel)       │
+│  • OpenTelemetry span creation                          │
+│  • State management                                      │
+└────────────────┬─────────────────────────────────────────┘
+                 │
+                 ▼
+┌──────────────────────────────────────────────────────────┐
+│                  Business Logic                          │
+│  handlers/ - Procedure implementations                   │
 │  • Pure functions: input → output                        │
-│  • No transport awareness                                │
-│  • Fully testable in isolation                           │
-└─────────────────────────────────────────────────────────┘
+│  • No transport coupling                                 │
+│  • Fully testable                                        │
+└──────────────────────────────────────────────────────────┘
+
+                 ┌──────────────────┐
+                 │    Git Repo      │
+                 │   workflows/     │
+                 │   ├── *.json     │
+                 │   Agent commits  │
+                 │   Human reviews  │
+                 └──────────────────┘
 ```
 
 ---
@@ -472,6 +496,677 @@ tsdev math.add --a 5 --b 3
 
 tsdev users.create --json '{"name":"Alice","email":"alice@example.com"}'
 # Parsed as: { name: "Alice", email: "alice@example.com" }
+```
+
+---
+
+## Agent Discovery Mechanism
+
+### Introspection Endpoint
+
+**Location:** `packages/adapters/src/http.ts`
+
+Agents discover procedures via `/procedures`:
+
+```typescript
+// GET /procedures
+if (req.url === "/procedures" && req.method === "GET") {
+  const procedures = Array.from(registry.entries()).map(([name, proc]) => ({
+    name,
+    description: proc.contract.description,
+    input: zodToJsonSchema(proc.contract.input),
+    output: zodToJsonSchema(proc.contract.output),
+    metadata: proc.contract.metadata,
+  }));
+
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ procedures }));
+  return;
+}
+```
+
+**Agent receives:**
+
+```json
+{
+  "procedures": [
+    {
+      "name": "users.create",
+      "description": "Creates a new user account",
+      "input": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "User's full name" },
+          "email": { "type": "string", "format": "email" }
+        },
+        "required": ["name", "email"]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "email": { "type": "string" }
+        }
+      },
+      "metadata": {
+        "tags": ["users", "write"],
+        "rateLimit": { "maxTokens": 10, "windowMs": 60000 }
+      }
+    }
+  ]
+}
+```
+
+### Why JSON Schema?
+
+**Zod schemas are converted to JSON Schema:**
+
+```typescript
+import { zodToJsonSchema } from 'zod-to-json-schema';
+
+const inputSchema = zodToJsonSchema(procedure.contract.input, {
+  name: `${procedure.contract.name}.Input`,
+  target: 'openApi3'
+});
+```
+
+**Benefits:**
+- Standard format agents understand
+- Includes validation rules
+- Describes structure and types
+- Machine-readable
+
+### Agent Usage Pattern
+
+```typescript
+// Agent discovers procedures
+const { procedures } = await fetch('http://api/procedures').then(r => r.json());
+
+// Agent builds knowledge graph
+const knowledgeBase = new Map();
+for (const proc of procedures) {
+  knowledgeBase.set(proc.name, {
+    description: proc.description,
+    inputSchema: proc.input,
+    outputSchema: proc.output,
+    tags: proc.metadata?.tags || []
+  });
+}
+
+// Agent finds relevant procedures for task
+function findProceduresForTask(task: string): string[] {
+  const relevant = [];
+  for (const [name, info] of knowledgeBase) {
+    if (matchesTask(task, info.description, info.tags)) {
+      relevant.push(name);
+    }
+  }
+  return relevant;
+}
+
+// Agent composes workflow
+const workflow = composeProceduresIntoWorkflow(relevant);
+```
+
+---
+
+## Workflow Lifecycle
+
+### 1. Composition (Agent Creates Workflow)
+
+Agent composes workflow from discovered procedures:
+
+```typescript
+// Agent's composition logic
+const workflow: WorkflowDefinition = {
+  id: generateWorkflowId(task),
+  name: task,
+  version: "1.0.0",
+  startNode: "step-1",
+  nodes: [
+    {
+      id: "step-1",
+      type: "procedure",
+      procedureName: "users.create",  // From introspection
+      config: {
+        name: "{{ input.userName }}",
+        email: "{{ input.userEmail }}"
+      },
+      next: "step-2"
+    },
+    {
+      id: "step-2",
+      type: "procedure",
+      procedureName: "emails.send",
+      config: {
+        to: "{{ step-1.email }}",  // Reference previous output
+        subject: "Welcome!"
+      }
+    }
+  ]
+};
+```
+
+### 2. Validation (Before Execution)
+
+**Endpoint:** `POST /workflow/validate`
+
+**Location:** `packages/adapters/src/workflow-http.ts`
+
+```typescript
+if (req.url === "/workflow/validate" && req.method === "POST") {
+  const workflow = JSON.parse(await parseBody(req));
+  
+  // Validate workflow structure
+  const errors = validateWorkflow(workflow, registry);
+  
+  if (errors.length > 0) {
+    res.writeHead(400, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ valid: false, errors }));
+    return;
+  }
+  
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ valid: true }));
+  return;
+}
+```
+
+**Validation checks:**
+
+```typescript
+export function validateWorkflow(
+  workflow: WorkflowDefinition,
+  registry: Registry
+): string[] {
+  const errors: string[] = [];
+  
+  // Check start node exists
+  if (!workflow.nodes.find(n => n.id === workflow.startNode)) {
+    errors.push(`Start node ${workflow.startNode} not found`);
+  }
+  
+  // Check all procedure nodes reference valid procedures
+  for (const node of workflow.nodes) {
+    if (node.type === "procedure" && node.procedureName) {
+      if (!registry.has(node.procedureName)) {
+        errors.push(`Node ${node.id}: procedure ${node.procedureName} not found`);
+      }
+    }
+    
+    // Check next nodes exist
+    const nextNodes = Array.isArray(node.next) ? node.next : node.next ? [node.next] : [];
+    for (const nextId of nextNodes) {
+      if (!workflow.nodes.find(n => n.id === nextId)) {
+        errors.push(`Node ${node.id}: next node ${nextId} not found`);
+      }
+    }
+  }
+  
+  return errors;
+}
+```
+
+**Agent validates before committing:**
+
+```typescript
+// Agent composed workflow
+const validation = await fetch('http://api/workflow/validate', {
+  method: 'POST',
+  body: JSON.stringify(workflow)
+}).then(r => r.json());
+
+if (!validation.valid) {
+  console.error('Workflow validation failed:', validation.errors);
+  // Agent fixes errors and re-validates
+} else {
+  // Agent commits to git
+  await commitWorkflow(workflow);
+}
+```
+
+### 3. Execution (Run Workflow)
+
+**Endpoint:** `POST /workflow/execute`
+
+```typescript
+if (req.url === "/workflow/execute" && req.method === "POST") {
+  const { workflow, input } = JSON.parse(await parseBody(req));
+  
+  // Execute workflow with OpenTelemetry tracing
+  const result = await executeWorkflow(workflow, registry, input);
+  
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(result));
+  return;
+}
+```
+
+**Returns:**
+
+```json
+{
+  "executionId": "wf_exec_123456",
+  "status": "completed",
+  "outputs": {
+    "step-1": { "id": "user_789", "name": "Alice", "email": "alice@example.com" },
+    "step-2": { "messageId": "msg_456", "status": "sent" }
+  },
+  "executionTime": 1234,
+  "nodesExecuted": ["step-1", "step-2"],
+  "spans": [
+    {
+      "spanId": "span_1",
+      "name": "workflow.execute",
+      "startTime": 1234567890,
+      "endTime": 1234569124,
+      "duration": 1234,
+      "status": { "code": "OK" },
+      "attributes": {
+        "workflow.id": "user-onboarding",
+        "workflow.execution_id": "wf_exec_123456"
+      }
+    }
+  ]
+}
+```
+
+### 4. Caching (Agent Saves Workflow)
+
+**Agent commits successful workflow to git:**
+
+```typescript
+// Agent executes workflow
+const result = await executeWorkflow(workflow, input);
+
+if (result.status === "completed") {
+  // Save to git
+  const workflowPath = `workflows/${workflow.id}.json`;
+  
+  await fs.writeFile(workflowPath, JSON.stringify(workflow, null, 2));
+  await git.add(workflowPath);
+  await git.commit(`Add ${workflow.id} workflow`);
+  
+  // Agent remembers: "For tasks like this, use workflows/user-onboarding.json"
+  agent.workflowCache.set(taskPattern, workflowPath);
+}
+```
+
+### 5. Reuse (Agent Loads Cached Workflow)
+
+**Next time agent sees similar task:**
+
+```typescript
+// Agent receives task
+const task = "Onboard user Bob";
+
+// Agent checks cache
+const workflowPath = agent.workflowCache.get(matchTaskPattern(task));
+
+if (workflowPath) {
+  // Load from git
+  const workflow = JSON.parse(await fs.readFile(workflowPath, 'utf8'));
+  
+  // Execute with new input
+  const result = await executeWorkflow(workflow, {
+    userName: "Bob",
+    userEmail: "bob@example.com"
+  });
+  
+  // Done in 5s instead of 2min
+} else {
+  // Compose new workflow
+  // Save to git
+  // Cache for next time
+}
+```
+
+---
+
+## Git Integration Architecture
+
+### Workflow Storage Structure
+
+```
+git-repo/
+├── workflows/
+│   ├── user-onboarding.json
+│   ├── payment-processing.json
+│   ├── data-pipeline.json
+│   │
+│   ├── e-commerce/
+│   │   ├── order-processing.json
+│   │   ├── inventory-check.json
+│   │   └── fraud-detection.json
+│   │
+│   └── analytics/
+│       ├── event-tracking.json
+│       └── report-generation.json
+│
+├── .github/
+│   └── workflows/
+│       └── validate-workflows.yml
+│
+└── src/
+    ├── contracts/
+    └── handlers/
+```
+
+### Workflow as Code
+
+**Workflow JSON is source code:**
+
+```json
+{
+  "id": "user-onboarding",
+  "name": "User Onboarding Flow",
+  "description": "Complete user registration with email verification",
+  "version": "1.0.0",
+  "author": "ai-agent",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "startNode": "create-account",
+  "nodes": [
+    {
+      "id": "create-account",
+      "type": "procedure",
+      "procedureName": "users.create",
+      "config": {},
+      "next": "send-verification",
+      "onError": "notify-admin"
+    },
+    {
+      "id": "send-verification",
+      "type": "procedure",
+      "procedureName": "emails.sendVerification",
+      "next": null
+    },
+    {
+      "id": "notify-admin",
+      "type": "procedure",
+      "procedureName": "notifications.sendAdmin",
+      "next": null
+    }
+  ],
+  "metadata": {
+    "tags": ["users", "onboarding"],
+    "estimatedDuration": 2000,
+    "sla": 5000
+  }
+}
+```
+
+### Git Workflow for Changes
+
+**1. Agent creates branch:**
+
+```bash
+git checkout -b workflows/improve-user-onboarding
+```
+
+**2. Agent modifies workflow:**
+
+```diff
+{
+  "nodes": [
+    {
+      "id": "create-account",
+      "type": "procedure",
+      "procedureName": "users.create",
++     "onError": "retry-create-account",
+      "next": "send-verification"
+    },
++   {
++     "id": "retry-create-account",
++     "type": "procedure",
++     "procedureName": "users.create",
++     "config": { "retry": true },
++     "next": "send-verification",
++     "onError": "notify-admin"
++   }
+  ]
+}
+```
+
+**3. Agent commits:**
+
+```bash
+git add workflows/user-onboarding.json
+git commit -m "Add retry logic to user-onboarding workflow
+
+Detected failure pattern in execution traces:
+- 15% of create-account calls fail transiently
+- Network timeouts are the primary cause
+
+Solution:
+- Added retry-create-account node
+- Activated via onError handler
+- Falls back to notify-admin if retry fails"
+
+git push origin workflows/improve-user-onboarding
+```
+
+**4. Agent creates PR:**
+
+```bash
+gh pr create \
+  --title "Improve user-onboarding workflow reliability" \
+  --body "$(cat <<EOF
+## Changes
+- Added retry logic to handle transient failures
+- Added error notification path
+
+## Metrics
+- Current success rate: 85%
+- Expected success rate with retry: 98%
+
+## Trace Analysis
+Analyzed 1000 recent executions:
+- 150 failures due to network timeouts
+- 0 failures due to invalid input
+- Average retry success rate: 87%
+
+## Testing
+- Validated workflow structure
+- Simulated 100 executions
+- Confirmed retry behavior
+EOF
+)"
+```
+
+**5. Human reviews:**
+
+```
+Reviewer: "Looks good, but let's add exponential backoff"
+
+Agent: "Updated with exponential backoff policy"
+```
+
+**6. Merge:**
+
+```bash
+git checkout main
+git merge workflows/improve-user-onboarding
+git push origin main
+```
+
+**7. Workflow deployed automatically via CI/CD**
+
+### CI/CD Pipeline
+
+**`.github/workflows/validate-workflows.yml`:**
+
+```yaml
+name: Validate and Deploy Workflows
+
+on:
+  pull_request:
+    paths:
+      - 'workflows/**'
+  push:
+    branches: [main]
+    paths:
+      - 'workflows/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: pnpm install
+      
+      - name: Validate all workflows
+        run: |
+          for workflow in workflows/**/*.json; do
+            echo "Validating $workflow"
+            curl -X POST http://localhost:3000/workflow/validate \
+              -H "Content-Type: application/json" \
+              -d @$workflow || exit 1
+          done
+      
+      - name: Test execution (dry run)
+        run: |
+          pnpm test:workflows
+  
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy workflows
+        run: |
+          # Upload workflows to production server
+          rsync -avz workflows/ production:/app/workflows/
+          
+          # Reload workflow registry
+          curl -X POST https://api.production/workflow/reload
+```
+
+---
+
+## OpenTelemetry as Agent Feedback
+
+### Automatic Trace Collection
+
+Every workflow execution creates OpenTelemetry spans:
+
+```typescript
+// In executeWorkflow()
+return tracer.startActiveSpan("workflow.execute", async (workflowSpan) => {
+  workflowSpan.setAttributes({
+    "workflow.id": workflow.id,
+    "workflow.name": workflow.name,
+    "workflow.execution_id": executionId
+  });
+  
+  // Execute nodes
+  for (const node of workflow.nodes) {
+    await executeNode(node, context, registry, workflow);
+  }
+  
+  workflowSpan.setAttributes({
+    "workflow.status": "completed",
+    "workflow.duration_ms": Date.now() - startTime
+  });
+});
+```
+
+### Agent Analyzes Traces
+
+**Agent queries execution history:**
+
+```typescript
+// GET /workflow/:id/executions
+const executions = await fetch(`http://api/workflow/${workflowId}/executions`)
+  .then(r => r.json());
+
+// Agent analyzes patterns
+const stats = {
+  totalExecutions: executions.length,
+  successRate: executions.filter(e => e.status === 'completed').length / executions.length,
+  avgDuration: mean(executions.map(e => e.executionTime)),
+  p95Duration: percentile(executions.map(e => e.executionTime), 95),
+  
+  // Bottlenecks
+  slowestNodes: analyzeSlowNodes(executions),
+  
+  // Failures
+  errorPatterns: analyzeErrors(executions)
+};
+```
+
+**Agent suggests improvements:**
+
+```typescript
+function suggestImprovements(stats) {
+  const suggestions = [];
+  
+  // Slow nodes → add caching
+  if (stats.slowestNodes.some(n => n.avgDuration > 1000)) {
+    suggestions.push({
+      type: "add-cache",
+      node: stats.slowestNodes[0].id,
+      expectedImprovement: "50% faster"
+    });
+  }
+  
+  // High failure rate → add retry
+  if (stats.successRate < 0.95) {
+    suggestions.push({
+      type: "add-retry",
+      nodes: stats.errorPatterns.map(e => e.nodeId),
+      expectedImprovement: `${((0.98 - stats.successRate) * 100).toFixed(1)}% higher success rate`
+    });
+  }
+  
+  // Independent nodes → parallelize
+  const parallelizable = findIndependentNodes(workflow);
+  if (parallelizable.length > 1) {
+    suggestions.push({
+      type: "parallelize",
+      nodes: parallelizable,
+      expectedImprovement: `${(parallelizable.length * 0.7).toFixed(1)}x faster`
+    });
+  }
+  
+  return suggestions;
+}
+```
+
+**Agent applies improvements:**
+
+```typescript
+// Agent loads workflow
+const workflow = JSON.parse(await fs.readFile('workflows/user-onboarding.json'));
+
+// Agent gets suggestions
+const suggestions = suggestImprovements(analyzeExecutions(workflow.id));
+
+// Agent modifies workflow
+for (const suggestion of suggestions) {
+  switch (suggestion.type) {
+    case "add-retry":
+      addRetryPolicy(workflow, suggestion.nodes);
+      break;
+    case "parallelize":
+      convertToParallel(workflow, suggestion.nodes);
+      break;
+    case "add-cache":
+      addCachePolicy(workflow, suggestion.node);
+      break;
+  }
+}
+
+// Agent commits improvement
+await git.commit('workflows/user-onboarding.json', workflow);
+await git.createPR(`Optimize ${workflow.id}: ${suggestions.map(s => s.type).join(', ')}`);
 ```
 
 ---
@@ -1153,33 +1848,165 @@ createGrpcServer(registry, {
 
 ---
 
+## Agent-Workflow Collaboration Pattern
+
+### How Agents and Humans Work Together
+
+```
+┌────────────────────────────────────────────────────────┐
+│                    AI Agent                            │
+│  1. Receives task: "Onboard new user"                  │
+│  2. Checks git: does workflows/user-onboarding.json    │
+│     exist?                                             │
+│  3a. YES: Load from git, execute with new input        │
+│  3b. NO: Compose new workflow from procedures          │
+│  4. Execute workflow                                   │
+│  5. Analyze OpenTelemetry traces                       │
+│  6. Detect bottlenecks/failures                        │
+│  7. Create PR with improvements                        │
+└────────────┬───────────────────────────────────────────┘
+             │
+             ▼
+┌────────────────────────────────────────────────────────┐
+│                   Git Repository                       │
+│  • workflows/*.json (version controlled)               │
+│  • Pull requests (agent-created)                       │
+│  • Review comments (human feedback)                    │
+└────────────┬───────────────────────────────────────────┘
+             │
+             ▼
+┌────────────────────────────────────────────────────────┐
+│                  Human Developer                       │
+│  1. Reviews agent's PR                                 │
+│  2. Adds domain knowledge:                             │
+│     - "Refunds > $100 need approval"                   │
+│     - "GDPR: log data access"                          │
+│     - "Use exponential backoff for retries"            │
+│  3. Approves or requests changes                       │
+│  4. Merges to main → deployed                          │
+└────────────┬───────────────────────────────────────────┘
+             │
+             ▼
+┌────────────────────────────────────────────────────────┐
+│                   CI/CD Pipeline                       │
+│  • Validates workflow JSON                             │
+│  • Runs workflow tests                                 │
+│  • Deploys to production                               │
+│  • Starts collecting traces                            │
+└────────────┬───────────────────────────────────────────┘
+             │
+             ▼ (feedback loop)
+┌────────────────────────────────────────────────────────┐
+│              Production Metrics                        │
+│  • OpenTelemetry traces                                │
+│  • Success/failure rates                               │
+│  • Performance data                                    │
+│  → Agent analyzes → suggests improvements → new PR     │
+└────────────────────────────────────────────────────────┘
+```
+
+### Real Example
+
+**Agent creates initial workflow:**
+
+```json
+{
+  "id": "customer-refund",
+  "nodes": [
+    { "id": "validate", "type": "procedure", "procedureName": "refunds.validate", "next": "process" },
+    { "id": "process", "type": "procedure", "procedureName": "refunds.process" }
+  ]
+}
+```
+
+**Human reviews PR:**
+
+```
+Comment: "We need manager approval for refunds > $100"
+```
+
+**Agent updates workflow:**
+
+```json
+{
+  "id": "customer-refund",
+  "nodes": [
+    { "id": "validate", "type": "procedure", "procedureName": "refunds.validate", "next": "check-amount" },
+    { "id": "check-amount", "type": "condition",
+      "config": {
+        "expression": "amount > 100",
+        "trueBranch": "request-approval",
+        "falseBranch": "process"
+      }
+    },
+    { "id": "request-approval", "type": "procedure", "procedureName": "approvals.request", "next": "process" },
+    { "id": "process", "type": "procedure", "procedureName": "refunds.process" }
+  ]
+}
+```
+
+**Merged → Deployed → Agent learns the pattern → applies to similar workflows**
+
+---
+
 ## Conclusion
 
-tsdev architecture is built on:
+tsdev architecture enables a new way of building software:
 
-1. **Separation of concerns**
-   - Core: Framework logic
-   - Adapters: Transport translation
-   - Handlers: Business logic
+### For AI Agents
 
-2. **Auto-discovery via reflection**
-   - No manual registration
+**Agents become software engineers who:**
+- Discover available capabilities (procedures)
+- Compose solutions (workflows)
+- Commit their work (git)
+- Learn from production (OpenTelemetry)
+- Iterate on improvements (PR workflow)
+
+**Result:** 10-100x speedup on repeated tasks through workflow caching.
+
+### For Development Teams
+
+**Collaborative intelligence:**
+- Agents contribute automation
+- Humans contribute domain expertise
+- Git manages evolution
+- CI/CD ensures quality
+- OpenTelemetry provides feedback
+
+**Result:** Workflows improve over time, knowledge compounds across agents.
+
+### Technical Foundation
+
+Built on:
+
+1. **Auto-discovery via reflection**
+   - Zero configuration
    - Runtime introspection
+   - Agent-friendly JSON APIs
 
-3. **Convention-driven automation**
-   - Naming → REST routes
-   - File structure → registry
+2. **Contracts as source of truth**
+   - Zod schemas → validation
+   - JSON Schema → agent discovery
+   - OpenAPI → ecosystem compatibility
+
+3. **Workflows as compiled logic**
+   - Declarative JSON
+   - Version controlled in git
+   - Reusable across contexts
 
 4. **Function composition**
-   - Policies as pure functions
+   - Pure procedures
+   - Composable policies
    - No framework magic
 
 5. **Built-in observability**
    - OpenTelemetry everywhere
-   - Business-level spans
+   - Automatic span hierarchy
+   - Agent feedback loop
 
-**Result:** Simple, extensible, observable system with minimal boilerplate.
+**Result:** Framework where AI agents build with procedures, humans guide with domain knowledge, and git manages continuous evolution.
 
 ---
 
-See [PHILOSOPHY.md](./PHILOSOPHY.md) for design principles.
+See [PHILOSOPHY.md](./PHILOSOPHY.md) for the deeper "why" behind this design.
+
