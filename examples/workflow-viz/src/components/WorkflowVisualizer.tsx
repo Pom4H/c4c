@@ -29,12 +29,16 @@ interface WorkflowVisualizerProps {
   };
 }
 
-const nodeTypeColors = {
-  procedure: "hsl(var(--span-procedure))",
-  condition: "hsl(var(--span-condition))",
-  parallel: "hsl(var(--span-parallel))",
-  sequential: "hsl(var(--span-sequential))",
-} as const;
+// Node type colors
+const getNodeTypeColor = (type: string) => {
+  const colors = {
+    procedure: "#4ade80",  // Green
+    condition: "#fbbf24",  // Yellow
+    parallel: "#818cf8",   // Purple
+    sequential: "#60a5fa", // Blue
+  } as const;
+  return colors[type as keyof typeof colors] || "#60a5fa";
+};
 
 export default function WorkflowVisualizer({
   workflow,
@@ -85,14 +89,14 @@ export default function WorkflowVisualizer({
         },
         style: {
           background: isExecuted
-            ? nodeTypeColors[node.type as keyof typeof nodeTypeColors] || "hsl(var(--primary))"
-            : "hsl(var(--muted))",
-          border: `2px solid ${nodeSpan?.status.code === "ERROR" ? "hsl(var(--destructive))" : "hsl(var(--primary))"}`,
+            ? getNodeTypeColor(node.type)
+            : "#e5e7eb",
+          border: `2px solid ${nodeSpan?.status.code === "ERROR" ? "#ef4444" : "#1e40af"}`,
           borderRadius: "8px",
           padding: "10px",
           width: 180,
           opacity: isExecuted ? 1 : 0.5,
-          color: isExecuted ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))",
+          color: isExecuted ? "#ffffff" : "#000000",
         },
       });
     });
@@ -115,8 +119,8 @@ export default function WorkflowVisualizer({
             animated: executionResult?.nodesExecuted.includes(node.id) ?? false,
             style: {
               stroke: executionResult?.nodesExecuted.includes(node.id)
-                ? "hsl(var(--span-procedure))"
-                : "hsl(var(--muted-foreground))",
+                ? "#4ade80"
+                : "#94a3b8",
               strokeWidth: 2,
             },
             label: Array.isArray(node.next) ? `branch ${index + 1}` : undefined,
@@ -134,7 +138,7 @@ export default function WorkflowVisualizer({
             target: config.trueBranch,
             animated: executionResult?.nodesExecuted.includes(node.id) ?? false,
             style: {
-              stroke: "hsl(var(--span-procedure))",
+              stroke: "#22c55e",
               strokeWidth: 2,
             },
             label: "✓ true",
@@ -147,7 +151,7 @@ export default function WorkflowVisualizer({
             target: config.falseBranch,
             animated: false,
             style: {
-              stroke: "hsl(var(--destructive))",
+              stroke: "#ef4444",
               strokeWidth: 2,
             },
             label: "✗ false",
@@ -167,7 +171,7 @@ export default function WorkflowVisualizer({
               animated:
                 executionResult?.nodesExecuted.includes(node.id) ?? false,
               style: {
-                stroke: "hsl(var(--span-parallel))",
+                stroke: "#818cf8",
                 strokeWidth: 2,
               },
               label: `parallel ${index + 1}`,
@@ -190,8 +194,29 @@ export default function WorkflowVisualizer({
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   return (
-    <div style={{ width: "100%", height: "600px" }}>
-      <ReactFlow
+    <div className="space-y-4">
+      {/* Legend */}
+      <div className="flex gap-4 text-xs flex-wrap">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded" style={{ background: "#4ade80" }} />
+          <span>Procedure</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded" style={{ background: "#fbbf24" }} />
+          <span>Condition</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded" style={{ background: "#818cf8" }} />
+          <span>Parallel</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded" style={{ background: "#60a5fa" }} />
+          <span>Sequential</span>
+        </div>
+      </div>
+      
+      <div style={{ width: "100%", height: "600px" }}>
+        <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -204,7 +229,7 @@ export default function WorkflowVisualizer({
         <MiniMap
           nodeColor={(node) => {
             const isExecuted = executionResult?.nodesExecuted.includes(node.id);
-            return isExecuted ? "hsl(var(--span-procedure))" : "hsl(var(--muted))";
+            return isExecuted ? "#4ade80" : "#e5e7eb";
           }}
         />
         <Panel position="top-left">
@@ -243,6 +268,7 @@ export default function WorkflowVisualizer({
           </Panel>
         )}
       </ReactFlow>
+      </div>
     </div>
   );
 }

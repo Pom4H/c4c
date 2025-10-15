@@ -265,21 +265,27 @@ export default function Home() {
 												},
 												{} as Record<string, number>
 											)
-										).map(([type, count]) => (
-											<div key={type} className="flex items-center gap-2">
-												<Badge
-													variant={
-														type === "procedure"
-															? "default"
-															: type === "condition"
-															? "secondary"
-															: "outline"
-													}
-												>
-													{type}: {count as number}
-												</Badge>
-											</div>
-										))}
+										).map(([type, count]) => {
+											const colorMap = {
+												procedure: "#4ade80",
+												condition: "#fbbf24",
+												parallel: "#818cf8",
+												sequential: "#60a5fa",
+											} as const;
+											const color = colorMap[type as keyof typeof colorMap] || "#60a5fa";
+											
+											return (
+												<div key={type} className="flex items-center gap-2">
+													<div
+														className="w-4 h-4 rounded"
+														style={{ background: color }}
+													/>
+													<span className="text-sm">
+														{type}: {count as number}
+													</span>
+												</div>
+											);
+										})}
 									</div>
 								</div>
 							</div>
