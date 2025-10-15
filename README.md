@@ -227,6 +227,40 @@ jobs:
 
 - Wire agents to GitHub via a bot token to edit procedures and workflows; the `collectRegistry()`-backed registry stays the single source of truth, ensuring safe automation.
 
+### GitHub Runtime for Agents (pull-and-act)
+
+For interactive automation, run a long-lived service that:
+- Periodically pulls the repository (or listens to webhooks) to keep a fresh working tree
+- Exposes a set of agent tools over RPC/HTTP:
+  - Files: read/write list, read file, write file (edits), search
+  - Git: create branch, commit, push, open PR, comment on PR, set labels
+  - Registry/Workflows: `describeRegistry()`, run workflow in dry-run, validate generators
+  - Status events: emit progress updates (SSE/WebSocket) for UI
+
+Sketch API shape:
+```typescript
+// Files
+GET  /files?path=src/**/*
+GET  /file?path=packages/core/src/registry.ts
+POST /file (path, content, message?)
+
+// Git
+POST /git/branch (name, from?)
+POST /git/commit (message)
+POST /git/push (remote, branch)
+POST /git/pr (title, body, draft?)
+
+// Agents
+GET  /registry/describe
+POST /workflow/validate (definition)
+POST /generate/openapi (handlersPath)
+
+// Events
+GET  /events/stream  // SSE with agent status/spans
+```
+
+Security: use GitHub App or bot token with least privilege; validate edits via CI before merge.
+
 ## 📦 Package Exports
 
 ### `@tsdev/core`

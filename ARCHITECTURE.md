@@ -260,6 +260,31 @@ The same artifacts (OpenAPI, JSON Schemas) provide validation and safety.
 - Generate OpenAPI on CI from the registry and publish as artifact or to Pages
 - Validate PRs by building registry, running generators, and executing example workflows
 - Agents (via bot account) can submit PRs that update procedures and workflows; CI provides guardrails
+
+### GitHub Runtime (Pull-and-Act)
+
+An optional runtime service keeps a local clone synchronized with GitHub and exposes capabilities for agents:
+
+1. Repository sync
+   - Pull on interval or webhook
+   - Track branches per agent/session
+2. File system tools
+   - List files, read, write
+   - Grep/search within workspace
+3. Git tools
+   - Create branch, commit, push
+   - Open/Update PRs, post comments, set labels
+4. Domain tools
+   - `describeRegistry()` for discoverability
+   - Workflow validate/execute (dry-run) with span collection
+   - Generators (OpenAPI/JSON Schema)
+5. Events
+   - Emit progress/status via SSE/WebSocket for UIs
+
+Security considerations:
+- Use a GitHub App with least privileges
+- Enforce branch protection; require CI checks (build, generators, lint)
+- Rate limit and audit agent actions
 ```
 
 ## Data Flow

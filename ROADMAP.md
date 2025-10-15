@@ -14,12 +14,14 @@
 - CLI tooling: `tsdev` helper (scaffold contracts/handlers/apps, run servers)
 - Better runtime diagnostics: pretty errors, trace IDs in logs
 - Generators: improve OpenAPI output; JSON Schema export options; CLI command `tsdev generate openapi`
+ - GitHub Runtime MVP: service that syncs repo and exposes agent tools (read/write, search, branch/PR)
 - React hooks: loading/error states, typed helpers, storybook examples
 - Policies: add `withCache`, `withTimeout`, `withCircuitBreaker`
 
 ## 0.3.x — Extensibility (mid-term)
 - New adapters: WebSocket (RPC over WS), background worker adapter
 - SDK generator (TypeScript) from registry/contracts; publish client library template
+ - Git tools v2: PR review comments from agents; status events via SSE/WebSocket; policy guardrails
 - Graph visualization API for workflows (data model and serialization)
 - Contract evolution guidelines (breaking/backward-compatible changes)
 - Pluggable registry collectors (custom discovery strategies)
@@ -30,6 +32,7 @@
 - Message queue adapter (SQS/Kafka/RabbitMQ pattern)
 - Authn/Authz policy examples (JWT, API key, RBAC)
 - GitHub integration: official Actions to build registry, generate OpenAPI, preview docs on PRs
+ - GitHub App packaging for the runtime (installation, permissions, webhook handling)
 
 ## 0.5.x — Observability and scale (long-term)
 - Distributed tracing examples across multi-service registries
@@ -42,6 +45,7 @@
 - Agent interface: LLM-callable procedure registry with safeguards (read-only discovery, sandboxed PR authoring)
 - Auto-docs site generator from registry (procedures, policies, workflows)
 - Multi-language SDKs (Python first)
+ - Autonomous agent workflows: plan→edit→PR→feedback loop with human-in-the-loop gates
 
 ## Nice-to-haves (ongoing)
 - Example gallery with real-world domains
