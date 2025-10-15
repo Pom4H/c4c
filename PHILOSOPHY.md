@@ -14,7 +14,7 @@ Most frameworks design APIs as a transport layer (REST, gRPC, GraphQL).
 - their names and invariants,
 - connections with the environment (context).
 
-**A contract is the single source of truth**, from which everything else is automatically derived: REST endpoints, CLI commands, SDKs, OpenAPI specs, agents, test fixtures.
+**A contract is the single source of truth**, from which everything else is automatically derived — при этом экспонирование осознанно: не каждая процедура становится endpoint/узлом. Метаданные управляют тем, что публично и стабильно.
 
 ---
 

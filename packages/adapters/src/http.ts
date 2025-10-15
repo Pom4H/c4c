@@ -106,7 +106,7 @@ export function createHttpServer(registry: Registry, port = 3000) {
 			return;
 		}
 
-		// RPC endpoint: POST /rpc/:procedureName
+        // RPC endpoint: POST /rpc/:procedureName
 		if (req.method === "POST" && req.url?.startsWith("/rpc/")) {
 			const procedureName = req.url.slice(5); // Remove "/rpc/"
 
@@ -123,7 +123,16 @@ export function createHttpServer(registry: Registry, port = 3000) {
 					return;
 				}
 
-				// Create execution context from HTTP request
+                // Respect exposure flags: RPC allowed if cli OR rest OR explicit rpc flag
+                const expose = (procedure.contract.metadata as any)?.expose || {};
+                const rpcAllowed = expose.rest === true || expose.cli === true || (expose as any).rpc === true;
+                if (!rpcAllowed) {
+                    res.writeHead(404, { "Content-Type": "application/json" });
+                    res.end(JSON.stringify({ error: "RPC not exposed for this procedure" }));
+                    return;
+                }
+
+                // Create execution context from HTTP request
 				const context = createExecutionContext({
 					transport: "http",
 					method: req.method,

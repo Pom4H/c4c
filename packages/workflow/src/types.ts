@@ -95,6 +95,7 @@ export interface NodeMetadata {
 	inputSchema: z.ZodType;
 	outputSchema: z.ZodType;
 	configSchema?: z.ZodType; // Node-specific configuration
+  exposed?: boolean; // whether discoverable in palette
 	examples?: Array<{
 		input: unknown;
 		output: unknown;

@@ -109,6 +109,23 @@ import { createHttpServer, runCli } from '@tsdev/adapters';
 ```
 
 ### Composable Policies (`@tsdev/policies`)
+### Exposure metadata (what becomes REST/CLI/Workflow)
+
+Mark exposure at the contract level. По умолчанию ничего не экспонируется.
+
+```ts
+metadata: {
+  visibility: 'public',
+  expose: { rest: true, cli: true, workflow: false, discoverable: true },
+  security: { scopes: ['users:write'] },
+  versioning: { api: 'v1' },
+}
+```
+
+- OpenAPI/REST учитывают только `expose.rest === true`.
+- CLI команды формируются при `expose.cli === true`.
+- Workflow‑палитра показывает узлы с `expose.workflow === true` (или помеченные `exposed` в метаданных узлов).
+
 ### Generators (`@tsdev/generators`)
 
 ```typescript

@@ -32,12 +32,20 @@ export async function handleRESTRequest(
 	}
 
 	try {
-		const procedure = registry.get(match.procedureName);
+        const procedure = registry.get(match.procedureName);
 		if (!procedure) {
 			res.writeHead(404, { "Content-Type": "application/json" });
 			res.end(JSON.stringify({ error: "Procedure not found" }));
 			return true;
 		}
+
+        // Respect exposure flags: only allow REST if explicitly exposed
+        const restExposed = (procedure.contract.metadata as any)?.expose?.rest === true;
+        if (!restExposed) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "REST not exposed for this procedure" }));
+            return true;
+        }
 
 		// Build input from params, query, and body
 		let input: Record<string, unknown> = {
@@ -197,7 +205,9 @@ export function listRESTRoutes(registry: Registry): Array<{
 }> {
 	const routes: Array<{ method: string; path: string; procedure: string }> = [];
 
-	for (const [procedureName] of registry.entries()) {
+    for (const [procedureName, procedure] of registry.entries()) {
+        const restExposed = (procedure.contract.metadata as any)?.expose?.rest === true;
+        if (!restExposed) continue;
 		const [resource, action] = procedureName.split(".");
 		if (!resource || !action) continue;
 

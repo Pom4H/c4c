@@ -17,7 +17,24 @@ export interface Contract<TInput = unknown, TOutput = unknown> {
 	description?: string;
 	input: z.ZodType<TInput>;
 	output: z.ZodType<TOutput>;
-	metadata?: Record<string, unknown>;
+  metadata?: {
+    tags?: string[];
+    visibility?: 'public' | 'internal' | 'experimental';
+    expose?: {
+      rest?: boolean;
+      cli?: boolean;
+      workflow?: boolean;
+      discoverable?: boolean; // visible to agents/docs
+    };
+    security?: {
+      scopes?: string[];
+      roles?: string[];
+    };
+    versioning?: {
+      api?: string; // e.g., 'v1'
+    };
+    [key: string]: unknown;
+  };
 }
 
 /**

@@ -91,14 +91,18 @@ export function generateOpenAPISpec(
 		},
 	};
 
-	// Generate paths for each procedure
-	for (const [name, procedure] of registry.entries()) {
+  // Generate paths for each procedure (honor exposure flags)
+  for (const [name, procedure] of registry.entries()) {
+    const exposeRest = (procedure.contract.metadata as any)?.expose?.rest === true;
+    if (!exposeRest) {
+      continue; // skip non-exposed procedures
+    }
 		// RPC-style endpoint
 		const rpcPath = `/rpc/${name}`;
 		spec.paths[rpcPath] = generateRPCPath(procedure.contract);
 
 		// RESTful endpoint (if applicable)
-		const restPath = generateRESTPath(procedure.contract);
+    const restPath = generateRESTPath(procedure.contract);
 		if (restPath) {
 			Object.assign(spec.paths, restPath);
 		}

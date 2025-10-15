@@ -125,6 +125,10 @@ const createUser: Procedure = {
     return { id: "...", name: input.name, ... };
   },
 };
+
+// Exposure and stability are configured at the contract level
+// Default is internal (not exposed to transports/workflow)
+// Adapters and generators honor these flags
 ```
 
 ### Registry (Self-Describing)
