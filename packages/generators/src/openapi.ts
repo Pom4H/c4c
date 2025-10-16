@@ -1,10 +1,7 @@
-import type { ZodType } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
+import { createDocument } from "zod-openapi";
 import type { Contract, Registry } from "@tsdev/core";
 
-/**
- * OpenAPI 3.0 specification types
- */
 export interface OpenAPISpec {
 	openapi: string;
 	info: {
@@ -13,42 +10,8 @@ export interface OpenAPISpec {
 		description?: string;
 	};
 	servers?: Array<{ url: string; description?: string }>;
-	paths: Record<string, PathItem>;
-	components?: {
-		schemas?: Record<string, unknown>;
-	};
-}
-
-interface PathItem {
-	[method: string]: Operation;
-}
-
-interface Operation {
-	summary?: string;
-	description?: string;
-	operationId: string;
-	tags?: string[];
-	requestBody?: RequestBody;
-	responses: Record<string, Response>;
-	parameters?: Parameter[];
-}
-
-interface RequestBody {
-	required: boolean;
-	content: {
-		"application/json": {
-			schema: unknown;
-		};
-	};
-}
-
-interface Response {
-	description: string;
-	content?: {
-		"application/json": {
-			schema: unknown;
-		};
-	};
+	paths: Record<string, unknown>;
+	components?: Record<string, unknown>;
 }
 
 interface Parameter {
@@ -58,9 +21,6 @@ interface Parameter {
 	schema: unknown;
 }
 
-/**
- * Generate OpenAPI 3.0 specification from registry
- */
 export function generateOpenAPISpec(
 	registry: Registry,
 	options: {
@@ -77,171 +37,141 @@ export function generateOpenAPISpec(
 		servers = [{ url: "http://localhost:3000", description: "Development server" }],
 	} = options;
 
-	const spec: OpenAPISpec = {
-		openapi: "3.0.0",
+	const paths: Record<string, any> = {};
+
+	for (const [name, procedure] of registry.entries()) {
+		const { contract } = procedure;
+
+		const rpcPath = `/rpc/${name}`;
+		paths[rpcPath] = {
+			...(paths[rpcPath] ?? {}),
+			post: buildRpcOperation(contract),
+		};
+
+		const restEntry = buildRestOperation(contract);
+		if (restEntry) {
+			const { path, method, operation } = restEntry;
+			paths[path] = {
+				...(paths[path] ?? {}),
+				[method]: operation,
+			};
+		}
+	}
+
+	const document = createDocument({
+		openapi: "3.1.0",
 		info: {
 			title,
 			version,
 			description,
 		},
 		servers,
-		paths: {},
-		components: {
-			schemas: {},
-		},
-	};
+		paths,
+	});
 
-	// Generate paths for each procedure
-	for (const [name, procedure] of registry.entries()) {
-		// RPC-style endpoint
-		const rpcPath = `/rpc/${name}`;
-		spec.paths[rpcPath] = generateRPCPath(procedure.contract);
-
-		// RESTful endpoint (if applicable)
-		const restPath = generateRESTPath(procedure.contract);
-		if (restPath) {
-			Object.assign(spec.paths, restPath);
-		}
-	}
-
-	return spec;
+	return document as OpenAPISpec;
 }
 
-/**
- * Generate RPC-style path
- */
-function generateRPCPath(contract: Contract): PathItem {
-	const inputSchema = zodToJsonSchema(contract.input as ZodType, {
-		name: `${contract.name}.Input`,
-	});
-	const outputSchema = zodToJsonSchema(contract.output as ZodType, {
-		name: `${contract.name}.Output`,
-	});
-
+function buildRpcOperation(contract: Contract) {
 	return {
-		post: {
-			summary: contract.description || contract.name,
-			description: contract.description,
-			operationId: contract.name,
-			tags: extractTags(contract),
-			requestBody: {
-				required: true,
-				content: {
-					"application/json": {
-						schema: inputSchema,
-					},
-				},
-			},
-			responses: {
-				"200": {
-					description: "Successful response",
-					content: {
-						"application/json": {
-							schema: outputSchema,
-						},
-					},
-				},
-				"400": {
-					description: "Validation error",
-					content: {
-						"application/json": {
-							schema: {
-								type: "object",
-								properties: {
-									error: { type: "string" },
-								},
-							},
-						},
-					},
-				},
-				"500": {
-					description: "Internal server error",
-					content: {
-						"application/json": {
-							schema: {
-								type: "object",
-								properties: {
-									error: { type: "string" },
-								},
-							},
-						},
-					},
+		summary: contract.description || contract.name,
+		description: contract.description,
+		operationId: contract.name,
+		tags: extractTags(contract),
+		requestBody: {
+			content: {
+				"application/json": {
+					schema: contract.input,
 				},
 			},
 		},
+		responses: successAndErrorResponses(contract.output),
 	};
 }
 
-/**
- * Generate RESTful path from contract name
- * Supports conventions like: resource.action -> /resource/action
- */
-function generateRESTPath(contract: Contract): Record<string, PathItem> | null {
+function buildRestOperation(
+	contract: Contract
+): { path: string; method: string; operation: any } | null {
 	const parts = contract.name.split(".");
 	if (parts.length < 2) return null;
 
 	const [resource, action] = parts;
-	const inputSchema = zodToJsonSchema(contract.input as ZodType, {
-		name: `${contract.name}.Input`,
-	});
-	const outputSchema = zodToJsonSchema(contract.output as ZodType, {
-		name: `${contract.name}.Output`,
-	});
-
-	// Map action to HTTP method and path
-	const mapping = getRESTMapping(resource || "", action || "");
+	const mapping = getRestMapping(resource || "", action || "");
 	if (!mapping) return null;
 
+	const operation: any = {
+		summary: contract.description || contract.name,
+		description: contract.description,
+		operationId: `${contract.name}_rest`,
+		tags: extractTags(contract),
+		responses: successAndErrorResponses(contract.output),
+	};
+
+	if (mapping.parameters?.length) {
+		operation.parameters = mapping.parameters;
+	}
+
+	if (mapping.hasBody) {
+		operation.requestBody = {
+			content: {
+				"application/json": {
+					schema: contract.input,
+				},
+			},
+		};
+	}
+
 	return {
-		[mapping.path]: {
-			[mapping.method]: {
-				summary: contract.description || contract.name,
-				description: contract.description,
-				operationId: `${contract.name}_rest`,
-				tags: extractTags(contract),
-				...(mapping.hasBody && {
-					requestBody: {
-						required: true,
-						content: {
-							"application/json": {
-								schema: inputSchema,
-							},
-						},
-					},
-				}),
-				...(mapping.parameters && {
-					parameters: mapping.parameters,
-				}),
-				responses: {
-					"200": {
-						description: "Successful response",
-						content: {
-							"application/json": {
-								schema: outputSchema,
-							},
-						},
-					},
-					"400": {
-						description: "Validation error",
-					},
-					"404": {
-						description: "Resource not found",
-					},
+		path: mapping.path,
+		method: mapping.method,
+		operation,
+	};
+}
+
+function successAndErrorResponses(outputSchema: Contract["output"]) {
+	return {
+		"200": {
+			description: "Successful response",
+			content: {
+				"application/json": {
+					schema: outputSchema,
+				},
+			},
+		},
+		"400": {
+			description: "Validation error",
+			content: {
+				"application/json": {
+					schema: z.object({
+						error: z.string(),
+					}),
+				},
+			},
+		},
+		"500": {
+			description: "Internal server error",
+			content: {
+				"application/json": {
+					schema: z.object({
+						error: z.string(),
+					}),
 				},
 			},
 		},
 	};
 }
 
-/**
- * Map action to REST convention
- */
-function getRESTMapping(resource: string, action: string): {
-	method: string;
-	path: string;
-	hasBody: boolean;
-	parameters?: Parameter[];
-} | null {
+function getRestMapping(
+	resource: string,
+	action: string
+):
+	| {
+			method: string;
+			path: string;
+			hasBody: boolean;
+			parameters?: Array<Parameter>;
+	  }
+	| null {
 	switch (action) {
 		case "create":
 			return {
@@ -316,31 +246,20 @@ function getRESTMapping(resource: string, action: string): {
 	}
 }
 
-/**
- * Extract tags from contract metadata
- */
 function extractTags(contract: Contract): string[] {
 	if (contract.metadata?.tags && Array.isArray(contract.metadata.tags)) {
 		return contract.metadata.tags as string[];
 	}
-	// Default tag from contract name
 	const parts = contract.name.split(".");
 	return parts.length > 1 ? [parts[0] || ""] : ["default"];
 }
 
-/**
- * Generate OpenAPI specification as JSON string
- */
 export function generateOpenAPIJSON(registry: Registry, options = {}): string {
 	const spec = generateOpenAPISpec(registry, options);
 	return JSON.stringify(spec, null, 2);
 }
 
-/**
- * Generate OpenAPI specification as YAML (simplified)
- */
 export function generateOpenAPIYAML(registry: Registry, options = {}): string {
 	const spec = generateOpenAPISpec(registry, options);
-	// Simple YAML conversion (for production, use a proper YAML library)
 	return JSON.stringify(spec, null, 2);
 }

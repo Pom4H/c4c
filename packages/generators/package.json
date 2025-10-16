@@ -26,8 +26,8 @@
   "dependencies": {
     "@tsdev/core": "workspace:*",
     "@tsdev/workflow": "workspace:*",
-    "zod": "^3.23.8",
-    "zod-to-json-schema": "^3.23.2"
+    "zod": "^4.1.12",
+    "zod-openapi": "^5.4.3"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",
