@@ -1,11 +1,25 @@
 import type { WorkflowResumeState, WorkflowExecutionResult } from "./types.js";
 
+export type SerializedWorkflowExecutionResult = Omit<WorkflowExecutionResult, "error"> & {
+  error?: {
+    message: string;
+    name?: string;
+    stack?: string;
+  };
+};
+
 export type WorkflowEvent =
   | {
       type: "workflow.started";
       workflowId: string;
       executionId: string;
       startTime: number;
+    }
+  | {
+      type: "workflow.resumed";
+      workflowId: string;
+      executionId: string;
+      timestamp: number;
     }
   | {
       type: "workflow.completed";
@@ -51,7 +65,7 @@ export type WorkflowEvent =
       type: "workflow.result";
       workflowId: string;
       executionId: string;
-      result: WorkflowExecutionResult;
+      result: SerializedWorkflowExecutionResult;
     };
 
 type Listener = (event: WorkflowEvent) => void;

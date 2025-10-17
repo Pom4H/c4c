@@ -188,6 +188,23 @@ pnpm install
 pnpm dev:basic        # Start API server with procedures
 ```
 
+### CLI usage
+
+```bash
+# Start all transports (RPC, REST, workflow) on port 3000
+tsdev serve
+
+# Serve only the workflow HTTP surface from a specific project root
+tsdev serve workflow --root ./examples/integrations --port 4000
+
+# Launch the workflow visualizer UI (defaults to ./workflows under the root)
+tsdev serve ui --root . --port 3100 --api-base http://localhost:3000
+
+# Generate a typed RPC client based on discovered procedures
+tsdev generate client --root ./examples/integrations --out ./src/generated/tsdev-client.ts
+
+```
+
 **Create procedures:**
 
 ```typescript

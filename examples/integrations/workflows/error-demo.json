@@ -1,0 +1,44 @@
+{
+  "id": "error-demo",
+  "name": "Error Handling Demo",
+  "description": "Demonstrates node failure and error span propagation",
+  "version": "1.0.0",
+  "startNode": "start",
+  "variables": {
+    "a": 10,
+    "b": 0
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "type": "procedure",
+      "procedureName": "math.add",
+      "config": {
+        "a": 5,
+        "b": 5
+      },
+      "next": "will-fail"
+    },
+    {
+      "id": "will-fail",
+      "type": "procedure",
+      "procedureName": "math.divide",
+      "config": {
+        "a": 100,
+        "b": 0
+      },
+      "next": "never-reached"
+    },
+    {
+      "id": "never-reached",
+      "type": "procedure",
+      "procedureName": "data.save"
+    }
+  ],
+  "metadata": {
+    "tags": [
+      "error",
+      "+otel"
+    ]
+  }
+}

@@ -281,6 +281,8 @@ function renderFile({
 				`  input: zod.${operation.dataKey},`,
 				`  output: zod.${operation.responseKey},`,
 				`  metadata: {`,
+				`    exposure: "internal",`,
+				`    roles: ["workflow-node"],`,
 				`    provider: ${escapeString(providerId)},`,
 				`    operation: ${escapeString(operation.name)},`,
 				`    tags: ${tagsArray},`,

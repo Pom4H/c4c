@@ -18,7 +18,8 @@ export interface UseWorkflowOptions {
 export interface UseWorkflowReturn {
   execute: (
     workflowId: string,
-    input?: Record<string, unknown>
+    input?: Record<string, unknown>,
+    options?: { executionId?: string }
   ) => Promise<WorkflowExecutionResult>;
   result: WorkflowExecutionResult | null;
   isExecuting: boolean;
@@ -36,7 +37,8 @@ export function useWorkflow(options: UseWorkflowOptions = {}): UseWorkflowReturn
   const execute = useCallback(
     async (
       workflowId: string,
-      input?: Record<string, unknown>
+      input?: Record<string, unknown>,
+      executeOptions?: { executionId?: string }
     ): Promise<WorkflowExecutionResult> => {
       setIsExecuting(true);
       setError(null);
@@ -48,7 +50,7 @@ export function useWorkflow(options: UseWorkflowOptions = {}): UseWorkflowReturn
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ workflowId, input }),
+          body: JSON.stringify({ workflowId, input, executionId: executeOptions?.executionId }),
         });
 
         if (!response.ok) {
@@ -99,8 +101,13 @@ export function useWorkflow(options: UseWorkflowOptions = {}): UseWorkflowReturn
   };
 }
 
-export function useWorkflows(options: { apiBaseUrl?: string } = {}) {
-  const { apiBaseUrl = "/api/workflow" } = options;
+export function useWorkflows(
+  options: {
+    apiBaseUrl?: string;
+    listPath?: string;
+  } = {}
+) {
+  const { apiBaseUrl = "/api/workflow", listPath = "/list" } = options;
   const [workflows, setWorkflows] = useState<
     Array<{
       id: string;
@@ -118,7 +125,7 @@ export function useWorkflows(options: { apiBaseUrl?: string } = {}) {
     setError(null);
 
     try {
-      const response = await fetch(`${apiBaseUrl}/list`);
+      const response = await fetch(resolveEndpoint(apiBaseUrl, listPath));
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -144,9 +151,15 @@ export function useWorkflows(options: { apiBaseUrl?: string } = {}) {
 
 export function useWorkflowDefinition(
   workflowId: string | null,
-  options: { apiBaseUrl?: string } = {}
+  options: {
+    apiBaseUrl?: string;
+    definitionPath?: ((workflowId: string) => string) | string;
+  } = {}
 ) {
-  const { apiBaseUrl = "/api/workflow" } = options;
+  const {
+    apiBaseUrl = "/api/workflow",
+    definitionPath = (id: string) => `/definition?id=${encodeURIComponent(id)}`,
+  } = options;
   const [definition, setDefinition] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -161,7 +174,12 @@ export function useWorkflowDefinition(
     setError(null);
 
     try {
-      const response = await fetch(`${apiBaseUrl}/definition?id=${workflowId}`);
+      const path =
+        typeof definitionPath === "function"
+          ? definitionPath(workflowId)
+          : definitionPath.replace("{id}", encodeURIComponent(workflowId));
+
+      const response = await fetch(resolveEndpoint(apiBaseUrl, path));
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -183,4 +201,13 @@ export function useWorkflowDefinition(
     error,
     fetchDefinition,
   };
+}
+
+function resolveEndpoint(baseUrl: string, path: string): string {
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+  const normalizedBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}`;
 }

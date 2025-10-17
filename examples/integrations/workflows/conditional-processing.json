@@ -1,0 +1,59 @@
+{
+  "id": "conditional-processing",
+  "name": "Conditional Data Processing",
+  "description": "Processes data differently based on user tier",
+  "version": "1.0.0",
+  "startNode": "fetch-user",
+  "variables": {
+    "userId": "user_123"
+  },
+  "nodes": [
+    {
+      "id": "fetch-user",
+      "type": "procedure",
+      "procedureName": "data.fetch",
+      "config": {
+        "userId": "user_123"
+      },
+      "next": "check-premium"
+    },
+    {
+      "id": "check-premium",
+      "type": "condition",
+      "config": {
+        "expression": "isPremium === true",
+        "trueBranch": "premium-processing",
+        "falseBranch": "basic-processing"
+      }
+    },
+    {
+      "id": "premium-processing",
+      "type": "procedure",
+      "procedureName": "data.process",
+      "config": {
+        "mode": "premium"
+      },
+      "next": "save-results"
+    },
+    {
+      "id": "basic-processing",
+      "type": "procedure",
+      "procedureName": "data.process",
+      "config": {
+        "mode": "basic"
+      },
+      "next": "save-results"
+    },
+    {
+      "id": "save-results",
+      "type": "procedure",
+      "procedureName": "data.save"
+    }
+  ],
+  "metadata": {
+    "tags": [
+      "data",
+      "conditional"
+    ]
+  }
+}

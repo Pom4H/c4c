@@ -5,7 +5,24 @@
  */
 
 // Types
-export type { Contract, Procedure, Handler, Registry, ExecutionContext, Policy } from "./types.js";
+export type {
+	Contract,
+	Procedure,
+	Handler,
+	Registry,
+	ExecutionContext,
+	Policy,
+	ContractMetadata,
+	ProcedureExposure,
+	ProcedureRole,
+} from "./types.js";
+
+export {
+	getContractMetadata,
+	getProcedureExposure,
+	getProcedureRoles,
+	isProcedureVisible,
+} from "./metadata.js";
 
 // Registry
 export { collectRegistry, getProcedure, listProcedures, describeRegistry } from "./registry.js";

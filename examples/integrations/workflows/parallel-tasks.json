@@ -1,0 +1,60 @@
+{
+  "id": "parallel-tasks",
+  "name": "Parallel Task Execution",
+  "description": "Executes multiple tasks simultaneously",
+  "version": "1.0.0",
+  "startNode": "parallel-execution",
+  "nodes": [
+    {
+      "id": "parallel-execution",
+      "type": "parallel",
+      "config": {
+        "branches": [
+          "task-1",
+          "task-2",
+          "task-3"
+        ],
+        "waitForAll": true
+      },
+      "next": "aggregate-results"
+    },
+    {
+      "id": "task-1",
+      "type": "procedure",
+      "procedureName": "math.add",
+      "config": {
+        "a": 10,
+        "b": 20
+      }
+    },
+    {
+      "id": "task-2",
+      "type": "procedure",
+      "procedureName": "math.multiply",
+      "config": {
+        "a": 5,
+        "b": 6
+      }
+    },
+    {
+      "id": "task-3",
+      "type": "procedure",
+      "procedureName": "math.subtract",
+      "config": {
+        "a": 100,
+        "b": 25
+      }
+    },
+    {
+      "id": "aggregate-results",
+      "type": "procedure",
+      "procedureName": "data.save"
+    }
+  ],
+  "metadata": {
+    "tags": [
+      "parallel",
+      "demo"
+    ]
+  }
+}

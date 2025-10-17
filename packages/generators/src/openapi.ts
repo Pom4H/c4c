@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createDocument } from "zod-openapi";
-import type { Contract, Registry } from "@tsdev/core";
+import { isProcedureVisible, type Contract, type Registry } from "@tsdev/core";
 
 export interface OpenAPISpec {
 	openapi: string;
@@ -42,19 +42,23 @@ export function generateOpenAPISpec(
 	for (const [name, procedure] of registry.entries()) {
 		const { contract } = procedure;
 
-		const rpcPath = `/rpc/${name}`;
-		paths[rpcPath] = {
-			...(paths[rpcPath] ?? {}),
-			post: buildRpcOperation(contract),
-		};
-
-		const restEntry = buildRestOperation(contract);
-		if (restEntry) {
-			const { path, method, operation } = restEntry;
-			paths[path] = {
-				...(paths[path] ?? {}),
-				[method]: operation,
+		if (isProcedureVisible(contract, "rpc")) {
+			const rpcPath = `/rpc/${name}`;
+			paths[rpcPath] = {
+				...(paths[rpcPath] ?? {}),
+				post: buildRpcOperation(contract),
 			};
+		}
+
+		if (isProcedureVisible(contract, "rest")) {
+			const restEntry = buildRestOperation(contract);
+			if (restEntry) {
+				const { path, method, operation } = restEntry;
+				paths[path] = {
+					...(paths[path] ?? {}),
+					[method]: operation,
+				};
+			}
 		}
 	}
 

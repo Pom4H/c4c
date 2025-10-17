@@ -16,7 +16,7 @@ import type {
 	ParallelConfig,
   WorkflowResumeState,
 } from "./types.js";
-import { publish } from "./events.js";
+import { publish, type SerializedWorkflowExecutionResult } from "./events.js";
 
 const tracer = trace.getTracer("tsdev.workflow");
 
@@ -144,22 +144,31 @@ export async function executeWorkflow(
 					`[Workflow] ✅ Completed: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`
 				);
 
-				// Publish workflow completed
-				publish({
-					type: "workflow.completed",
-					workflowId: workflow.id,
-					executionId,
-					executionTime,
-					nodesExecuted,
-				});
+			const workflowResult = {
+				executionId,
+				status: "completed" as const,
+				outputs,
+				executionTime,
+				nodesExecuted,
+			};
 
-				return {
-					executionId,
-					status: "completed" as const,
-					outputs,
-					executionTime,
-					nodesExecuted,
-				};
+			// Publish workflow completed
+			publish({
+				type: "workflow.completed",
+				workflowId: workflow.id,
+				executionId,
+				executionTime,
+				nodesExecuted,
+			});
+
+			publish({
+				type: "workflow.result",
+				workflowId: workflow.id,
+				executionId,
+				result: toSerializedResult(workflowResult),
+			});
+
+			return workflowResult;
 			} catch (error) {
 				if (error instanceof PauseSignal) {
 					const executionTime = Date.now() - startTime;
@@ -201,14 +210,23 @@ export async function executeWorkflow(
                         resumeState,
                     });
 
-					return {
-						executionId,
-						status: "paused" as const,
-						outputs,
-						executionTime,
-						nodesExecuted,
-						resumeState,
-					};
+			const workflowResult = {
+				executionId,
+				status: "paused" as const,
+				outputs,
+				executionTime,
+				nodesExecuted,
+				resumeState,
+			};
+
+			publish({
+				type: "workflow.result",
+				workflowId: workflow.id,
+				executionId,
+				result: toSerializedResult(workflowResult),
+			});
+
+			return workflowResult;
 				}
 				const executionTime = Date.now() - startTime;
 
@@ -240,14 +258,23 @@ export async function executeWorkflow(
 					error: error instanceof Error ? error.message : String(error),
 				});
 
-				return {
-					executionId,
-					status: "failed" as const,
-					outputs: {},
-					error: error instanceof Error ? error : new Error(String(error)),
-					executionTime,
-					nodesExecuted,
-				};
+			const failureResult = {
+				executionId,
+				status: "failed" as const,
+				outputs: {},
+				error: error instanceof Error ? error : new Error(String(error)),
+				executionTime,
+				nodesExecuted,
+			};
+
+			publish({
+				type: "workflow.result",
+				workflowId: workflow.id,
+				executionId,
+				result: toSerializedResult(failureResult),
+			});
+
+			return failureResult;
 			} finally {
 				workflowSpan.end();
 			}
@@ -265,6 +292,13 @@ export async function resumeWorkflow(
   variablesDelta: Record<string, unknown> = {}
 ): Promise<WorkflowExecutionResult> {
   const startTime = Date.now();
+
+  publish({
+    type: "workflow.resumed",
+    workflowId: workflow.id,
+    executionId: resumeState.executionId,
+    timestamp: startTime,
+  });
 
   return tracer.startActiveSpan(
     `workflow.resume`,
@@ -309,7 +343,27 @@ export async function resumeWorkflow(
             "workflow.nodes_executed": nodesExecuted.length,
           });
 
+          publish({
+            type: "node.started",
+            workflowId: workflow.id,
+            executionId: resumeState.executionId,
+            nodeId: currentNodeId,
+            nodeIndex,
+            timestamp: Date.now(),
+          });
+
           const nextNodeId = await executeNode(node, workflowContext, registry, workflow);
+
+          publish({
+            type: "node.completed",
+            workflowId: workflow.id,
+            executionId: resumeState.executionId,
+            nodeId: node.id,
+            nodeIndex,
+            nextNodeId,
+            timestamp: Date.now(),
+          });
+
           currentNodeId = nextNodeId;
           nodeIndex++;
         }
@@ -332,13 +386,30 @@ export async function resumeWorkflow(
           `[Workflow] ▶️ Resumed and completed: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`
         );
 
-        return {
+        const workflowResult = {
           executionId: resumeState.executionId,
           status: "completed" as const,
           outputs,
           executionTime,
           nodesExecuted,
         };
+
+        publish({
+          type: "workflow.completed",
+          workflowId: workflow.id,
+          executionId: resumeState.executionId,
+          executionTime,
+          nodesExecuted,
+        });
+
+        publish({
+          type: "workflow.result",
+          workflowId: workflow.id,
+          executionId: resumeState.executionId,
+          result: toSerializedResult(workflowResult),
+        });
+
+        return workflowResult;
       } catch (error) {
         if (error instanceof PauseSignal) {
           const executionTime = Date.now() - startTime;
@@ -368,7 +439,16 @@ export async function resumeWorkflow(
             `[Workflow] ⏸️ Paused after resume: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes) — ${error.reason}`
           );
 
-          return {
+          publish({
+            type: "workflow.paused",
+            workflowId: workflow.id,
+            executionId: resumeState.executionId,
+            executionTime,
+            nodesExecuted,
+            resumeState: newResumeState,
+          });
+
+          const pausedResult = {
             executionId: resumeState.executionId,
             status: "paused" as const,
             outputs,
@@ -376,6 +456,15 @@ export async function resumeWorkflow(
             nodesExecuted,
             resumeState: newResumeState,
           };
+
+          publish({
+            type: "workflow.result",
+            workflowId: workflow.id,
+            executionId: resumeState.executionId,
+            result: toSerializedResult(pausedResult),
+          });
+
+          return pausedResult;
         }
 
         const executionTime = Date.now() - startTime;
@@ -386,14 +475,26 @@ export async function resumeWorkflow(
           "workflow.error": error instanceof Error ? error.message : String(error),
         });
         workflowSpan.recordException(error instanceof Error ? error : new Error(String(error)));
-        workflowSpan.setStatus({ code: SpanStatusCode.ERROR, message: error instanceof Error ? error.message : String(error) });
+        workflowSpan.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: error instanceof Error ? error.message : String(error),
+        });
 
         console.error(
           `[Workflow] ❌ Failed after resume: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`,
           error
         );
 
-        return {
+        publish({
+          type: "workflow.failed",
+          workflowId: workflow.id,
+          executionId: resumeState.executionId,
+          executionTime,
+          nodesExecuted,
+          error: error instanceof Error ? error.message : String(error),
+        });
+
+        const failureResult = {
           executionId: resumeState.executionId,
           status: "failed" as const,
           outputs: {},
@@ -401,11 +502,34 @@ export async function resumeWorkflow(
           executionTime,
           nodesExecuted,
         };
+
+        publish({
+          type: "workflow.result",
+          workflowId: workflow.id,
+          executionId: resumeState.executionId,
+          result: toSerializedResult(failureResult),
+        });
+
+        return failureResult;
       } finally {
         workflowSpan.end();
       }
     }
   );
+}
+
+function toSerializedResult(result: WorkflowExecutionResult): SerializedWorkflowExecutionResult {
+  const { error, ...rest } = result;
+  return {
+    ...rest,
+    error: error
+      ? {
+          message: error.message,
+          name: error.name,
+          stack: error.stack,
+        }
+      : undefined,
+  };
 }
 
 /**

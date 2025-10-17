@@ -21,10 +21,10 @@ export function createSubworkflowProcedure(
       description,
       input: z.object({
         workflowId: z.string(),
-        input: z.record(z.unknown()).optional(),
+        input: z.record(z.string(), z.unknown()).optional(),
         mergeOutputs: z.boolean().optional(),
       }) as unknown as z.ZodType<SubWorkflowConfig & Record<string, unknown>>, // align with core types
-      output: z.record(z.unknown()),
+      output: z.record(z.string(), z.unknown()),
     },
     handler: async (input, context) => {
       const cfg = input as unknown as SubWorkflowConfig;

@@ -27,8 +27,15 @@ export { SpanCollector } from "./span-collector.js";
 export { bindCollector, forceFlush, clearActiveCollector } from "./otel.js";
 
 // Realtime events for SSE/WebSocket integrations
-export type { WorkflowEvent } from "./events.js";
+export type { WorkflowEvent, SerializedWorkflowExecutionResult } from "./events.js";
 export { subscribeToExecution } from "./events.js";
+
+// Workflow library utilities
+export {
+	loadWorkflowLibrary,
+	loadWorkflowDefinitionById,
+	type WorkflowSummary,
+} from "./library.js";
 
 // Re-export selected core types for app/example convenience
 export type { Registry, Procedure } from "@tsdev/core";

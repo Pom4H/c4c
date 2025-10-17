@@ -1,5 +1,15 @@
 import type { z } from "zod";
 
+export type ProcedureExposure = "external" | "internal";
+export type ProcedureRole = "workflow-node" | "api-endpoint" | "sdk-client";
+
+export interface ContractMetadata extends Record<string, unknown> {
+	exposure?: ProcedureExposure;
+	roles?: ProcedureRole[];
+	category?: string;
+	tags?: string[];
+}
+
 /**
  * Context passed to every handler execution
  */
@@ -17,7 +27,7 @@ export interface Contract<TInput = unknown, TOutput = unknown> {
 	description?: string;
 	input: z.ZodType<TInput>;
 	output: z.ZodType<TOutput>;
-	metadata?: Record<string, unknown>;
+	metadata?: ContractMetadata;
 }
 
 /**

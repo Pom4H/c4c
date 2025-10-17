@@ -31,6 +31,8 @@ This document explains the internals of tsdev with focus on:
 │  • GET /openapi.json     - OpenAPI spec                  │
 │  • POST /rpc/:name       - Direct procedure calls        │
 │  • POST /workflow/*      - Workflow operations           │
+│  • GET /workflow/palette - Generated workflow catalog    │
+│  • GET /workflow/executions/:id/stream - SSE events      │
 └────────────────┬─────────────────────────────────────────┘
                  │
                  ▼
@@ -2009,4 +2011,3 @@ Built on:
 ---
 
 See [PHILOSOPHY.md](./PHILOSOPHY.md) for the deeper "why" behind this design.
-

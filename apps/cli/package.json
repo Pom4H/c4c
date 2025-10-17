@@ -1,15 +1,12 @@
 {
-  "name": "@tsdev/adapters",
+  "name": "@tsdev/cli",
   "version": "0.1.0",
-  "description": "Transport adapters (HTTP, CLI, REST) for tsdev",
+  "description": "Command line tools for tsdev",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
+  "bin": {
+    "tsdev": "./dist/bin.js"
   },
   "scripts": {
     "build": "tsc",
@@ -17,20 +14,17 @@
     "lint:fix": "biome check --write ."
   },
   "keywords": [
-    "http",
+    "tsdev",
     "cli",
-    "rest",
-    "adapters"
+    "workflow"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@tsdev/adapters": "workspace:*",
     "@tsdev/core": "workspace:*",
-    "@tsdev/workflow": "workspace:*",
     "@tsdev/generators": "workspace:*",
-    "@hono/node-server": "^1.19.5",
-    "@hono/zod-validator": "^0.7.4",
-    "hono": "^4.9.12"
+    "commander": "^14.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",

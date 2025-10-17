@@ -1,48 +1,73 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { createExecutionContext, executeProcedure, type Registry } from "@tsdev/core";
+import { serve } from "@hono/node-server";
+import { Hono } from "hono";
+import type { Registry } from "@tsdev/core";
 import { generateOpenAPIJSON } from "@tsdev/generators";
-import { handleRESTRequest, listRESTRoutes } from "./rest.js";
-import { handleWorkflowRequest } from "./workflow-http.js";
+import { createRestRouter, listRESTRoutes } from "./rest.js";
+import { createWorkflowRouter } from "./workflow-http.js";
+import { createRpcRouter } from "./rpc.js";
+
+export interface HttpAppOptions {
+	port?: number;
+	enableDocs?: boolean;
+	enableRpc?: boolean;
+	enableRest?: boolean;
+	enableWorkflow?: boolean;
+	workflowsPath?: string;
+}
 
 /**
  * HTTP adapter for tsdev
- * Supports both RPC and REST endpoints from the same contracts
+ * Builds a Hono application and starts a Node server
  */
-export function createHttpServer(registry: Registry, port = 3000) {
-	const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-		// CORS headers
-		res.setHeader("Access-Control-Allow-Origin", "*");
-		res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-		res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+export function createHttpServer(registry: Registry, port = 3000, options: HttpAppOptions = {}) {
+	const finalOptions: HttpAppOptions = { port, ...options };
+	const app = buildHttpApp(registry, finalOptions);
+	const server = serve({
+		fetch: app.fetch,
+		port: finalOptions.port ?? port,
+	});
 
-		if (req.method === "OPTIONS") {
-			res.writeHead(200);
-			res.end();
-			return;
+	logStartup(registry, finalOptions);
+	return server;
+}
+
+export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
+	const {
+		port = 3000,
+		enableDocs = true,
+		enableRpc = true,
+		enableRest = true,
+		enableWorkflow = true,
+		workflowsPath = process.env.TSDEV_WORKFLOWS_DIR ?? "workflows",
+	} = options;
+
+	const app = new Hono();
+
+	app.use("*", async (c, next) => {
+		c.header("Access-Control-Allow-Origin", "*");
+		c.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+		c.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+		if (c.req.method === "OPTIONS") {
+			return c.body(null, 204);
 		}
 
-		// Health check
-		if (req.url === "/health" && req.method === "GET") {
-			res.writeHead(200, { "Content-Type": "application/json" });
-			res.end(JSON.stringify({ status: "ok" }));
-			return;
-		}
+		await next();
+	});
 
-		// List all procedures (introspection endpoint)
-		if (req.url === "/procedures" && req.method === "GET") {
-			const procedures = Array.from(registry.entries()).map(([name, proc]) => ({
-				name,
-				description: proc.contract.description,
-				metadata: proc.contract.metadata,
-			}));
+	app.get("/health", (c) => c.json({ status: "ok" }, 200));
 
-			res.writeHead(200, { "Content-Type": "application/json" });
-			res.end(JSON.stringify({ procedures }));
-			return;
-		}
+	app.get("/procedures", (c) => {
+		const procedures = Array.from(registry.entries()).map(([name, proc]) => ({
+			name,
+			description: proc.contract.description,
+			metadata: proc.contract.metadata,
+		}));
+		return c.json({ procedures }, 200);
+	});
 
-		// OpenAPI specification endpoint
-		if (req.url === "/openapi.json" && req.method === "GET") {
+	if (enableDocs) {
+		app.get("/openapi.json", (c) => {
 			const spec = generateOpenAPIJSON(registry, {
 				title: "tsdev API",
 				version: "1.0.0",
@@ -50,13 +75,10 @@ export function createHttpServer(registry: Registry, port = 3000) {
 				servers: [{ url: `http://localhost:${port}`, description: "Development server" }],
 			});
 
-			res.writeHead(200, { "Content-Type": "application/json" });
-			res.end(spec);
-			return;
-		}
+			return c.json(JSON.parse(spec), 200);
+		});
 
-		// Swagger UI (simple HTML version)
-		if (req.url === "/docs" && req.method === "GET") {
+		app.get("/docs", (c) => {
 			const html = `
 <!DOCTYPE html>
 <html>
@@ -80,100 +102,79 @@ export function createHttpServer(registry: Registry, port = 3000) {
 </body>
 </html>`;
 
-			res.writeHead(200, { "Content-Type": "text/html" });
-			res.end(html);
-			return;
-		}
+    return c.html(html);
+		});
+	}
 
-		// List REST routes
-		if (req.url === "/routes" && req.method === "GET") {
+	if (enableRest) {
+		app.get("/routes", (c) => {
 			const routes = listRESTRoutes(registry);
+			return c.json({ routes }, 200);
+		});
+	}
 
-			res.writeHead(200, { "Content-Type": "application/json" });
-			res.end(JSON.stringify({ routes }));
-			return;
-		}
+	if (enableWorkflow) {
+		app.route("/", createWorkflowRouter(registry, { workflowsPath }));
+	}
 
-		// Try workflow endpoints
-		const workflowHandled = await handleWorkflowRequest(req, res, registry);
-		if (workflowHandled) {
-			return;
-		}
+	if (enableRest) {
+		app.route("/", createRestRouter(registry));
+	}
 
-		// Try REST endpoints
-		const restHandled = await handleRESTRequest(req, res, registry);
-		if (restHandled) {
-			return;
-		}
+	if (enableRpc) {
+		app.route("/", createRpcRouter(registry));
+	}
 
-		// RPC endpoint: POST /rpc/:procedureName
-		if (req.method === "POST" && req.url?.startsWith("/rpc/")) {
-			const procedureName = req.url.slice(5); // Remove "/rpc/"
+	app.notFound((c) => c.json({ error: "Not found" }, 404));
 
-			try {
-				// Parse request body
-				const body = await parseBody(req);
-				const input = JSON.parse(body);
+	return app;
+}
 
-				// Get procedure from registry
-				const procedure = registry.get(procedureName);
-				if (!procedure) {
-					res.writeHead(404, { "Content-Type": "application/json" });
-					res.end(JSON.stringify({ error: `Procedure '${procedureName}' not found` }));
-					return;
-				}
+function logStartup(registry: Registry, options: HttpAppOptions) {
+	if (process.env.TSDEV_QUIET === "1") {
+		return;
+	}
 
-				// Create execution context from HTTP request
-				const context = createExecutionContext({
-					transport: "http",
-					method: req.method,
-					url: req.url,
-					userAgent: req.headers["user-agent"],
-				});
+	const {
+		port = 3000,
+		enableDocs = true,
+		enableRpc = true,
+		enableRest = true,
+		enableWorkflow = true,
+		workflowsPath = process.env.TSDEV_WORKFLOWS_DIR ?? "workflows",
+	} = options;
 
-				// Execute procedure
-				const result = await executeProcedure(procedure, input, context);
-
-				res.writeHead(200, { "Content-Type": "application/json" });
-				res.end(JSON.stringify(result));
-			} catch (error) {
-				console.error("HTTP error:", error);
-
-				const statusCode = error instanceof Error && error.message.includes("not found") ? 404 : 400;
-				res.writeHead(statusCode, { "Content-Type": "application/json" });
-				res.end(
-					JSON.stringify({
-						error: error instanceof Error ? error.message : String(error),
-					})
-				);
-			}
-			return;
-		}
-
-		// 404 for unknown routes
-		res.writeHead(404, { "Content-Type": "application/json" });
-		res.end(JSON.stringify({ error: "Not found" }));
-	});
-
-	server.listen(port, () => {
-		console.log(`🚀 HTTP server listening on http://localhost:${port}`);
-		console.log(`\n📚 Documentation:`);
+	console.log(`🚀 HTTP server listening on http://localhost:${port}`);
+	console.log(`\n📚 Documentation:`);
+	console.log(`   Procedures:       http://localhost:${port}/procedures`);
+	if (enableDocs) {
 		console.log(`   Swagger UI:       http://localhost:${port}/docs`);
 		console.log(`   OpenAPI JSON:     http://localhost:${port}/openapi.json`);
-		console.log(`   Procedures:       http://localhost:${port}/procedures`);
+	}
+	if (enableRest) {
 		console.log(`   REST Routes:      http://localhost:${port}/routes`);
+	}
+	if (enableWorkflow) {
 		console.log(`\n🔄 Workflow:`);
 		console.log(`   Node Palette:     http://localhost:${port}/workflow/palette`);
 		console.log(`   UI Config:        http://localhost:${port}/workflow/ui-config`);
+		console.log(`   Definitions:      http://localhost:${port}/workflow/definitions`);
 		console.log(`   Execute:          POST http://localhost:${port}/workflow/execute`);
 		console.log(`   Validate:         POST http://localhost:${port}/workflow/validate`);
 		console.log(`   Resume:           POST http://localhost:${port}/workflow/resume`);
-		console.log(`\n🔧 Endpoints:`);
+		console.log(`   Stream:           GET  http://localhost:${port}/workflow/executions/:id/stream`);
+		console.log(`   Files:            ${workflowsPath}`);
+	}
+	console.log(`\n🔧 Endpoints:`);
+	if (enableRpc) {
 		console.log(`   RPC:  POST http://localhost:${port}/rpc/:procedureName`);
+	}
+	if (enableRest) {
 		console.log(`   REST: http://localhost:${port}/:resource (conventional)`);
-		console.log(``);
+	}
+	console.log(``);
 
-		// List REST routes
+	if (enableRest) {
 		const routes = listRESTRoutes(registry);
 		if (routes.length > 0) {
 			console.log(`📍 Available REST routes:`);
@@ -181,21 +182,5 @@ export function createHttpServer(registry: Registry, port = 3000) {
 				console.log(`   ${route.method.padEnd(6)} ${route.path.padEnd(20)} -> ${route.procedure}`);
 			}
 		}
-	});
-
-	return server;
-}
-
-/**
- * Parse HTTP request body
- */
-function parseBody(req: IncomingMessage): Promise<string> {
-	return new Promise((resolve, reject) => {
-		let body = "";
-		req.on("data", (chunk) => {
-			body += chunk.toString();
-		});
-		req.on("end", () => resolve(body));
-		req.on("error", reject);
-	});
+	}
 }

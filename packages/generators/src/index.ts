@@ -9,3 +9,4 @@ export {
   generateOpenAPIJSON,
   generateOpenAPIYAML,
 } from "./openapi.js";
+export { generateRpcClientModule, type RpcClientGeneratorOptions } from "./client.js";

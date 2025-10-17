@@ -1,5 +1,32 @@
-import { globSync } from "glob";
+import { readdir } from "node:fs/promises";
+import { extname, join, resolve } from "node:path";
 import type { Procedure, Registry } from "./types.js";
+
+let tsLoaderReady: Promise<void> | null = null;
+
+async function ensureTypeScriptLoader() {
+	if (!tsLoaderReady) {
+		tsLoaderReady = (async () => {
+			try {
+				const moduleId = "tsx/esm/api";
+				const dynamicImport = new Function(
+					"specifier",
+					"return import(specifier);"
+				) as (specifier: string) => Promise<{ register?: () => void }>;
+				const { register } = await dynamicImport(moduleId).catch(() => ({ register: undefined }));
+				if (typeof register === "function") {
+					register();
+				}
+			} catch (error) {
+				console.warn(
+					"[Registry] Unable to register TypeScript loader. Only JavaScript handlers will be loaded.",
+					error
+				);
+			}
+		})();
+	}
+	return tsLoaderReady;
+}
 
 /**
  * Collects all procedures from handlers directory
@@ -8,14 +35,15 @@ import type { Procedure, Registry } from "./types.js";
 export async function collectRegistry(handlersPath = "src/handlers"): Promise<Registry> {
 	const registry: Registry = new Map();
 
-	// Find all TypeScript files in handlers directory
-	const handlerFiles = globSync(`${handlersPath}/**/*.ts`, {
-		absolute: true,
-		ignore: ["**/*.test.ts", "**/*.spec.ts"],
-	});
+	const absoluteRoot = resolve(handlersPath);
+	const handlerFiles = await findHandlerFiles(absoluteRoot);
 
 	for (const file of handlerFiles) {
 		try {
+			if (file.endsWith(".ts") || file.endsWith(".tsx")) {
+				await ensureTypeScriptLoader();
+			}
+
 			// Dynamic import of handler module
 			const module = await import(file);
 
@@ -33,6 +61,40 @@ export async function collectRegistry(handlersPath = "src/handlers"): Promise<Re
 	}
 
 	return registry;
+}
+
+const ALLOWED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
+const IGNORED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build"]);
+const TEST_FILE_PATTERN = /\.(test|spec)\.[^.]+$/i;
+
+async function findHandlerFiles(root: string): Promise<string[]> {
+	const result: string[] = [];
+
+	async function walk(directory: string) {
+		const entries = await readdir(directory, { withFileTypes: true });
+		for (const entry of entries) {
+			const entryPath = join(directory, entry.name);
+
+			if (entry.isDirectory()) {
+				if (IGNORED_DIRECTORIES.has(entry.name)) continue;
+				await walk(entryPath);
+				continue;
+			}
+
+			if (entry.isFile()) {
+				if (entry.name.endsWith(".d.ts")) continue;
+				if (TEST_FILE_PATTERN.test(entry.name)) continue;
+
+				const extension = extname(entry.name).toLowerCase();
+				if (!ALLOWED_EXTENSIONS.has(extension)) continue;
+
+				result.push(entryPath);
+			}
+		}
+	}
+
+	await walk(root);
+	return result;
 }
 
 /**

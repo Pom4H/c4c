@@ -1,0 +1,89 @@
+{
+  "id": "complex-workflow",
+  "name": "Complex Multi-Pattern Workflow",
+  "description": "Demonstrates sequential, conditional, and parallel patterns",
+  "version": "1.0.0",
+  "startNode": "init-data",
+  "variables": {
+    "userId": "user_456"
+  },
+  "nodes": [
+    {
+      "id": "init-data",
+      "type": "procedure",
+      "procedureName": "data.fetch",
+      "config": {
+        "userId": "user_456"
+      },
+      "next": "parallel-checks"
+    },
+    {
+      "id": "parallel-checks",
+      "type": "parallel",
+      "config": {
+        "branches": [
+          "check-1",
+          "check-2"
+        ],
+        "waitForAll": true
+      },
+      "next": "evaluate-results"
+    },
+    {
+      "id": "check-1",
+      "type": "procedure",
+      "procedureName": "math.add",
+      "config": {
+        "a": 5,
+        "b": 7
+      }
+    },
+    {
+      "id": "check-2",
+      "type": "procedure",
+      "procedureName": "math.multiply",
+      "config": {
+        "a": 3,
+        "b": 4
+      }
+    },
+    {
+      "id": "evaluate-results",
+      "type": "condition",
+      "config": {
+        "expression": "check1Result > check2Result",
+        "trueBranch": "premium-branch",
+        "falseBranch": "basic-branch"
+      }
+    },
+    {
+      "id": "premium-branch",
+      "type": "procedure",
+      "procedureName": "data.process",
+      "config": {
+        "mode": "premium"
+      },
+      "next": "finalize"
+    },
+    {
+      "id": "basic-branch",
+      "type": "procedure",
+      "procedureName": "data.process",
+      "config": {
+        "mode": "basic"
+      },
+      "next": "finalize"
+    },
+    {
+      "id": "finalize",
+      "type": "procedure",
+      "procedureName": "data.save"
+    }
+  ],
+  "metadata": {
+    "tags": [
+      "complex",
+      "demo"
+    ]
+  }
+}
