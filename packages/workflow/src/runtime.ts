@@ -5,7 +5,8 @@
  * Fully integrated with OpenTelemetry tracing
  */
 
-import { trace, type Span, SpanStatusCode, context as otelContext } from "@opentelemetry/api";
+import { trace, type Span, SpanStatusCode } from "@opentelemetry/api";
+import { inspect } from "node:util";
 import { executeProcedure, createExecutionContext, type Registry } from "@tsdev/core";
 import type {
 	WorkflowDefinition,
@@ -14,9 +15,11 @@ import type {
 	WorkflowNode,
 	ConditionConfig,
 	ParallelConfig,
+	ConditionPredicateContext,
   WorkflowResumeState,
 } from "./types.js";
 import { publish, type SerializedWorkflowExecutionResult } from "./events.js";
+import { SpanCollector, bindCollector, forceFlush, clearActiveCollector } from "./otel.js";
 
 const tracer = trace.getTracer("tsdev.workflow");
 
@@ -39,13 +42,21 @@ export async function executeWorkflow(
 	workflow: WorkflowDefinition,
 	registry: Registry,
 	initialInput: Record<string, unknown> = {},
-	options?: { executionId?: string }
+	options?: { executionId?: string; collector?: SpanCollector }
 ): Promise<WorkflowExecutionResult> {
 	const executionId = options?.executionId ?? `wf_exec_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 	const startTime = Date.now();
+	const collector = options?.collector ?? new SpanCollector();
+	let collectorBound = false;
 
-	// Create workflow-level span
-	return tracer.startActiveSpan(
+	try {
+		await bindCollector(collector);
+		collectorBound = true;
+	} catch (error) {
+		console.warn("[Workflow] Failed to initialize OpenTelemetry collector:", error);
+	}
+
+	const result = await tracer.startActiveSpan(
 		`workflow.execute`,
 		{
 			attributes: {
@@ -68,7 +79,6 @@ export async function executeWorkflow(
 
 			const nodesExecuted: string[] = [];
 
-			// Publish workflow started
 			publish({
 				type: "workflow.started",
 				workflowId: workflow.id,
@@ -77,7 +87,6 @@ export async function executeWorkflow(
 			});
 
 			try {
-				// Start execution from start node
 				let currentNodeId: string | undefined = workflow.startNode;
 				let nodeIndex = 0;
 
@@ -90,14 +99,12 @@ export async function executeWorkflow(
 					workflowContext.currentNode = currentNodeId;
 					nodesExecuted.push(currentNodeId);
 
-					// Add workflow execution attributes
 					workflowSpan.setAttributes({
 						"workflow.current_node": currentNodeId,
 						"workflow.current_node_index": nodeIndex,
 						"workflow.nodes_executed": nodesExecuted.length,
 					});
 
-					// Publish node started
 					publish({
 						type: "node.started",
 						workflowId: workflow.id,
@@ -107,24 +114,22 @@ export async function executeWorkflow(
 						timestamp: Date.now(),
 					});
 
-					// Execute node (creates its own span)
 					const nextNodeId = await executeNode(node, workflowContext, registry, workflow);
 
-					// Publish node completed
 					publish({
 						type: "node.completed",
 						workflowId: workflow.id,
 						executionId,
 						nodeId: node.id,
 						nodeIndex,
-						nextNodeId: nextNodeId,
+						nextNodeId,
 						timestamp: Date.now(),
 					});
+
 					currentNodeId = nextNodeId;
 					nodeIndex++;
 				}
 
-				// Workflow completed successfully
 				const outputs: Record<string, unknown> = {};
 				for (const [nodeId, output] of workflowContext.nodeOutputs.entries()) {
 					outputs[nodeId] = output;
@@ -132,7 +137,6 @@ export async function executeWorkflow(
 
 				const executionTime = Date.now() - startTime;
 
-				// Set success attributes
 				workflowSpan.setAttributes({
 					"workflow.status": "completed",
 					"workflow.nodes_executed_total": nodesExecuted.length,
@@ -144,41 +148,31 @@ export async function executeWorkflow(
 					`[Workflow] ✅ Completed: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`
 				);
 
-			const workflowResult = {
-				executionId,
-				status: "completed" as const,
-				outputs,
-				executionTime,
-				nodesExecuted,
-			};
+				const workflowResult: WorkflowExecutionResult = {
+					executionId,
+					status: "completed",
+					outputs,
+					executionTime,
+					nodesExecuted,
+				};
 
-			// Publish workflow completed
-			publish({
-				type: "workflow.completed",
-				workflowId: workflow.id,
-				executionId,
-				executionTime,
-				nodesExecuted,
-			});
+				publish({
+					type: "workflow.completed",
+					workflowId: workflow.id,
+					executionId,
+					executionTime,
+					nodesExecuted,
+				});
 
-			publish({
-				type: "workflow.result",
-				workflowId: workflow.id,
-				executionId,
-				result: toSerializedResult(workflowResult),
-			});
-
-			return workflowResult;
+				return workflowResult;
 			} catch (error) {
 				if (error instanceof PauseSignal) {
 					const executionTime = Date.now() - startTime;
-					// Prepare partial outputs
 					const outputs: Record<string, unknown> = {};
 					for (const [nodeId, output] of workflowContext.nodeOutputs.entries()) {
 						outputs[nodeId] = output;
 					}
 
-					// Mark span as paused
 					workflowSpan.setAttributes({
 						"workflow.status": "paused",
 						"workflow.nodes_executed_total": nodesExecuted.length,
@@ -191,7 +185,7 @@ export async function executeWorkflow(
 						`[Workflow] ⏸️ Paused: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes) — ${error.reason}`
 					);
 
-                    const resumeState: WorkflowResumeState = {
+					const resumeState: WorkflowResumeState = {
 						workflowId: workflow.id,
 						executionId,
 						currentNode: workflowContext.currentNode || workflow.startNode,
@@ -200,322 +194,392 @@ export async function executeWorkflow(
 						nodesExecuted: [...nodesExecuted],
 					};
 
-                    // Publish workflow paused (after resumeState is defined)
-                    publish({
-                        type: "workflow.paused",
-                        workflowId: workflow.id,
-                        executionId,
-                        executionTime,
-                        nodesExecuted,
-                        resumeState,
-                    });
+					publish({
+						type: "workflow.paused",
+						workflowId: workflow.id,
+						executionId,
+						executionTime,
+						nodesExecuted,
+						resumeState,
+					});
 
-			const workflowResult = {
-				executionId,
-				status: "paused" as const,
-				outputs,
-				executionTime,
-				nodesExecuted,
-				resumeState,
-			};
+					const workflowResult: WorkflowExecutionResult = {
+						executionId,
+						status: "paused",
+						outputs,
+						executionTime,
+						nodesExecuted,
+						resumeState,
+					};
 
-			publish({
-				type: "workflow.result",
-				workflowId: workflow.id,
-				executionId,
-				result: toSerializedResult(workflowResult),
-			});
-
-			return workflowResult;
+					return workflowResult;
 				}
-				const executionTime = Date.now() - startTime;
 
-				// Set error attributes
+				const executionTime = Date.now() - startTime;
+				const normalizedError = normalizeError(error);
+
 				workflowSpan.setAttributes({
 					"workflow.status": "failed",
 					"workflow.nodes_executed_total": nodesExecuted.length,
 					"workflow.execution_time_ms": executionTime,
-					"workflow.error": error instanceof Error ? error.message : String(error),
+					"workflow.error": normalizedError.message,
 				});
-				workflowSpan.recordException(error instanceof Error ? error : new Error(String(error)));
+				workflowSpan.recordException(normalizedError);
 				workflowSpan.setStatus({
 					code: SpanStatusCode.ERROR,
-					message: error instanceof Error ? error.message : String(error),
+					message: normalizedError.message,
 				});
 
 				console.error(
 					`[Workflow] ❌ Failed: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`,
-					error
+					normalizedError
 				);
 
-				// Publish workflow failed
 				publish({
 					type: "workflow.failed",
 					workflowId: workflow.id,
 					executionId,
 					executionTime,
 					nodesExecuted,
-					error: error instanceof Error ? error.message : String(error),
+					error: normalizedError.message,
 				});
 
-			const failureResult = {
-				executionId,
-				status: "failed" as const,
-				outputs: {},
-				error: error instanceof Error ? error : new Error(String(error)),
-				executionTime,
-				nodesExecuted,
-			};
+				const failureResult: WorkflowExecutionResult = {
+					executionId,
+					status: "failed",
+					outputs: {},
+					error: normalizedError,
+					executionTime,
+					nodesExecuted,
+				};
 
-			publish({
-				type: "workflow.result",
-				workflowId: workflow.id,
-				executionId,
-				result: toSerializedResult(failureResult),
-			});
-
-			return failureResult;
+				return failureResult;
 			} finally {
 				workflowSpan.end();
 			}
 		}
 	);
+
+	if (collectorBound) {
+		try {
+			await forceFlush();
+		} catch (flushError) {
+			console.warn("[Workflow] Failed to flush collected spans:", flushError);
+		}
+		result.spans = collector.getSpans();
+		clearActiveCollector();
+	}
+
+	result.spans ??= [];
+
+	publish({
+		type: "workflow.result",
+		workflowId: workflow.id,
+		executionId: result.executionId,
+		result: toSerializedResult(result),
+	});
+
+	return result;
 }
 
 /**
  * Resume a previously paused workflow from a serialized state
  */
 export async function resumeWorkflow(
-  workflow: WorkflowDefinition,
-  registry: Registry,
-  resumeState: WorkflowResumeState,
-  variablesDelta: Record<string, unknown> = {}
+	workflow: WorkflowDefinition,
+	registry: Registry,
+	resumeState: WorkflowResumeState,
+	variablesDelta: Record<string, unknown> = {},
+	options?: { collector?: SpanCollector }
 ): Promise<WorkflowExecutionResult> {
-  const startTime = Date.now();
+	const startTime = Date.now();
+	const collector = options?.collector ?? new SpanCollector();
+	let collectorBound = false;
 
-  publish({
-    type: "workflow.resumed",
-    workflowId: workflow.id,
-    executionId: resumeState.executionId,
-    timestamp: startTime,
-  });
+	try {
+		await bindCollector(collector);
+		collectorBound = true;
+	} catch (error) {
+		console.warn("[Workflow] Failed to initialize OpenTelemetry collector for resume:", error);
+	}
 
-  return tracer.startActiveSpan(
-    `workflow.resume`,
-    {
-      attributes: {
-        "workflow.id": workflow.id,
-        "workflow.name": workflow.name,
-        "workflow.version": workflow.version,
-        "workflow.execution_id": resumeState.executionId,
-        "workflow.start_node": resumeState.currentNode,
-        "workflow.node_count": workflow.nodes.length,
-      },
-    },
-    async (workflowSpan: Span) => {
-      const workflowContext: WorkflowContext = {
-        workflowId: workflow.id,
-        executionId: resumeState.executionId,
-        variables: { ...workflow.variables, ...resumeState.variables, ...variablesDelta },
-        nodeOutputs: new Map(Object.entries(resumeState.nodeOutputs || {})),
-        startTime: new Date(),
-        currentNode: resumeState.currentNode,
-      };
+	publish({
+		type: "workflow.resumed",
+		workflowId: workflow.id,
+		executionId: resumeState.executionId,
+		timestamp: startTime,
+	});
 
-      const nodesExecuted: string[] = [...(resumeState.nodesExecuted || [])];
+	const result = await tracer.startActiveSpan(
+		`workflow.resume`,
+		{
+			attributes: {
+				"workflow.id": workflow.id,
+				"workflow.name": workflow.name,
+				"workflow.version": workflow.version,
+				"workflow.execution_id": resumeState.executionId,
+				"workflow.start_node": resumeState.currentNode,
+				"workflow.node_count": workflow.nodes.length,
+			},
+		},
+		async (workflowSpan: Span) => {
+			const workflowContext: WorkflowContext = {
+				workflowId: workflow.id,
+				executionId: resumeState.executionId,
+				variables: { ...workflow.variables, ...resumeState.variables, ...variablesDelta },
+				nodeOutputs: new Map(Object.entries(resumeState.nodeOutputs || {})),
+				startTime: new Date(),
+				currentNode: resumeState.currentNode,
+			};
 
-      try {
-        let currentNodeId: string | undefined = resumeState.currentNode;
-        let nodeIndex = nodesExecuted.length;
+			const nodesExecuted: string[] = [...(resumeState.nodesExecuted || [])];
 
-        while (currentNodeId) {
-          const node = workflow.nodes.find((n) => n.id === currentNodeId);
-          if (!node) {
-            throw new Error(`Node ${currentNodeId} not found in workflow`);
-          }
+			try {
+				let currentNodeId: string | undefined = resumeState.currentNode;
+				let nodeIndex = nodesExecuted.length;
 
-          workflowContext.currentNode = currentNodeId;
-          nodesExecuted.push(currentNodeId);
+				while (currentNodeId) {
+					const node = workflow.nodes.find((n) => n.id === currentNodeId);
+					if (!node) {
+						throw new Error(`Node ${currentNodeId} not found in workflow`);
+					}
 
-          workflowSpan.setAttributes({
-            "workflow.current_node": currentNodeId,
-            "workflow.current_node_index": nodeIndex,
-            "workflow.nodes_executed": nodesExecuted.length,
-          });
+					workflowContext.currentNode = currentNodeId;
+					nodesExecuted.push(currentNodeId);
 
-          publish({
-            type: "node.started",
-            workflowId: workflow.id,
-            executionId: resumeState.executionId,
-            nodeId: currentNodeId,
-            nodeIndex,
-            timestamp: Date.now(),
-          });
+					workflowSpan.setAttributes({
+						"workflow.current_node": currentNodeId,
+						"workflow.current_node_index": nodeIndex,
+						"workflow.nodes_executed": nodesExecuted.length,
+					});
 
-          const nextNodeId = await executeNode(node, workflowContext, registry, workflow);
+					publish({
+						type: "node.started",
+						workflowId: workflow.id,
+						executionId: resumeState.executionId,
+						nodeId: currentNodeId,
+						nodeIndex,
+						timestamp: Date.now(),
+					});
 
-          publish({
-            type: "node.completed",
-            workflowId: workflow.id,
-            executionId: resumeState.executionId,
-            nodeId: node.id,
-            nodeIndex,
-            nextNodeId,
-            timestamp: Date.now(),
-          });
+					const nextNodeId = await executeNode(node, workflowContext, registry, workflow);
 
-          currentNodeId = nextNodeId;
-          nodeIndex++;
-        }
+					publish({
+						type: "node.completed",
+						workflowId: workflow.id,
+						executionId: resumeState.executionId,
+						nodeId: node.id,
+						nodeIndex,
+						nextNodeId,
+						timestamp: Date.now(),
+					});
 
-        const outputs: Record<string, unknown> = {};
-        for (const [nodeId, output] of workflowContext.nodeOutputs.entries()) {
-          outputs[nodeId] = output;
-        }
+					currentNodeId = nextNodeId;
+					nodeIndex++;
+				}
 
-        const executionTime = Date.now() - startTime;
+				const outputs: Record<string, unknown> = {};
+				for (const [nodeId, output] of workflowContext.nodeOutputs.entries()) {
+					outputs[nodeId] = output;
+				}
 
-        workflowSpan.setAttributes({
-          "workflow.status": "completed",
-          "workflow.nodes_executed_total": nodesExecuted.length,
-          "workflow.execution_time_ms": executionTime,
-        });
-        workflowSpan.setStatus({ code: SpanStatusCode.OK });
+				const executionTime = Date.now() - startTime;
 
-        console.log(
-          `[Workflow] ▶️ Resumed and completed: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`
-        );
+				workflowSpan.setAttributes({
+					"workflow.status": "completed",
+					"workflow.nodes_executed_total": nodesExecuted.length,
+					"workflow.execution_time_ms": executionTime,
+				});
+				workflowSpan.setStatus({ code: SpanStatusCode.OK });
 
-        const workflowResult = {
-          executionId: resumeState.executionId,
-          status: "completed" as const,
-          outputs,
-          executionTime,
-          nodesExecuted,
-        };
+				console.log(
+					`[Workflow] ▶️ Resumed and completed: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`
+				);
 
-        publish({
-          type: "workflow.completed",
-          workflowId: workflow.id,
-          executionId: resumeState.executionId,
-          executionTime,
-          nodesExecuted,
-        });
+				const workflowResult: WorkflowExecutionResult = {
+					executionId: resumeState.executionId,
+					status: "completed",
+					outputs,
+					executionTime,
+					nodesExecuted,
+				};
 
-        publish({
-          type: "workflow.result",
-          workflowId: workflow.id,
-          executionId: resumeState.executionId,
-          result: toSerializedResult(workflowResult),
-        });
+				publish({
+					type: "workflow.completed",
+					workflowId: workflow.id,
+					executionId: resumeState.executionId,
+					executionTime,
+					nodesExecuted,
+				});
 
-        return workflowResult;
-      } catch (error) {
-        if (error instanceof PauseSignal) {
-          const executionTime = Date.now() - startTime;
-          const outputs: Record<string, unknown> = {};
-          for (const [nodeId, output] of workflowContext.nodeOutputs.entries()) {
-            outputs[nodeId] = output;
-          }
+				return workflowResult;
+			} catch (error) {
+				if (error instanceof PauseSignal) {
+					const executionTime = Date.now() - startTime;
+					const outputs: Record<string, unknown> = {};
+					for (const [nodeId, output] of workflowContext.nodeOutputs.entries()) {
+						outputs[nodeId] = output;
+					}
 
-          workflowSpan.setAttributes({
-            "workflow.status": "paused",
-            "workflow.nodes_executed_total": nodesExecuted.length,
-            "workflow.execution_time_ms": executionTime,
-            "workflow.pause.reason": error.reason,
-          });
-          workflowSpan.setStatus({ code: SpanStatusCode.UNSET });
+					workflowSpan.setAttributes({
+						"workflow.status": "paused",
+						"workflow.nodes_executed_total": nodesExecuted.length,
+						"workflow.execution_time_ms": executionTime,
+						"workflow.pause.reason": error.reason,
+					});
+					workflowSpan.setStatus({ code: SpanStatusCode.UNSET });
 
-          const newResumeState: WorkflowResumeState = {
-            workflowId: workflow.id,
-            executionId: resumeState.executionId,
-            currentNode: workflowContext.currentNode || resumeState.currentNode,
-            variables: { ...workflowContext.variables },
-            nodeOutputs: Object.fromEntries(workflowContext.nodeOutputs.entries()),
-            nodesExecuted: [...nodesExecuted],
-          };
+					const newResumeState: WorkflowResumeState = {
+						workflowId: workflow.id,
+						executionId: resumeState.executionId,
+						currentNode: workflowContext.currentNode || resumeState.currentNode,
+						variables: { ...workflowContext.variables },
+						nodeOutputs: Object.fromEntries(workflowContext.nodeOutputs.entries()),
+						nodesExecuted: [...nodesExecuted],
+					};
 
-          console.log(
-            `[Workflow] ⏸️ Paused after resume: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes) — ${error.reason}`
-          );
+					console.log(
+						`[Workflow] ⏸️ Paused after resume: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes) — ${error.reason}`
+					);
 
-          publish({
-            type: "workflow.paused",
-            workflowId: workflow.id,
-            executionId: resumeState.executionId,
-            executionTime,
-            nodesExecuted,
-            resumeState: newResumeState,
-          });
+					publish({
+						type: "workflow.paused",
+						workflowId: workflow.id,
+						executionId: resumeState.executionId,
+						executionTime,
+						nodesExecuted,
+						resumeState: newResumeState,
+					});
 
-          const pausedResult = {
-            executionId: resumeState.executionId,
-            status: "paused" as const,
-            outputs,
-            executionTime,
-            nodesExecuted,
-            resumeState: newResumeState,
-          };
+					const pausedResult: WorkflowExecutionResult = {
+						executionId: resumeState.executionId,
+						status: "paused",
+						outputs,
+						executionTime,
+						nodesExecuted,
+						resumeState: newResumeState,
+					};
 
-          publish({
-            type: "workflow.result",
-            workflowId: workflow.id,
-            executionId: resumeState.executionId,
-            result: toSerializedResult(pausedResult),
-          });
+					return pausedResult;
+				}
 
-          return pausedResult;
-        }
+				const executionTime = Date.now() - startTime;
+				const normalizedError = normalizeError(error);
 
-        const executionTime = Date.now() - startTime;
-        workflowSpan.setAttributes({
-          "workflow.status": "failed",
-          "workflow.nodes_executed_total": nodesExecuted.length,
-          "workflow.execution_time_ms": executionTime,
-          "workflow.error": error instanceof Error ? error.message : String(error),
-        });
-        workflowSpan.recordException(error instanceof Error ? error : new Error(String(error)));
-        workflowSpan.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: error instanceof Error ? error.message : String(error),
-        });
+				workflowSpan.setAttributes({
+					"workflow.status": "failed",
+					"workflow.nodes_executed_total": nodesExecuted.length,
+					"workflow.execution_time_ms": executionTime,
+					"workflow.error": normalizedError.message,
+				});
+				workflowSpan.recordException(normalizedError);
+				workflowSpan.setStatus({
+					code: SpanStatusCode.ERROR,
+					message: normalizedError.message,
+				});
 
-        console.error(
-          `[Workflow] ❌ Failed after resume: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`,
-          error
-        );
+				console.error(
+					`[Workflow] ❌ Failed after resume: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`,
+					normalizedError
+				);
 
-        publish({
-          type: "workflow.failed",
-          workflowId: workflow.id,
-          executionId: resumeState.executionId,
-          executionTime,
-          nodesExecuted,
-          error: error instanceof Error ? error.message : String(error),
-        });
+				publish({
+					type: "workflow.failed",
+					workflowId: workflow.id,
+					executionId: resumeState.executionId,
+					executionTime,
+					nodesExecuted,
+					error: normalizedError.message,
+				});
 
-        const failureResult = {
-          executionId: resumeState.executionId,
-          status: "failed" as const,
-          outputs: {},
-          error: error instanceof Error ? error : new Error(String(error)),
-          executionTime,
-          nodesExecuted,
-        };
+				const failureResult: WorkflowExecutionResult = {
+					executionId: resumeState.executionId,
+					status: "failed",
+					outputs: {},
+					error: normalizedError,
+					executionTime,
+					nodesExecuted,
+				};
 
-        publish({
-          type: "workflow.result",
-          workflowId: workflow.id,
-          executionId: resumeState.executionId,
-          result: toSerializedResult(failureResult),
-        });
+				return failureResult;
+			} finally {
+				workflowSpan.end();
+			}
+		}
+	);
 
-        return failureResult;
-      } finally {
-        workflowSpan.end();
-      }
-    }
-  );
+	if (collectorBound) {
+		try {
+			await forceFlush();
+		} catch (flushError) {
+			console.warn("[Workflow] Failed to flush collected spans after resume:", flushError);
+		}
+		result.spans = collector.getSpans();
+		clearActiveCollector();
+	}
+
+	result.spans ??= [];
+
+	publish({
+		type: "workflow.result",
+		workflowId: workflow.id,
+		executionId: result.executionId,
+		result: toSerializedResult(result),
+	});
+
+	return result;
+}
+
+function normalizeError(error: unknown): Error {
+	if (error instanceof Error) {
+		return error;
+	}
+
+	if (typeof Response !== "undefined" && error instanceof Response) {
+		const statusText = error.statusText || "Response error";
+		return new Error(`HTTP ${error.status}: ${statusText}`);
+	}
+
+	if (error && typeof error === "object") {
+		const maybeMessage = (error as { message?: unknown }).message;
+		const maybeName = (error as { name?: unknown }).name;
+
+		let message: string | undefined;
+		if (typeof maybeMessage === "string") {
+			message = maybeMessage;
+		} else if (maybeMessage !== undefined) {
+			message = stringifyUnknown(maybeMessage);
+		}
+
+		if (!message) {
+			message = stringifyUnknown(error);
+		}
+
+		const normalized = new Error(message);
+		if (typeof maybeName === "string" && maybeName.length > 0) {
+			normalized.name = maybeName;
+		}
+		return normalized;
+	}
+
+	return new Error(stringifyUnknown(error));
+}
+
+function stringifyUnknown(value: unknown): string {
+	if (typeof value === "string") return value;
+	if (typeof value === "number" || typeof value === "boolean") return String(value);
+	if (typeof value === "bigint") return value.toString();
+	if (value === null || value === undefined) return String(value);
+
+	try {
+		return JSON.stringify(
+			value,
+			(_, v) => (typeof v === "bigint" ? v.toString() : v),
+			2
+		);
+	} catch {
+		return inspect(value, { depth: 5 });
+	}
 }
 
 function toSerializedResult(result: WorkflowExecutionResult): SerializedWorkflowExecutionResult {
@@ -608,18 +672,20 @@ async function executeNode(
 
 				return nextNodeId;
 			} catch (error) {
+				const normalizedError = normalizeError(error);
+
 				// Set error attributes
 				nodeSpan.setAttributes({
 					"node.status": "failed",
-					"node.error": error instanceof Error ? error.message : String(error),
+					"node.error": normalizedError.message,
 				});
-				nodeSpan.recordException(error instanceof Error ? error : new Error(String(error)));
+				nodeSpan.recordException(normalizedError);
 				nodeSpan.setStatus({
 					code: SpanStatusCode.ERROR,
-					message: error instanceof Error ? error.message : String(error),
+					message: normalizedError.message,
 				});
 
-				console.error(`[Workflow] ❌ Node failed: ${node.id}`, error);
+				console.error(`[Workflow] ❌ Node failed: ${node.id}`, normalizedError);
 
 				// Handle error node if configured
 				if (node.onError) {
@@ -627,7 +693,7 @@ async function executeNode(
 					return node.onError;
 				}
 
-				throw error;
+				throw normalizedError;
 			} finally {
 				nodeSpan.end();
 			}
@@ -709,33 +775,41 @@ async function executeConditionNode(
 	context: WorkflowContext
 ): Promise<string | undefined> {
 	const config = node.config as unknown as ConditionConfig;
-	if (!config?.expression) {
-		throw new Error(`Condition node ${node.id} missing expression`);
+	if (!config?.expression && typeof config?.predicateFn !== "function") {
+		throw new Error(`Condition node ${node.id} is missing expression or predicate`);
 	}
 
-	// Add condition details to current span
 	const activeSpan = trace.getActiveSpan();
-	if (activeSpan) {
-		activeSpan.setAttributes({
-			"condition.expression": config.expression,
-			"condition.variables": JSON.stringify(context.variables),
-		});
-	}
+	let result = false;
+	let expressionLabel = config.expression ?? "predicate";
 
-	// Evaluate condition expression
-	const result = evaluateExpression(config.expression, context.variables);
+	if (typeof config.predicateFn === "function") {
+		try {
+			const predicateContext = createPredicateContext(context);
+			result = Boolean(config.predicateFn(predicateContext));
+			expressionLabel = config.expression ?? config.predicateFn.name ?? "predicate";
+		} catch (error) {
+			console.error(`[Workflow] Condition predicate failed for node ${node.id}`, error);
+			throw error;
+		}
+	} else {
+		result = evaluateExpression(config.expression, context.variables);
+		expressionLabel = config.expression ?? "expression";
+	}
 
 	const nextBranch = result ? config.trueBranch : config.falseBranch;
 
 	if (activeSpan) {
 		activeSpan.setAttributes({
+			"condition.expression": expressionLabel,
+			"condition.variables": JSON.stringify(context.variables),
 			"condition.result": result,
 			"condition.branch_taken": nextBranch,
 		});
 	}
 
 	console.log(
-		`[Workflow] 🔀 Condition "${config.expression}" = ${result} → ${nextBranch}`
+		`[Workflow] 🔀 Condition "${expressionLabel}" = ${result} → ${nextBranch}`
 	);
 
 	// Return appropriate branch
@@ -840,7 +914,21 @@ function buildNodeInput(node: WorkflowNode, context: WorkflowContext): Record<st
 /**
  * Evaluate a JavaScript expression in context
  */
-function evaluateExpression(expression: string, variables: Record<string, unknown>): boolean {
+
+function createPredicateContext(context: WorkflowContext): ConditionPredicateContext {
+	return {
+		variables: context.variables,
+		outputs: context.nodeOutputs,
+		get: <T = unknown>(key: string) => context.variables[key] as T | undefined,
+		inputData: context.variables,
+	};
+}
+
+function evaluateExpression(
+	expression: string | undefined,
+	variables: Record<string, unknown>
+): boolean {
+	if (!expression) return false;
 	try {
 		// Create a function with variables as parameters
 		const func = new Function(...Object.keys(variables), `return ${expression}`);

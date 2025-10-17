@@ -33,3 +33,10 @@ pnpm --filter integrations dev
 ```
 
 By default the server listens on `http://localhost:3100`. Override `PORT` or set provider tokens (e.g. `GOOGLE_OAUTH`, `AVITO__OAUTH`) in `.env` or the shell before starting.
+
+## Authoring Workflows
+
+Workflows are defined as TypeScript modules inside `examples/integrations/workflows/`. Each file exports one or more `WorkflowDefinition` objects, and the optional `index.ts` aggregates them for convenience:
+
+- `*.ts` workflow files can cite generated Zod schemas with `satisfies Partial<z.infer<...>>` to guarantee contract compatibility at compile time.
+- `pnpm --filter integrations dev` (or `tsdev serve --root examples/integrations`) will load these modules directly via the tsx loader—no JSON serialization step required.

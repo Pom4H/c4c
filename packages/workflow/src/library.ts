@@ -1,5 +1,6 @@
-import { promises as fs } from "node:fs";
-import { extname, join } from "node:path";
+import { readdir } from "node:fs/promises";
+import { extname, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { WorkflowDefinition } from "./types.js";
 
 export interface WorkflowSummary {
@@ -11,38 +12,51 @@ export interface WorkflowSummary {
 	path: string;
 }
 
-const WORKFLOW_EXTENSION = ".json";
+const ALLOWED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
+const IGNORED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build"]);
 
 export async function loadWorkflowLibrary(directory: string): Promise<{
 	workflows: WorkflowDefinition[];
 	summaries: WorkflowSummary[];
 }> {
-	const entries = await safeReadDirectory(directory);
-	const workflows: WorkflowDefinition[] = [];
-	const summaries: WorkflowSummary[] = [];
+	const absoluteRoot = resolve(directory);
+	const files = await findWorkflowModules(absoluteRoot);
+	const byId = new Map<string, { definition: WorkflowDefinition; path: string }>();
 
-	for (const entry of entries) {
-		if (!entry.isFile()) continue;
-		if (extname(entry.name).toLowerCase() !== WORKFLOW_EXTENSION) continue;
+	for (const file of files) {
+		try {
+			if (file.endsWith(".ts") || file.endsWith(".tsx")) {
+				await ensureTypeScriptLoader();
+			}
 
-		const path = join(directory, entry.name);
-		const definition = await safeReadWorkflow(path);
-		if (!definition) continue;
+			const module = await import(pathToFileURL(file).href);
+			const definitions = extractDefinitionsFromModule(module);
 
-		workflows.push(definition);
-		summaries.push({
+			for (const definition of definitions) {
+				if (!definition?.id) continue;
+				if (byId.has(definition.id)) continue;
+				byId.set(definition.id, { definition, path: file });
+			}
+		} catch (error) {
+			console.warn(`[WorkflowLibrary] Failed to load workflows from ${file}:`, error);
+		}
+	}
+
+	const workflows = Array.from(byId.values())
+		.map((entry) => entry.definition)
+		.sort((a, b) => a.name.localeCompare(b.name));
+
+	const summaries: WorkflowSummary[] = workflows.map((definition) => {
+		const entry = byId.get(definition.id);
+		return {
 			id: definition.id,
 			name: definition.name,
 			description: definition.description,
 			version: definition.version,
 			nodeCount: definition.nodes.length,
-			path,
-		});
-	}
-
-	// Sort by name for consistent output
-	summaries.sort((a, b) => a.name.localeCompare(b.name));
-	workflows.sort((a, b) => a.name.localeCompare(b.name));
+			path: entry?.path ?? "",
+		};
+	});
 
 	return { workflows, summaries };
 }
@@ -51,35 +65,95 @@ export async function loadWorkflowDefinitionById(
 	directory: string,
 	id: string
 ): Promise<WorkflowDefinition | undefined> {
-	const filename = `${id}${WORKFLOW_EXTENSION}`;
-	const path = join(directory, filename);
-	return safeReadWorkflow(path);
+	const { workflows } = await loadWorkflowLibrary(directory);
+	return workflows.find((workflow) => workflow.id === id);
 }
 
-async function safeReadDirectory(directory: string) {
-	try {
-		return await fs.readdir(directory, { withFileTypes: true });
-	} catch (error) {
-		if ((error as NodeJS.ErrnoException)?.code === "ENOENT") {
-			return [];
+async function findWorkflowModules(root: string): Promise<string[]> {
+	const result: string[] = [];
+
+	async function walk(directory: string) {
+		const entries = await readdir(directory, { withFileTypes: true }).catch(() => []);
+
+		for (const entry of entries) {
+			const entryPath = join(directory, entry.name);
+
+			if (entry.isDirectory()) {
+				if (IGNORED_DIRECTORIES.has(entry.name)) continue;
+				await walk(entryPath);
+				continue;
+			}
+
+			if (!entry.isFile()) continue;
+			if (entry.name.endsWith(".d.ts")) continue;
+
+			const extension = extname(entry.name).toLowerCase();
+			if (!ALLOWED_EXTENSIONS.has(extension)) continue;
+
+			result.push(entryPath);
 		}
-		throw error;
 	}
+
+	await walk(root);
+	return result;
 }
 
-async function safeReadWorkflow(path: string): Promise<WorkflowDefinition | undefined> {
-	try {
-		const raw = await fs.readFile(path, "utf8");
-		const definition = JSON.parse(raw) as WorkflowDefinition;
-		if (!definition?.id) {
-			console.warn(`[WorkflowLibrary] Workflow file ${path} missing 'id'. Skipping.`);
-			return undefined;
+function extractDefinitionsFromModule(module: Record<string, unknown>): WorkflowDefinition[] {
+	const definitions: WorkflowDefinition[] = [];
+
+	const maybeAdd = (value: unknown) => {
+		if (isWorkflowDefinition(value)) {
+			definitions.push(value);
+		} else if (Array.isArray(value)) {
+			for (const item of value) {
+				if (isWorkflowDefinition(item)) {
+					definitions.push(item);
+				}
+			}
 		}
-		return definition;
-	} catch (error) {
-		if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") {
-			console.warn(`[WorkflowLibrary] Failed to load workflow from ${path}:`, error);
-		}
-		return undefined;
+	};
+
+	for (const value of Object.values(module)) {
+		maybeAdd(value);
 	}
+
+	return definitions;
+}
+
+function isWorkflowDefinition(value: unknown): value is WorkflowDefinition {
+	if (!value || typeof value !== "object") return false;
+	const candidate = value as Partial<WorkflowDefinition>;
+	return (
+		typeof candidate.id === "string" &&
+		typeof candidate.name === "string" &&
+		typeof candidate.version === "string" &&
+		Array.isArray(candidate.nodes) &&
+		typeof candidate.startNode === "string"
+	);
+}
+
+let tsLoaderReady: Promise<void> | null = null;
+
+async function ensureTypeScriptLoader() {
+	if (!tsLoaderReady) {
+		tsLoaderReady = (async () => {
+			try {
+				const moduleId = "tsx/esm/api";
+				const dynamicImport = new Function(
+					"specifier",
+					"return import(specifier);"
+				) as (specifier: string) => Promise<{ register?: () => void }>;
+				const { register } = await dynamicImport(moduleId).catch(() => ({ register: undefined }));
+				if (typeof register === "function") {
+					register();
+				}
+			} catch (error) {
+				console.warn(
+					"[WorkflowLibrary] Unable to register TypeScript loader. Only JavaScript workflows will be loaded.",
+					error
+				);
+			}
+		})();
+	}
+	return tsLoaderReady;
 }

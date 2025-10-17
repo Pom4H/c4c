@@ -104,14 +104,14 @@ export function withOAuth(options: OAuthPolicyOptions): Policy {
 
 	return <TInput, TOutput>(handler: Handler<TInput, TOutput>): Handler<TInput, TOutput> => {
 		return async (input, context) => {
-			const resolvedToken = await resolveToken({
-				context,
-				provider,
-				metadataTokenKey,
-				envVar,
-				token,
-				tokenProvider,
-			});
+		const resolvedToken = await resolveToken({
+			context,
+			provider,
+			metadataTokenKey,
+			envVar,
+			token,
+			tokenProvider,
+		});
 
 			if (!resolvedToken) {
 				throw new Error(
@@ -120,12 +120,12 @@ export function withOAuth(options: OAuthPolicyOptions): Policy {
 				);
 			}
 
-			const headerValue =
-				typeof scheme === "function"
-					? scheme(resolvedToken)
-					: scheme
-					? `${scheme} ${resolvedToken}`
-					: resolvedToken;
+		const headerValue =
+			typeof scheme === "function"
+				? scheme(resolvedToken)
+				: scheme
+				? normalizeSchemeHeader(scheme, resolvedToken)
+				: resolvedToken;
 
 			const nextContext: ExecutionContext = storeMetadata
 				? enrichContext(context, provider, headerName, headerValue, resolvedToken, metadataTokenKey)
@@ -213,4 +213,13 @@ function enrichContext(
 		...context,
 		metadata,
 	};
+}
+
+function normalizeSchemeHeader(scheme: string, token: string): string {
+	const trimmedToken = token.trim();
+	const lowerScheme = scheme.trim().toLowerCase();
+	if (trimmedToken.toLowerCase().startsWith(`${lowerScheme} `)) {
+		return trimmedToken;
+	}
+	return `${scheme.trim()} ${trimmedToken}`.trim();
 }

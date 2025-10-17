@@ -112,54 +112,51 @@ When an agent successfully solves a task, that solution is valuable:
 
 ### Workflow as DSL
 
-Agents compose procedures into workflows:
+Agents compose procedures into workflows with the builder API:
 
 ```typescript
-// Agent's internal reasoning:
-// "To onboard user, I need to:
-//  1. Create account
-//  2. Send welcome email
-//  3. Track signup event"
+import { workflow, step } from "@tsdev/workflow";
+import { z } from "zod";
 
-// Agent generates:
-const workflow = {
-  id: "user-onboarding",
-  nodes: [
-    {
-      id: "create-account",
-      type: "procedure",
-      procedureName: "users.create",
-      next: "send-email"
-    },
-    {
-      id: "send-email",
-      type: "procedure",
-      procedureName: "emails.sendWelcome",
-      config: {
-        userId: "{{ createAccount.id }}"  // Reference previous output
-      },
-      next: "track-event"
-    },
-    {
-      id: "track-event",
-      type: "procedure",
-      procedureName: "analytics.track",
-      config: {
-        event: "user.signup",
-        userId: "{{ createAccount.id }}"
-      }
-    }
-  ]
-};
+const createAccount = step({
+  id: "create-account",
+  input: z.object({ name: z.string(), email: z.string().email() }),
+  output: z.object({ id: z.string() }),
+  execute: ({ engine, inputData }) => engine.run("users.create", inputData),
+});
+
+const sendEmail = step({
+  id: "send-email",
+  input: createAccount.output,
+  output: z.object({ delivered: z.boolean() }),
+  execute: ({ engine }) => engine.run("emails.sendWelcome"),
+});
+
+const trackEvent = step({
+  id: "track-event",
+  input: sendEmail.output,
+  output: z.object({ tracked: z.boolean() }),
+  execute: ({ engine, variables }) =>
+    engine.run("analytics.track", {
+      event: "user.signup",
+      userId: variables.createAccount?.id,
+    }),
+});
+
+export const userOnboarding = workflow("user-onboarding")
+  .step(createAccount)
+  .step(sendEmail)
+  .step(trackEvent)
+  .commit();
 ```
 
-**This is executable code.**
+**This is executable TypeScript.**
 
 The agent can:
 - Execute it: `POST /workflow/execute`
-- Save it: Commit to git
-- Reuse it: Load from git next time
-- Improve it: Edit JSON, commit changes
+- Save it: commit the `.ts` module to git
+- Reuse it: import the module next time
+- Improve it: edit the TypeScript and re-run validation
 
 ### Performance Impact
 
@@ -187,7 +184,7 @@ Total: 5s
 
 ### Workflows are Code
 
-Workflows are declarative JSON:
+Workflows are TypeScript modules:
 - **Version controlled** - Track changes over time
 - **Reviewable** - PR workflow for changes
 - **Testable** - Validate before merge
@@ -230,21 +227,21 @@ Complex workflows decompose into sub-workflows:
 ```
 workflows/
 ├── e-commerce/
-│   ├── order-processing.json        # Main workflow
-│   ├── payment-flow.json            # Sub-workflow
-│   ├── inventory-check.json         # Sub-workflow
-│   └── fraud-detection.json         # Sub-workflow
+│   ├── order-processing.ts        # Main workflow
+│   ├── payment-flow.ts            # Sub-workflow
+│   ├── inventory-check.ts         # Sub-workflow
+│   └── fraud-detection.ts         # Sub-workflow
 │
 ├── user-management/
-│   ├── user-onboarding.json
-│   ├── user-offboarding.json
-│   └── password-reset.json
+│   ├── user-onboarding.ts
+│   ├── user-offboarding.ts
+│   └── password-reset.ts
 │
 └── data-pipelines/
-    ├── etl-main.json
-    ├── extract-users.json
-    ├── transform-events.json
-    └── load-warehouse.json
+    ├── etl-main.ts
+    ├── extract-users.ts
+    ├── transform-events.ts
+    └── load-warehouse.ts
 ```
 
 **Benefits:**
@@ -666,7 +663,7 @@ Total: 2 minutes per order
 ```
 Agent task: "Process customer order"
 
-Agent checks: workflows/order-processing.json exists
+Agent checks: workflows/order-processing.ts exists
 
 Agent execution (5s):
 - Load workflow

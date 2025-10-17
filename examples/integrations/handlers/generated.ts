@@ -6,3 +6,5 @@ export * from "../contracts/avito/messenger/procedures.gen.js";
 export * from "../contracts/google/authorization/procedures.gen.js";
 export * from "../contracts/google/drive/procedures.gen.js";
 export * from "../contracts/google/sheets/procedures.gen.js";
+export * from "./math.js";
+export * from "./data.js";

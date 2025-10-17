@@ -130,10 +130,20 @@ export interface WorkflowResumeState {
 /**
  * Condition node configuration
  */
+export interface ConditionPredicateContext {
+	variables: Record<string, unknown>;
+	outputs: Map<string, unknown>;
+	get<T = unknown>(key: string): T | undefined;
+	inputData?: unknown;
+}
+
+export type ConditionPredicate = (context: ConditionPredicateContext) => boolean;
+
 export interface ConditionConfig {
-	expression: string; // JavaScript expression
+	expression?: string; // JavaScript expression
 	trueBranch: string; // Node ID for true
 	falseBranch: string; // Node ID for false
+	predicateFn?: ConditionPredicate; // Optional runtime predicate
 }
 
 /**

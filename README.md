@@ -28,21 +28,31 @@ const procedures = await fetch('/procedures').then(r => r.json());
 //   { name: "analytics.track", input: {...}, output: {...} }
 // ]
 
-// AI composes workflow (DSL)
-const workflow = {
-  id: "user-onboarding",
-  nodes: [
-    { id: "create", type: "procedure", procedureName: "users.create", next: "email" },
-    { id: "email", type: "procedure", procedureName: "emails.send", next: "track" },
-    { id: "track", type: "procedure", procedureName: "analytics.track" }
-  ]
-};
+// AI composes workflow (builder API)
+const createUser = step({
+  id: "create",
+  input: z.object({ name: z.string(), email: z.string().email() }),
+  output: z.object({ id: z.string() }),
+  execute: ({ engine, inputData }) => engine.run("users.create", inputData),
+});
+
+const sendEmail = step({
+  id: "email",
+  input: createUser.output,
+  output: z.object({ delivered: z.boolean() }),
+  execute: ({ engine }) => engine.run("emails.send"),
+});
+
+export const userOnboarding = workflow("user-onboarding")
+  .step(createUser)
+  .step(sendEmail)
+  .commit();
 
 // Save to git
-await git.commit("workflows/user-onboarding.json", workflow);
+await git.commit("workflows/user-onboarding.ts", userOnboarding);
 
 // Reuse forever
-const result = await executeWorkflow(workflow, registry);
+const result = await executeWorkflow(userOnboarding, registry);
 ```
 
 **The agent never solves this problem again.**
@@ -69,34 +79,34 @@ Agent calls: GET /procedures
   ↓
 Agent sees: users.create, emails.send, analytics.track
   ↓
-Agent composes workflow:
-  {
-    nodes: [
-      { type: "procedure", procedureName: "users.create" },
-      { type: "procedure", procedureName: "emails.send" },
-      { type: "procedure", procedureName: "analytics.track" }
-    ]
-  }
+Agent composes workflow (builder):
+```ts
+export const userOnboarding = workflow("user-onboarding")
+  .step(step({ id: "create", ... }))
+  .step(step({ id: "email", ... }))
+  .step(step({ id: "track", ... }))
+  .commit();
+```
   ↓
 Agent executes: POST /workflow/execute
   ↓
 Workflow runs with full OpenTelemetry tracing
   ↓
-Agent commits workflow to git: workflows/user-onboarding.json
+Agent commits workflow to git: workflows/user-onboarding.ts
   ↓
 Next time: Agent reuses workflow instead of re-thinking
 ```
 
 ### 2. Git-Based Workflow Management
 
-**Workflows are just JSON** → version control works perfectly:
+**Workflows are just TypeScript modules** → version control works perfectly:
 
 ```bash
 git/
 ├── workflows/
-│   ├── user-onboarding.json      # AI-composed workflow
-│   ├── payment-processing.json   # Human-decomposed workflow
-│   └── data-pipeline.json        # Complex multi-step workflow
+│   ├── user-onboarding.ts        # AI-composed workflow
+│   ├── payment-processing.ts     # Human-decomposed workflow
+│   └── data-pipeline.ts          # Complex multi-step workflow
 ```
 
 **Benefits:**
@@ -111,8 +121,8 @@ git/
 ```bash
 # AI creates initial workflow
 git checkout -b feat/user-onboarding
-echo '{...}' > workflows/user-onboarding.json
-git add workflows/user-onboarding.json
+pnpm tsx scripts/scaffold-workflow.ts user-onboarding
+git add workflows/user-onboarding.ts
 git commit -m "Add user onboarding workflow"
 git push
 
@@ -327,7 +337,7 @@ const result = await fetch('http://localhost:3000/workflow/execute', {
 const { executionId, status, outputs, spans } = await result.json();
 
 // Agent saves workflow to git
-await saveToGit('workflows/user-onboarding.json', workflow);
+await saveToGit('workflows/user-onboarding.ts', workflow);
 
 // Next time agent sees "onboard user" task:
 // 1. Loads workflow from git
@@ -355,7 +365,7 @@ const improvedWorkflow = {
 };
 
 // Commit improvement
-await git.commit("workflows/user-onboarding.json", improvedWorkflow);
+await git.commit("workflows/user-onboarding.ts", improvedWorkflow);
 await git.createPR("Improve user onboarding: add email retry");
 ```
 
@@ -373,9 +383,9 @@ your-project/
 │   └── apps/
 │
 ├── workflows/               # Workflow definitions (git)
-│   ├── user-onboarding.json
-│   ├── payment-flow.json
-│   └── data-pipeline.json
+│   ├── user-onboarding.ts
+│   ├── payment-flow.ts
+│   └── data-pipeline.ts
 │
 └── .github/workflows/
     └── deploy-workflows.yml  # CI/CD for workflows
@@ -413,7 +423,7 @@ your-project/
 ```bash
 git checkout -b workflows/user-onboarding
 # AI generates workflow JSON
-git add workflows/user-onboarding.json
+git add workflows/user-onboarding.ts
 git commit -m "Add user onboarding workflow"
 git push origin workflows/user-onboarding
 ```
@@ -429,7 +439,7 @@ git push origin workflows/user-onboarding
 ```bash
 # Agent reads review comments
 # Updates workflow JSON
-git add workflows/user-onboarding.json
+git add workflows/user-onboarding.ts
 git commit -m "Address review: add error handling"
 git push
 ```
@@ -461,14 +471,14 @@ jobs:
       
       - name: Validate workflows
         run: |
-          for workflow in workflows/*.json; do
+          for workflow in workflows/*.ts; do
             curl -X POST http://api/workflow/validate \
               -d @$workflow
           done
       
       - name: Deploy workflows
         run: |
-          for workflow in workflows/*.json; do
+          for workflow in workflows/*.ts; do
             curl -X POST http://api/workflow/deploy \
               -d @$workflow
           done
@@ -501,7 +511,7 @@ Task: "Onboard new user"
   ↓
 Agent checks: "Do I have workflow for this?"
   ↓
-Agent finds: workflows/user-onboarding.json
+Agent finds: workflows/user-onboarding.ts
   ↓
 Agent executes workflow (5s)
   ↓
@@ -562,10 +572,10 @@ AI agent decomposes complex task:
 **Git structure:**
 ```
 workflows/
-├── data-pipeline.json           # Main workflow
-├── transform-users.json         # Sub-workflow
-├── transform-events.json        # Sub-workflow
-└── transform-analytics.json     # Sub-workflow
+├── data-pipeline.ts           # Main workflow
+├── transform-users.ts         # Sub-workflow
+├── transform-events.ts        # Sub-workflow
+└── transform-analytics.ts     # Sub-workflow
 ```
 
 **Agent can:**
@@ -639,7 +649,7 @@ const orderWorkflow = {
 
 **Agent commits to git:**
 ```bash
-workflows/order-processing.json
+workflows/order-processing.ts
 ```
 
 **Team reviews and improves:**
@@ -703,7 +713,7 @@ workflows/order-processing.json
              ┌────────────────┐
              │   Git Repo     │
              │  workflows/    │
-             │  ├── *.json    │
+             │  ├── *.ts      │
              └────────────────┘
 ```
 

@@ -37,5 +37,9 @@ export {
 	type WorkflowSummary,
 } from "./library.js";
 
+// Workflow builder API
+export { workflow, step, parallel, condition, sequence } from "./builder.js";
+export type { StepContext, ConditionContext } from "./builder.js";
+
 // Re-export selected core types for app/example convenience
 export type { Registry, Procedure } from "@tsdev/core";

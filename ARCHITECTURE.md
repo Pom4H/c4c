@@ -62,7 +62,7 @@ This document explains the internals of tsdev with focus on:
                  ┌──────────────────┐
                  │    Git Repo      │
                  │   workflows/     │
-                 │   ├── *.json     │
+                 │   ├── *.ts       │
                  │   Agent commits  │
                  │   Human reviews  │
                  └──────────────────┘
@@ -783,14 +783,15 @@ if (req.url === "/workflow/execute" && req.method === "POST") {
 const result = await executeWorkflow(workflow, input);
 
 if (result.status === "completed") {
-  // Save to git
-  const workflowPath = `workflows/${workflow.id}.json`;
-  
-  await fs.writeFile(workflowPath, JSON.stringify(workflow, null, 2));
+  // Save to git as TypeScript module
+  const workflowPath = `workflows/${workflow.id}.ts`;
+  const source = renderWorkflowModule(workflow); // builder -> TS string
+
+  await fs.writeFile(workflowPath, source);
   await git.add(workflowPath);
   await git.commit(`Add ${workflow.id} workflow`);
-  
-  // Agent remembers: "For tasks like this, use workflows/user-onboarding.json"
+
+  // Agent remembers: "For tasks like this, use workflows/user-onboarding.ts"
   agent.workflowCache.set(taskPattern, workflowPath);
 }
 ```
@@ -807,11 +808,11 @@ const task = "Onboard user Bob";
 const workflowPath = agent.workflowCache.get(matchTaskPattern(task));
 
 if (workflowPath) {
-  // Load from git
-  const workflow = JSON.parse(await fs.readFile(workflowPath, 'utf8'));
-  
+  // Load from git (dynamic import of module)
+  const { userOnboarding } = await import(`../${workflowPath}`);
+
   // Execute with new input
-  const result = await executeWorkflow(workflow, {
+  const result = await executeWorkflow(userOnboarding, {
     userName: "Bob",
     userEmail: "bob@example.com"
   });
@@ -833,18 +834,18 @@ if (workflowPath) {
 ```
 git-repo/
 ├── workflows/
-│   ├── user-onboarding.json
-│   ├── payment-processing.json
-│   ├── data-pipeline.json
+│   ├── user-onboarding.ts
+│   ├── payment-processing.ts
+│   ├── data-pipeline.ts
 │   │
 │   ├── e-commerce/
-│   │   ├── order-processing.json
-│   │   ├── inventory-check.json
-│   │   └── fraud-detection.json
+│   │   ├── order-processing.ts
+│   │   ├── inventory-check.ts
+│   │   └── fraud-detection.ts
 │   │
 │   └── analytics/
-│       ├── event-tracking.json
-│       └── report-generation.json
+│       ├── event-tracking.ts
+│       └── report-generation.ts
 │
 ├── .github/
 │   └── workflows/
@@ -857,7 +858,7 @@ git-repo/
 
 ### Workflow as Code
 
-**Workflow JSON is source code:**
+**Workflow TypeScript is source code:**
 
 ```json
 {
@@ -909,31 +910,26 @@ git checkout -b workflows/improve-user-onboarding
 **2. Agent modifies workflow:**
 
 ```diff
-{
-  "nodes": [
-    {
-      "id": "create-account",
-      "type": "procedure",
-      "procedureName": "users.create",
-+     "onError": "retry-create-account",
-      "next": "send-verification"
-    },
-+   {
-+     "id": "retry-create-account",
-+     "type": "procedure",
-+     "procedureName": "users.create",
-+     "config": { "retry": true },
-+     "next": "send-verification",
-+     "onError": "notify-admin"
-+   }
-  ]
-}
+ export const userOnboarding = workflow("user-onboarding")
+-  .step(createAccount)
+-  .step(sendVerification)
++  .step(createAccount)
++  .step(retryCreateAccount)
++  .step(sendVerification)
+   .commit();
+
++const retryCreateAccount = step({
++  id: "retry-create-account",
++  input: createAccount.output,
++  output: createAccount.output,
++  execute: ({ engine, inputData }) => engine.run("users.create", { ...inputData, retry: true }),
++});
 ```
 
 **3. Agent commits:**
 
 ```bash
-git add workflows/user-onboarding.json
+git add workflows/user-onboarding.ts
 git commit -m "Add retry logic to user-onboarding workflow
 
 Detected failure pattern in execution traces:
@@ -1026,7 +1022,7 @@ jobs:
       
       - name: Validate all workflows
         run: |
-          for workflow in workflows/**/*.json; do
+          for workflow in workflows/**/*.ts; do
             echo "Validating $workflow"
             curl -X POST http://localhost:3000/workflow/validate \
               -H "Content-Type: application/json" \
@@ -1146,7 +1142,7 @@ function suggestImprovements(stats) {
 
 ```typescript
 // Agent loads workflow
-const workflow = JSON.parse(await fs.readFile('workflows/user-onboarding.json'));
+const { userOnboarding } = await import('../workflows/user-onboarding.js');
 
 // Agent gets suggestions
 const suggestions = suggestImprovements(analyzeExecutions(workflow.id));
@@ -1167,7 +1163,7 @@ for (const suggestion of suggestions) {
 }
 
 // Agent commits improvement
-await git.commit('workflows/user-onboarding.json', workflow);
+await git.commit('workflows/user-onboarding.ts', workflow);
 await git.createPR(`Optimize ${workflow.id}: ${suggestions.map(s => s.type).join(', ')}`);
 ```
 
@@ -1858,7 +1854,7 @@ createGrpcServer(registry, {
 ┌────────────────────────────────────────────────────────┐
 │                    AI Agent                            │
 │  1. Receives task: "Onboard new user"                  │
-│  2. Checks git: does workflows/user-onboarding.json    │
+│  2. Checks git: does workflows/user-onboarding.ts    │
 │     exist?                                             │
 │  3a. YES: Load from git, execute with new input        │
 │  3b. NO: Compose new workflow from procedures          │
@@ -1871,7 +1867,7 @@ createGrpcServer(registry, {
              ▼
 ┌────────────────────────────────────────────────────────┐
 │                   Git Repository                       │
-│  • workflows/*.json (version controlled)               │
+│  • workflows/*.ts (version controlled)               │
 │  • Pull requests (agent-created)                       │
 │  • Review comments (human feedback)                    │
 └────────────┬───────────────────────────────────────────┘
