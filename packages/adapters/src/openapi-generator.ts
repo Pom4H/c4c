@@ -5,7 +5,7 @@
 
 import { Hono } from "hono";
 import { OpenAPIGenerator, type OpenAPIGeneratorOptions } from "@tsdev/generators";
-import type { Registry } from "@tsdev/core";
+import type { Registry, DynamicLoader } from "@tsdev/core";
 
 export interface OpenAPIGeneratorConfig {
   baseUrl?: string;
@@ -26,14 +26,17 @@ export interface OpenAPIGeneratorConfig {
   };
 }
 
-export function createOpenAPIGeneratorRouter(config: OpenAPIGeneratorConfig = {}) {
+export function createOpenAPIGeneratorRouter(
+  config: OpenAPIGeneratorConfig = {},
+  dynamicLoader?: DynamicLoader
+) {
   const app = new Hono();
 
   // POST /openapi/generate - Generate contracts and handlers from OpenAPI spec
   app.post("/openapi/generate", async (c) => {
     try {
       const body = await c.req.json();
-      const { spec, options = {} } = body;
+      const { spec, options = {}, loadDynamically = true } = body;
 
       if (!spec) {
         return c.json({ error: "OpenAPI spec is required" }, 400);
@@ -48,13 +51,37 @@ export function createOpenAPIGeneratorRouter(config: OpenAPIGeneratorConfig = {}
       const files = await generator.generate();
       const stats = generator.getStats();
 
+      let moduleId: string | undefined;
+      let module: any = undefined;
+
+      // If dynamic loading is enabled and loader is available
+      if (loadDynamically && dynamicLoader) {
+        // Generate unique module ID
+        const { createHash } = await import("crypto");
+        const specHash = createHash("md5").update(JSON.stringify(spec)).digest("hex");
+        moduleId = `openapi-${specHash.slice(0, 12)}`;
+
+        // Load module dynamically
+        module = await dynamicLoader.loadModule(moduleId, files, {
+          name: spec.info?.title || "Generated API",
+          source: "openapi",
+        });
+      }
+
       return c.json({
         success: true,
-        files,
+        files: loadDynamically ? undefined : files, // Don't return files if loaded dynamically
         stats,
         oauthConfig: generator.getOAuthConfig(),
         webhookOperations: generator.getWebhookOperations(),
         oauthCallbackOperations: generator.getOAuthCallbackOperations(),
+        module: module ? {
+          id: module.id,
+          name: module.name,
+          gitBranch: module.gitBranch,
+          gitCommit: module.gitCommit,
+          procedures: Array.from(module.procedures.keys()),
+        } : undefined,
       });
     } catch (error) {
       console.error("OpenAPI generation error:", error);
@@ -352,6 +379,102 @@ export function createOpenAPIGeneratorRouter(config: OpenAPIGeneratorConfig = {}
     };
 
     return c.json({ templates });
+  });
+
+  // GET /openapi/modules - List all loaded modules
+  app.get("/openapi/modules", async (c) => {
+    if (!dynamicLoader) {
+      return c.json({ error: "Dynamic loading not available" }, 503);
+    }
+
+    const modules = dynamicLoader.getModules();
+    const stats = dynamicLoader.getStats();
+
+    return c.json({
+      modules: modules.map(module => ({
+        id: module.id,
+        name: module.name,
+        version: module.version,
+        source: module.source,
+        createdAt: module.createdAt,
+        updatedAt: module.updatedAt,
+        gitBranch: module.gitBranch,
+        gitCommit: module.gitCommit,
+        procedureCount: module.procedures.size,
+        procedures: Array.from(module.procedures.keys()),
+      })),
+      stats,
+    });
+  });
+
+  // POST /openapi/modules/:id/reload - Reload a specific module
+  app.post("/openapi/modules/:id/reload", async (c) => {
+    if (!dynamicLoader) {
+      return c.json({ error: "Dynamic loading not available" }, 503);
+    }
+
+    const moduleId = c.req.param("id");
+    const module = await dynamicLoader.reloadModule(moduleId);
+
+    if (!module) {
+      return c.json({ error: "Module not found" }, 404);
+    }
+
+    return c.json({
+      success: true,
+      module: {
+        id: module.id,
+        name: module.name,
+        updatedAt: module.updatedAt,
+        procedures: Array.from(module.procedures.keys()),
+      },
+    });
+  });
+
+  // DELETE /openapi/modules/:id - Unload a specific module
+  app.delete("/openapi/modules/:id", async (c) => {
+    if (!dynamicLoader) {
+      return c.json({ error: "Dynamic loading not available" }, 503);
+    }
+
+    const moduleId = c.req.param("id");
+    const success = await dynamicLoader.unloadModule(moduleId);
+
+    if (!success) {
+      return c.json({ error: "Module not found" }, 404);
+    }
+
+    return c.json({ success: true });
+  });
+
+  // GET /openapi/modules/:id - Get module details
+  app.get("/openapi/modules/:id", async (c) => {
+    if (!dynamicLoader) {
+      return c.json({ error: "Dynamic loading not available" }, 503);
+    }
+
+    const moduleId = c.req.param("id");
+    const module = dynamicLoader.getModule(moduleId);
+
+    if (!module) {
+      return c.json({ error: "Module not found" }, 404);
+    }
+
+    return c.json({
+      id: module.id,
+      name: module.name,
+      version: module.version,
+      source: module.source,
+      createdAt: module.createdAt,
+      updatedAt: module.updatedAt,
+      gitBranch: module.gitBranch,
+      gitCommit: module.gitCommit,
+      procedures: Array.from(module.procedures.entries()).map(([name, procedure]) => ({
+        name,
+        description: procedure.contract.description,
+        metadata: procedure.contract.metadata,
+      })),
+    });
   });
 
   return app;

@@ -29,3 +29,6 @@ export { collectRegistry, getProcedure, listProcedures, describeRegistry } from 
 
 // Executor
 export { executeProcedure, createExecutionContext, applyPolicies } from "./executor.js";
+
+// Dynamic loading
+export { DynamicLoader, type DynamicModule, type DynamicLoaderOptions } from "./dynamic-loader.js";

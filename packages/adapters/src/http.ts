@@ -6,6 +6,7 @@ import { createRestRouter, listRESTRoutes } from "./rest.js";
 import { createWorkflowRouter } from "./workflow-http.js";
 import { createRpcRouter } from "./rpc.js";
 import { createOpenAPIGeneratorRouter } from "./openapi-generator.js";
+import { DynamicLoader } from "@tsdev/core";
 
 export interface HttpAppOptions {
 	port?: number;
@@ -14,7 +15,11 @@ export interface HttpAppOptions {
 	enableRest?: boolean;
 	enableWorkflow?: boolean;
 	enableOpenAPIGenerator?: boolean;
+	enableDynamicLoading?: boolean;
 	workflowsPath?: string;
+	modulesDir?: string;
+	gitEnabled?: boolean;
+	gitRemote?: string;
 }
 
 /**
