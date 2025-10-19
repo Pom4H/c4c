@@ -46,10 +46,24 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 		enableRest = true,
 		enableWorkflow = true,
 		enableOpenAPIGenerator = true,
+		enableDynamicLoading = true,
 		workflowsPath = process.env.TSDEV_WORKFLOWS_DIR ?? "workflows",
+		modulesDir = "./generated-modules",
+		gitEnabled = true,
+		gitRemote,
 	} = options;
 
 	const app = new Hono();
+
+	// Initialize dynamic loader if enabled
+	let dynamicLoader: DynamicLoader | undefined;
+	if (enableDynamicLoading) {
+		dynamicLoader = new DynamicLoader(registry, {
+			modulesDir,
+			gitEnabled,
+			gitRemote,
+		});
+	}
 
 	app.use("*", async (c, next) => {
 		c.header("Access-Control-Allow-Origin", "*");
@@ -134,7 +148,7 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 	}
 
 	if (enableOpenAPIGenerator) {
-		app.route("/", createOpenAPIGeneratorRouter());
+		app.route("/", createOpenAPIGeneratorRouter({}, dynamicLoader));
 	}
 
 	app.notFound((c) => c.json({ error: "Not found" }, 404));
@@ -190,6 +204,12 @@ function logStartup(registry: Registry, options: HttpAppOptions) {
 		console.log(`   Generate:         POST http://localhost:${port}/openapi/generate`);
 		console.log(`   Validate:         POST http://localhost:${port}/openapi/validate`);
 		console.log(`   Templates:        GET  http://localhost:${port}/openapi/templates`);
+		if (enableDynamicLoading) {
+			console.log(`   Modules:          GET  http://localhost:${port}/openapi/modules`);
+			console.log(`   Module Details:   GET  http://localhost:${port}/openapi/modules/:id`);
+			console.log(`   Reload Module:    POST http://localhost:${port}/openapi/modules/:id/reload`);
+			console.log(`   Unload Module:    DELETE http://localhost:${port}/openapi/modules/:id`);
+		}
 	}
 	console.log(``);
 

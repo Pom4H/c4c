@@ -8,7 +8,7 @@
  */
 
 import { createHttpServer } from "@tsdev/adapters";
-import { collectRegistry } from "@tsdev/core";
+import { collectRegistry, DynamicLoader } from "@tsdev/core";
 import { OpenAPIGenerator } from "@tsdev/generators";
 
 // Example OpenAPI spec
@@ -272,6 +272,7 @@ async function main() {
   console.log("🌐 Starting HTTP server...");
   console.log("   The server will include:");
   console.log("   - OpenAPI generator endpoints");
+  console.log("   - Dynamic module loading");
   console.log("   - Generated procedures (if any)");
   console.log("   - Swagger UI documentation");
   console.log("");
@@ -286,6 +287,9 @@ async function main() {
     enableRest: true,
     enableWorkflow: true,
     enableOpenAPIGenerator: true,
+    enableDynamicLoading: true,
+    modulesDir: "./generated-modules",
+    gitEnabled: true,
   });
 
   console.log("🎉 Server started!");
@@ -293,6 +297,8 @@ async function main() {
   console.log("   Visit http://localhost:3000/openapi/templates for available templates");
   console.log("   Use POST http://localhost:3000/openapi/validate to validate specs");
   console.log("   Use POST http://localhost:3000/openapi/generate to generate code");
+  console.log("   Use GET http://localhost:3000/openapi/modules to list loaded modules");
+  console.log("   Use POST http://localhost:3000/openapi/modules/:id/reload to reload modules");
   console.log("");
   console.log("Press Ctrl+C to stop the server");
 }

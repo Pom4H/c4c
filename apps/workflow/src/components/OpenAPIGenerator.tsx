@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -45,6 +45,19 @@ interface GeneratedFiles {
   packageJson: string;
 }
 
+interface LoadedModule {
+  id: string;
+  name: string;
+  version: string;
+  source: string;
+  createdAt: string;
+  updatedAt: string;
+  gitBranch?: string;
+  gitCommit?: string;
+  procedureCount: number;
+  procedures: string[];
+}
+
 interface OpenAPIGeneratorProps {
   apiBaseUrl?: string;
 }
@@ -60,6 +73,9 @@ export default function OpenAPIGenerator({ apiBaseUrl = "http://localhost:3000" 
   } | null>(null);
   const [generatedFiles, setGeneratedFiles] = useState<GeneratedFiles | null>(null);
   const [selectedFile, setSelectedFile] = useState<string>("contracts");
+  const [loadedModules, setLoadedModules] = useState<LoadedModule[]>([]);
+  const [selectedModule, setSelectedModule] = useState<string | null>(null);
+  const [moduleDetails, setModuleDetails] = useState<any>(null);
   const [generationOptions, setGenerationOptions] = useState({
     baseUrl: "https://api.example.com",
     timeout: 30000,
@@ -67,6 +83,7 @@ export default function OpenAPIGenerator({ apiBaseUrl = "http://localhost:3000" 
     generateTypes: true,
     generateWebhooks: true,
     generateOAuthCallbacks: true,
+    loadDynamically: true,
   });
 
   const validateSpec = useCallback(async () => {
@@ -112,12 +129,21 @@ export default function OpenAPIGenerator({ apiBaseUrl = "http://localhost:3000" 
         body: JSON.stringify({
           spec: JSON.parse(spec),
           options: generationOptions,
+          loadDynamically: generationOptions.loadDynamically,
         }),
       });
 
       const result = await response.json();
       if (result.success) {
-        setGeneratedFiles(result.files);
+        if (generationOptions.loadDynamically && result.module) {
+          // Module was loaded dynamically
+          await loadModules(); // Refresh modules list
+          setSelectedModule(result.module.id);
+          await loadModuleDetails(result.module.id);
+        } else {
+          // Return files for download
+          setGeneratedFiles(result.files);
+        }
       } else {
         throw new Error(result.error || "Generation failed");
       }
@@ -127,6 +153,63 @@ export default function OpenAPIGenerator({ apiBaseUrl = "http://localhost:3000" 
       setIsGenerating(false);
     }
   }, [spec, validationResult, generationOptions, apiBaseUrl]);
+
+  const loadModules = useCallback(async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/openapi/modules`);
+      const result = await response.json();
+      if (result.modules) {
+        setLoadedModules(result.modules);
+      }
+    } catch (error) {
+      console.error("Failed to load modules:", error);
+    }
+  }, [apiBaseUrl]);
+
+  const loadModuleDetails = useCallback(async (moduleId: string) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/openapi/modules/${moduleId}`);
+      const result = await response.json();
+      if (result.id) {
+        setModuleDetails(result);
+      }
+    } catch (error) {
+      console.error("Failed to load module details:", error);
+    }
+  }, [apiBaseUrl]);
+
+  const reloadModule = useCallback(async (moduleId: string) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/openapi/modules/${moduleId}/reload`, {
+        method: "POST",
+      });
+      const result = await response.json();
+      if (result.success) {
+        await loadModules();
+        await loadModuleDetails(moduleId);
+      }
+    } catch (error) {
+      console.error("Failed to reload module:", error);
+    }
+  }, [apiBaseUrl, loadModules, loadModuleDetails]);
+
+  const unloadModule = useCallback(async (moduleId: string) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/openapi/modules/${moduleId}`, {
+        method: "DELETE",
+      });
+      const result = await response.json();
+      if (result.success) {
+        await loadModules();
+        if (selectedModule === moduleId) {
+          setSelectedModule(null);
+          setModuleDetails(null);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to unload module:", error);
+    }
+  }, [apiBaseUrl, loadModules, selectedModule]);
 
   const downloadFile = useCallback((filename: string, content: string) => {
     const blob = new Blob([content], { type: "text/plain" });
@@ -178,6 +261,11 @@ export default function OpenAPIGenerator({ apiBaseUrl = "http://localhost:3000" 
       console.error("Failed to load template:", error);
     }
   }, [apiBaseUrl]);
+
+  // Load modules on component mount
+  useEffect(() => {
+    loadModules();
+  }, [loadModules]);
 
   return (
     <div className="space-y-6">
@@ -237,41 +325,58 @@ export default function OpenAPIGenerator({ apiBaseUrl = "http://localhost:3000" 
             />
           </div>
 
-          <div className="flex gap-2">
-            <Button
-              onClick={validateSpec}
-              disabled={isValidating || !spec.trim()}
-              className="flex-1"
-            >
-              {isValidating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Validating...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Validate Spec
-                </>
-              )}
-            </Button>
-            <Button
-              onClick={generateCode}
-              disabled={!validationResult?.valid || isGenerating}
-              className="flex-1"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Generate Code
-                </>
-              )}
-            </Button>
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="loadDynamically"
+                checked={generationOptions.loadDynamically}
+                onChange={(e) =>
+                  setGenerationOptions(prev => ({ ...prev, loadDynamically: e.target.checked }))
+                }
+                className="rounded"
+              />
+              <Label htmlFor="loadDynamically" className="text-sm">
+                Load dynamically on server (recommended)
+              </Label>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={validateSpec}
+                disabled={isValidating || !spec.trim()}
+                className="flex-1"
+              >
+                {isValidating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Validating...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Validate Spec
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={generateCode}
+                disabled={!validationResult?.valid || isGenerating}
+                className="flex-1"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {generationOptions.loadDynamically ? "Loading..." : "Generating..."}
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    {generationOptions.loadDynamically ? "Load & Generate" : "Generate Code"}
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -330,6 +435,125 @@ export default function OpenAPIGenerator({ apiBaseUrl = "http://localhost:3000" 
                 </AlertDescription>
               </Alert>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Loaded Modules */}
+      {loadedModules.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Code className="h-5 w-5" />
+              Loaded Modules ({loadedModules.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {loadedModules.map((module) => (
+                <div
+                  key={module.id}
+                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                    selectedModule === module.id ? "border-primary bg-muted" : "hover:bg-muted/50"
+                  }`}
+                  onClick={() => {
+                    setSelectedModule(module.id);
+                    loadModuleDetails(module.id);
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold">{module.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {module.procedureCount} procedures • {module.source} • {module.version}
+                      </p>
+                      {module.gitBranch && (
+                        <Badge variant="outline" className="mt-1">
+                          {module.gitBranch}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          reloadModule(module.id);
+                        }}
+                      >
+                        Reload
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          unloadModule(module.id);
+                        }}
+                      >
+                        Unload
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Module Details */}
+      {moduleDetails && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Code className="h-5 w-5" />
+              Module Details: {moduleDetails.name}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">ID</Label>
+                  <p className="text-sm text-muted-foreground">{moduleDetails.id}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Source</Label>
+                  <p className="text-sm text-muted-foreground">{moduleDetails.source}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Version</Label>
+                  <p className="text-sm text-muted-foreground">{moduleDetails.version}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Procedures</Label>
+                  <p className="text-sm text-muted-foreground">{moduleDetails.procedures?.length || 0}</p>
+                </div>
+              </div>
+
+              {moduleDetails.gitBranch && (
+                <div>
+                  <Label className="text-sm font-medium">Git Branch</Label>
+                  <p className="text-sm text-muted-foreground">{moduleDetails.gitBranch}</p>
+                </div>
+              )}
+
+              {moduleDetails.procedures && moduleDetails.procedures.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium">Available Procedures</Label>
+                  <div className="mt-2 space-y-2">
+                    {moduleDetails.procedures.map((proc: any) => (
+                      <div key={proc.name} className="p-2 bg-muted rounded">
+                        <div className="font-medium">{proc.name}</div>
+                        <div className="text-sm text-muted-foreground">{proc.description}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
