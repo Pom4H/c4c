@@ -1,0 +1,23 @@
+{
+  "name": "@tsdev/example-openapi-generator",
+  "version": "0.1.0",
+  "description": "Example of OpenAPI to tsdev generation",
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@tsdev/core": "workspace:*",
+    "@tsdev/adapters": "workspace:*",
+    "@tsdev/generators": "workspace:*",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "tsx": "^4.7.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -5,6 +5,7 @@ import { generateOpenAPIJSON } from "@tsdev/generators";
 import { createRestRouter, listRESTRoutes } from "./rest.js";
 import { createWorkflowRouter } from "./workflow-http.js";
 import { createRpcRouter } from "./rpc.js";
+import { createOpenAPIGeneratorRouter } from "./openapi-generator.js";
 
 export interface HttpAppOptions {
 	port?: number;
@@ -12,6 +13,7 @@ export interface HttpAppOptions {
 	enableRpc?: boolean;
 	enableRest?: boolean;
 	enableWorkflow?: boolean;
+	enableOpenAPIGenerator?: boolean;
 	workflowsPath?: string;
 }
 
@@ -38,6 +40,7 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 		enableRpc = true,
 		enableRest = true,
 		enableWorkflow = true,
+		enableOpenAPIGenerator = true,
 		workflowsPath = process.env.TSDEV_WORKFLOWS_DIR ?? "workflows",
 	} = options;
 
@@ -125,6 +128,10 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 		app.route("/", createRpcRouter(registry));
 	}
 
+	if (enableOpenAPIGenerator) {
+		app.route("/", createOpenAPIGeneratorRouter());
+	}
+
 	app.notFound((c) => c.json({ error: "Not found" }, 404));
 
 	return app;
@@ -141,6 +148,7 @@ function logStartup(registry: Registry, options: HttpAppOptions) {
 		enableRpc = true,
 		enableRest = true,
 		enableWorkflow = true,
+		enableOpenAPIGenerator = true,
 		workflowsPath = process.env.TSDEV_WORKFLOWS_DIR ?? "workflows",
 	} = options;
 
@@ -171,6 +179,12 @@ function logStartup(registry: Registry, options: HttpAppOptions) {
 	}
 	if (enableRest) {
 		console.log(`   REST: http://localhost:${port}/:resource (conventional)`);
+	}
+	if (enableOpenAPIGenerator) {
+		console.log(`\n⚡ OpenAPI Generator:`);
+		console.log(`   Generate:         POST http://localhost:${port}/openapi/generate`);
+		console.log(`   Validate:         POST http://localhost:${port}/openapi/validate`);
+		console.log(`   Templates:        GET  http://localhost:${port}/openapi/templates`);
 	}
 	console.log(``);
 

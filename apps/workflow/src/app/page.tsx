@@ -11,6 +11,7 @@ import WorkflowVisualizer from "@/components/WorkflowVisualizer";
 import TraceViewer from "@/components/TraceViewer";
 import SpanGanttChart from "@/components/SpanGanttChart";
 import ThemeToggle from "@/components/ThemeToggle";
+import OpenAPIGenerator from "@/components/OpenAPIGenerator";
 import { useWorkflow } from "@tsdev/workflow-react";
 import { useWorkflows, useWorkflowDefinition } from "@tsdev/workflow-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,7 +47,7 @@ function hydrateExecutionResult(result: SerializedWorkflowExecutionResult): Work
 
 export default function Home() {
 	const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>("");
-	const [activeTab, setActiveTab] = useState<"graph" | "trace" | "gantt">("graph");
+	const [activeTab, setActiveTab] = useState<"graph" | "trace" | "gantt" | "generator">("graph");
   const [liveNodesExecuted, setLiveNodesExecuted] = useState<string[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
   const [finalResult, setFinalResult] = useState<WorkflowExecutionResult | null>(null);
@@ -330,6 +331,12 @@ export default function Home() {
 							>
 								🔍 Trace Details
 							</TabsTrigger>
+							<TabsTrigger
+								value="generator"
+								className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+							>
+								⚡ OpenAPI Generator
+							</TabsTrigger>
 						</TabsList>
 
 						<CardContent className="p-6">
@@ -359,6 +366,10 @@ export default function Home() {
 
                   <TabsContent value="trace" className="m-0">
                     <TraceViewer spans={finalResult?.spans || []} />
+							</TabsContent>
+
+                  <TabsContent value="generator" className="m-0">
+                    <OpenAPIGenerator apiBaseUrl={apiBase} />
 							</TabsContent>
 						</CardContent>
 					</Tabs>
