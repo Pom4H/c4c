@@ -1,0 +1,178 @@
+{
+  "$schema": "./schema.json",
+  "version": "1.0.0",
+  "integrations": {
+    "google-drive": {
+      "name": "Google Drive",
+      "description": "Google Drive API v3 - File storage and management",
+      "provider": "google",
+      "category": "storage",
+      "openapi": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/googleapis.com/drive/v3/openapi.yaml",
+      "procedures": [
+        "files.list",
+        "files.get",
+        "files.create",
+        "files.update",
+        "files.delete",
+        "files.copy"
+      ],
+      "workflows": ["backup", "sync", "inventory"],
+      "tags": ["storage", "google", "cloud", "files"],
+      "authentication": "oauth2",
+      "documentation": "https://developers.google.com/drive/api/v3/reference"
+    },
+    "google-sheets": {
+      "name": "Google Sheets",
+      "description": "Google Sheets API v4 - Spreadsheet management",
+      "provider": "google",
+      "category": "productivity",
+      "openapi": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/googleapis.com/sheets/v4/openapi.yaml",
+      "procedures": [
+        "spreadsheets.create",
+        "spreadsheets.get",
+        "spreadsheets.values.get",
+        "spreadsheets.values.update",
+        "spreadsheets.values.append"
+      ],
+      "workflows": ["data-export", "reporting"],
+      "tags": ["productivity", "google", "spreadsheet", "data"],
+      "authentication": "oauth2",
+      "documentation": "https://developers.google.com/sheets/api/reference/rest"
+    },
+    "stripe": {
+      "name": "Stripe",
+      "description": "Stripe Payments API - Payment processing",
+      "provider": "stripe",
+      "category": "payments",
+      "openapi": "https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json",
+      "procedures": [
+        "customers.create",
+        "customers.retrieve",
+        "customers.update",
+        "charges.create",
+        "subscriptions.create",
+        "subscriptions.update",
+        "subscriptions.cancel"
+      ],
+      "workflows": ["subscription-flow", "payment-retry", "refund-process"],
+      "tags": ["payments", "billing", "subscriptions", "finance"],
+      "authentication": "api_key",
+      "documentation": "https://stripe.com/docs/api"
+    },
+    "github": {
+      "name": "GitHub",
+      "description": "GitHub REST API - Repository and issue management",
+      "provider": "github",
+      "category": "devtools",
+      "openapi": "https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json",
+      "procedures": [
+        "repos.get",
+        "repos.create",
+        "issues.list",
+        "issues.create",
+        "issues.update",
+        "pulls.create",
+        "pulls.merge"
+      ],
+      "workflows": ["pr-automation", "issue-triage"],
+      "tags": ["devtools", "git", "ci-cd", "automation"],
+      "authentication": "oauth2",
+      "documentation": "https://docs.github.com/en/rest"
+    },
+    "slack": {
+      "name": "Slack",
+      "description": "Slack Web API - Messaging and collaboration",
+      "provider": "slack",
+      "category": "communication",
+      "openapi": "https://raw.githubusercontent.com/slackapi/slack-api-specs/master/web-api/slack_web_openapi_v2.json",
+      "procedures": [
+        "chat.postMessage",
+        "chat.update",
+        "channels.list",
+        "users.list",
+        "files.upload"
+      ],
+      "workflows": ["notification-system", "daily-standup"],
+      "tags": ["communication", "messaging", "collaboration"],
+      "authentication": "oauth2",
+      "documentation": "https://api.slack.com/web"
+    },
+    "sendgrid": {
+      "name": "SendGrid",
+      "description": "SendGrid Email API - Transactional email service",
+      "provider": "sendgrid",
+      "category": "communication",
+      "openapi": "https://raw.githubusercontent.com/sendgrid/sendgrid-oai/main/oai.json",
+      "procedures": [
+        "mail.send",
+        "templates.create",
+        "templates.get",
+        "suppressions.get"
+      ],
+      "workflows": ["email-campaign", "welcome-email"],
+      "tags": ["email", "communication", "transactional"],
+      "authentication": "api_key",
+      "documentation": "https://docs.sendgrid.com/api-reference"
+    },
+    "twilio": {
+      "name": "Twilio",
+      "description": "Twilio API - SMS and voice communications",
+      "provider": "twilio",
+      "category": "communication",
+      "openapi": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_api_v2010.json",
+      "procedures": [
+        "messages.create",
+        "calls.create",
+        "recordings.list"
+      ],
+      "workflows": ["sms-notification", "voice-verification"],
+      "tags": ["sms", "voice", "communication"],
+      "authentication": "basic",
+      "documentation": "https://www.twilio.com/docs/usage/api"
+    },
+    "notion": {
+      "name": "Notion",
+      "description": "Notion API - Workspace and database management",
+      "provider": "notion",
+      "category": "productivity",
+      "openapi": "https://raw.githubusercontent.com/ramnes/notion-sdk-py/main/notion_openapi.json",
+      "procedures": [
+        "pages.create",
+        "pages.retrieve",
+        "pages.update",
+        "databases.query",
+        "databases.create"
+      ],
+      "workflows": ["content-sync", "database-backup"],
+      "tags": ["productivity", "notes", "database", "workspace"],
+      "authentication": "bearer",
+      "documentation": "https://developers.notion.com/reference/intro"
+    }
+  },
+  "workflows": {
+    "etl-pipeline": {
+      "name": "ETL Data Pipeline",
+      "description": "Extract, transform, load pattern for data processing",
+      "category": "data",
+      "dependencies": [],
+      "tags": ["data", "etl", "pipeline"],
+      "files": ["etl-pipeline.ts"]
+    },
+    "subscription-flow": {
+      "name": "Subscription Signup Flow",
+      "description": "Complete user subscription with payment and email",
+      "category": "payments",
+      "dependencies": ["stripe", "sendgrid"],
+      "tags": ["payments", "subscription", "email"],
+      "files": ["subscription-flow.ts"]
+    },
+    "notification-system": {
+      "name": "Multi-channel Notification",
+      "description": "Send notifications via email, SMS, and Slack",
+      "category": "communication",
+      "dependencies": ["sendgrid", "twilio", "slack"],
+      "tags": ["notifications", "communication"],
+      "files": ["notification-system.ts"]
+    }
+  }
+}

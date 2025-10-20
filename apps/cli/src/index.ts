@@ -75,3 +75,52 @@ export async function generateClient(options: GenerateClientOptions): Promise<st
 	await fs.writeFile(outFile, moduleSource, "utf8");
 	return outFile;
 }
+
+export interface AddIntegrationOptions {
+	root?: string;
+	registry?: string;
+	force?: boolean;
+}
+
+export async function addIntegration(
+	name: string,
+	options: AddIntegrationOptions = {}
+): Promise<void> {
+	const { fetchRegistry, generateIntegrationFiles, copyWorkflowFiles, listIntegrations } = await import("./registry.js");
+	
+	// Special case: list all integrations
+	if (name === "list" || name === "ls") {
+		await listIntegrations(options.registry);
+		return;
+	}
+	
+	// Parse name - check if it's a workflow
+	const isWorkflow = name.startsWith("workflow:");
+	const itemId = isWorkflow ? name.replace("workflow:", "") : name;
+	
+	// Fetch registry
+	const registry = await fetchRegistry(options.registry);
+	
+	if (isWorkflow) {
+		// Add workflow
+		const workflow = registry.workflows[itemId];
+		if (!workflow) {
+			throw new Error(`Workflow '${itemId}' not found in registry.`);
+		}
+		
+		console.log(`[c4c] Adding workflow '${workflow.name}'...`);
+		await copyWorkflowFiles(workflow, itemId, options.root ?? process.cwd(), { force: options.force });
+	} else {
+		// Add integration
+		const integration = registry.integrations[itemId];
+		if (!integration) {
+			throw new Error(
+				`Integration '${itemId}' not found in registry.\n` +
+				`Run 'c4c add list' to see available integrations.`
+			);
+		}
+		
+		console.log(`[c4c] Adding integration '${integration.name}'...`);
+		await generateIntegrationFiles(integration, options.root ?? process.cwd(), { force: options.force });
+	}
+}

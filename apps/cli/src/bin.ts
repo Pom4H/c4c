@@ -7,9 +7,11 @@ import process from "node:process";
 import {
 	serve,
 	generateClient,
+	addIntegration,
 	type GenerateClientOptions,
 	type ServeMode,
 	type ServeOptions,
+	type AddIntegrationOptions,
 } from "./index.js";
 
 const pkg = JSON.parse(
@@ -105,6 +107,27 @@ generate
 		} catch (error) {
 			console.error(
 				`[tsdev] ${error instanceof Error ? error.message : String(error)}`
+			);
+			process.exit(1);
+		}
+	});
+
+program
+	.command("add")
+	.description("Add an integration or workflow from the registry (like shadcn/ui)")
+	.argument("<name>", "Name of the integration or workflow (e.g., 'google-drive', 'workflow:etl-pipeline')")
+	.option("--root <path>", "Project root directory", process.cwd())
+	.option("--registry <url>", "Custom registry URL")
+	.option("--force", "Overwrite existing files")
+	.action(async (name: string, options) => {
+		try {
+			console.log(`[c4c] Adding ${name}...`);
+			console.log(`[c4c] This feature is coming soon!`);
+			console.log(`[c4c] It will work like 'npx shadcn add button' - downloading ready-to-use integrations.`);
+			// TODO: Implement registry fetch and file copying
+		} catch (error) {
+			console.error(
+				`[c4c] ${error instanceof Error ? error.message : String(error)}`
 			);
 			process.exit(1);
 		}

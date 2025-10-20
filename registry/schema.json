@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "c4c Registry",
+  "description": "Schema for c4c integrations and workflows registry",
+  "type": "object",
+  "required": ["version", "integrations", "workflows"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Registry version"
+    },
+    "integrations": {
+      "type": "object",
+      "description": "Available integrations",
+      "additionalProperties": {
+        "$ref": "#/definitions/Integration"
+      }
+    },
+    "workflows": {
+      "type": "object",
+      "description": "Available workflows",
+      "additionalProperties": {
+        "$ref": "#/definitions/Workflow"
+      }
+    }
+  },
+  "definitions": {
+    "Integration": {
+      "type": "object",
+      "required": ["name", "description", "provider", "category", "openapi"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Integration description"
+        },
+        "provider": {
+          "type": "string",
+          "description": "Provider identifier (e.g., 'google', 'stripe')"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["storage", "productivity", "payments", "communication", "devtools", "data", "analytics"]
+        },
+        "openapi": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to OpenAPI specification"
+        },
+        "procedures": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of main procedures"
+        },
+        "workflows": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Associated workflow templates"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "authentication": {
+          "type": "string",
+          "enum": ["oauth2", "api_key", "bearer", "basic"],
+          "description": "Authentication method"
+        },
+        "documentation": {
+          "type": "string",
+          "format": "uri",
+          "description": "Link to API documentation"
+        }
+      }
+    },
+    "Workflow": {
+      "type": "object",
+      "required": ["name", "description", "category", "files"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Workflow name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Workflow description"
+        },
+        "category": {
+          "type": "string"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Required integrations"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Workflow files to copy"
+        }
+      }
+    }
+  }
+}
