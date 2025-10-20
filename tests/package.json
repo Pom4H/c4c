@@ -1,0 +1,23 @@
+{
+  "name": "@c4c/tests",
+  "version": "0.1.0",
+  "description": "Tests for c4c CLI commands",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "devDependencies": {
+    "@c4c/cli": "workspace:*",
+    "@c4c/core": "workspace:*",
+    "@c4c/adapters": "workspace:*",
+    "@c4c/generators": "workspace:*",
+    "@types/node": "^24.7.2",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
