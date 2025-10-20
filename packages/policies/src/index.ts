@@ -20,6 +20,8 @@ export {
 	hasPermission,
 	hasAnyRole,
 	hasAllRoles,
+	requireAuth,
+	createAuthProcedure,
 	type AuthPolicyOptions,
 	type AuthData,
 	type AuthScheme,

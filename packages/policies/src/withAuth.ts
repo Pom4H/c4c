@@ -1,4 +1,4 @@
-import type { ExecutionContext, Handler, Policy } from "@c4c/core";
+import type { ExecutionContext, Handler, Policy, Contract } from "@c4c/core";
 
 export type AuthScheme = "Bearer" | "Basic" | "ApiKey" | "Custom";
 
@@ -290,4 +290,90 @@ export function withAuthRequired(options: Omit<AuthPolicyOptions, "allowAnonymou
 		...options,
 		allowAnonymous: false,
 	});
+}
+
+/**
+ * Helper to mark a contract as requiring authentication.
+ * This updates the contract metadata so that generated clients know to include auth headers.
+ * 
+ * @example
+ * ```typescript
+ * const contract = requireAuth(myContract, {
+ *   requiredRoles: ["admin"],
+ *   authScheme: "Bearer"
+ * });
+ * ```
+ */
+export function requireAuth<TInput, TOutput>(
+	contract: Contract<TInput, TOutput>,
+	options: {
+		requiredRoles?: string[];
+		requiredPermissions?: string[];
+		authScheme?: string;
+	} = {}
+): Contract<TInput, TOutput> {
+	return {
+		...contract,
+		metadata: {
+			...contract.metadata,
+			auth: {
+				requiresAuth: true,
+				requiredRoles: options.requiredRoles,
+				requiredPermissions: options.requiredPermissions,
+				authScheme: options.authScheme ?? "Bearer",
+			},
+		},
+	};
+}
+
+/**
+ * Create an authenticated procedure with proper metadata.
+ * This is a convenience function that combines contract metadata and auth policy.
+ * 
+ * @example
+ * ```typescript
+ * export const deleteUser = createAuthProcedure({
+ *   contract: deleteUserContract,
+ *   handler: async (input, context) => { ... },
+ *   auth: {
+ *     requiredRoles: ["admin"],
+ *   }
+ * });
+ * ```
+ */
+export function createAuthProcedure<TInput, TOutput>(config: {
+	contract: Contract<TInput, TOutput>;
+	handler: Handler<TInput, TOutput>;
+	auth: AuthPolicyOptions & {
+		requiredRoles?: string[];
+		requiredPermissions?: string[];
+		authScheme?: string;
+	};
+}): {
+	contract: Contract<TInput, TOutput>;
+	handler: Handler<TInput, TOutput>;
+} {
+	const { contract, handler, auth } = config;
+
+	// Update contract metadata
+	const updatedContract = requireAuth(contract, {
+		requiredRoles: auth.requiredRoles,
+		requiredPermissions: auth.requiredPermissions,
+		authScheme: auth.authScheme,
+	});
+
+	// Determine which auth policy to apply
+	let authPolicy: Policy;
+	if (auth.requiredRoles && auth.requiredRoles.length > 0) {
+		authPolicy = withRole(auth.requiredRoles, auth);
+	} else if (auth.requiredPermissions && auth.requiredPermissions.length > 0) {
+		authPolicy = withPermission(auth.requiredPermissions, auth);
+	} else {
+		authPolicy = withAuthRequired(auth);
+	}
+
+	return {
+		contract: updatedContract,
+		handler: authPolicy(handler),
+	};
 }

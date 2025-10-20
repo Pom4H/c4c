@@ -1,13 +1,14 @@
 import type { Procedure } from "@c4c/core";
 import { applyPolicies } from "@c4c/core";
-import { withAuth, withRole, withPermission, withAuthRequired } from "@c4c/policies";
+import { withAuth, withRole, withPermission, withAuthRequired, requireAuth, createAuthProcedure } from "@c4c/policies";
 import { z } from "zod";
 
 // ============================================================================
 // Contracts
 // ============================================================================
 
-const getUserProfileContract = {
+// Contract with auth metadata for client generation
+const getUserProfileContract = requireAuth({
 	name: "getUserProfile",
 	description: "Get user profile - requires authentication",
 	input: z.object({
@@ -19,7 +20,11 @@ const getUserProfileContract = {
 		email: z.string(),
 		roles: z.array(z.string()),
 	}),
-};
+	metadata: {
+		exposure: "external",
+		roles: ["api-endpoint", "sdk-client"],
+	},
+});
 
 const updateUserProfileContract = {
 	name: "updateUserProfile",
@@ -37,7 +42,7 @@ const updateUserProfileContract = {
 	}),
 };
 
-const deleteUserContract = {
+const deleteUserContract = requireAuth({
 	name: "deleteUser",
 	description: "Delete user - requires admin role",
 	input: z.object({
@@ -47,9 +52,15 @@ const deleteUserContract = {
 		success: z.boolean(),
 		message: z.string(),
 	}),
-};
+	metadata: {
+		exposure: "external",
+		roles: ["api-endpoint", "sdk-client"],
+	},
+}, {
+	requiredRoles: ["admin"],
+});
 
-const listUsersContract = {
+const listUsersContract = requireAuth({
 	name: "listUsers",
 	description: "List all users - requires moderator or admin role",
 	input: z.object({
@@ -64,7 +75,13 @@ const listUsersContract = {
 		})),
 		total: z.number(),
 	}),
-};
+	metadata: {
+		exposure: "external",
+		roles: ["api-endpoint", "sdk-client"],
+	},
+}, {
+	requiredRoles: ["moderator", "admin"],
+});
 
 // ============================================================================
 // In-memory storage for demo
@@ -252,6 +269,9 @@ export const customAuthExample: Procedure = {
 				
 				return isOwner || hasAdminRole;
 			},
+		})
+	),
+};
 		})
 	),
 };

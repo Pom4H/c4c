@@ -3,11 +3,34 @@ import type { z } from "zod";
 export type ProcedureExposure = "external" | "internal";
 export type ProcedureRole = "workflow-node" | "api-endpoint" | "sdk-client";
 
+export interface AuthRequirements {
+	/**
+	 * Whether this procedure requires authentication
+	 */
+	requiresAuth?: boolean;
+	/**
+	 * Required roles for this procedure
+	 */
+	requiredRoles?: string[];
+	/**
+	 * Required permissions for this procedure
+	 */
+	requiredPermissions?: string[];
+	/**
+	 * Authentication scheme (Bearer, Basic, ApiKey, etc.)
+	 */
+	authScheme?: string;
+}
+
 export interface ContractMetadata extends Record<string, unknown> {
 	exposure?: ProcedureExposure;
 	roles?: ProcedureRole[];
 	category?: string;
 	tags?: string[];
+	/**
+	 * Authentication and authorization requirements
+	 */
+	auth?: AuthRequirements;
 }
 
 /**

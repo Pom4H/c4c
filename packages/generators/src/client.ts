@@ -18,6 +18,10 @@ interface GeneratedProcedure {
 	outputTypeName: string;
 	inputType: string;
 	outputType: string;
+	requiresAuth: boolean;
+	requiredRoles?: string[];
+	requiredPermissions?: string[];
+	authScheme?: string;
 }
 
 export function generateRpcClientModule(
@@ -33,6 +37,14 @@ export function generateRpcClientModule(
 		const inputTypeName = `${pascalName}Input`;
 		const outputTypeName = `${pascalName}Output`;
 
+		const auth = procedure.contract.metadata?.auth as {
+			requiresAuth?: boolean;
+			requiredRoles?: string[];
+			requiredPermissions?: string[];
+			authScheme?: string;
+		} | undefined;
+		const requiresAuth = auth?.requiresAuth ?? false;
+
 		procedures.push({
 			name,
 			pascalName,
@@ -40,6 +52,10 @@ export function generateRpcClientModule(
 			outputTypeName,
 			inputType: toTypeScript(procedure.contract.input),
 			outputType: toTypeScript(procedure.contract.output),
+			requiresAuth,
+			requiredRoles: auth?.requiredRoles,
+			requiredPermissions: auth?.requiredPermissions,
+			authScheme: auth?.authScheme,
 		});
 	}
 
@@ -51,12 +67,23 @@ export function generateRpcClientModule(
 	lines.push('  baseUrl?: string;');
 	lines.push('  fetch?: typeof fetch;');
 	lines.push('  headers?: Record<string, string>;');
+	lines.push('  /**');
+	lines.push('   * Authentication token for protected procedures');
+	lines.push('   * Will be automatically added as "Authorization: Bearer <token>" header');
+	lines.push('   */');
+	lines.push('  authToken?: string;');
+	lines.push('  /**');
+	lines.push('   * Custom function to get auth token dynamically');
+	lines.push('   */');
+	lines.push('  getAuthToken?: () => string | undefined | Promise<string | undefined>;');
 	lines.push("}\n");
 
 	lines.push("interface ResolvedClientOptions {");
 	lines.push("  baseUrl: string;");
 	lines.push("  fetch: typeof fetch;");
 	lines.push("  headers: Record<string, string>;");
+	lines.push("  authToken?: string;");
+	lines.push("  getAuthToken?: () => string | undefined | Promise<string | undefined>;");
 	lines.push("}\n");
 
 	lines.push("function resolveOptions(options: TsdevClientOptions = {}): ResolvedClientOptions {");
@@ -74,6 +101,8 @@ export function generateRpcClientModule(
 	lines.push("      \"Content-Type\": \"application/json\",");
 	lines.push("      ...(options.headers ?? {}),");
 	lines.push("    },");
+	lines.push("    authToken: options.authToken,");
+	lines.push("    getAuthToken: options.getAuthToken,");
 	lines.push("  };");
 	lines.push("}\n");
 
@@ -85,10 +114,31 @@ export function generateRpcClientModule(
 			lines.push(`  "${procedure.name}": {`);
 			lines.push(`    input: ${procedure.inputTypeName};`);
 			lines.push(`    output: ${procedure.outputTypeName};`);
+			lines.push(`    requiresAuth: ${procedure.requiresAuth};`);
 			lines.push("  };");
 		}
 	}
 	lines.push("}\n");
+
+	// Add metadata mapping for procedures
+	lines.push("const PROCEDURE_METADATA = {");
+	if (procedures.length > 0) {
+		for (const procedure of procedures) {
+			lines.push(`  "${procedure.name}": {`);
+			lines.push(`    requiresAuth: ${procedure.requiresAuth},`);
+			if (procedure.requiredRoles && procedure.requiredRoles.length > 0) {
+				lines.push(`    requiredRoles: ${JSON.stringify(procedure.requiredRoles)},`);
+			}
+			if (procedure.requiredPermissions && procedure.requiredPermissions.length > 0) {
+				lines.push(`    requiredPermissions: ${JSON.stringify(procedure.requiredPermissions)},`);
+			}
+			if (procedure.authScheme) {
+				lines.push(`    authScheme: ${JSON.stringify(procedure.authScheme)},`);
+			}
+			lines.push("  },");
+		}
+	}
+	lines.push("} as const;\n");
 
 	lines.push("export function createTsdevClient(options: TsdevClientOptions = {}) {");
 	lines.push("  const resolved = resolveOptions(options);");
@@ -96,9 +146,26 @@ export function generateRpcClientModule(
 	lines.push("    name: P,");
 	lines.push("    input: ProcedureDefinitions[P][\"input\"]");
 	lines.push("  ): Promise<ProcedureDefinitions[P][\"output\"]> => {");
+	lines.push("    const metadata = PROCEDURE_METADATA[name as string] ?? { requiresAuth: false };");
+	lines.push("    const headers = { ...resolved.headers };");
+	lines.push("");
+	lines.push("    // Add Authorization header for procedures that require auth");
+	lines.push("    if (metadata.requiresAuth) {");
+	lines.push("      let token: string | undefined = resolved.authToken;");
+	lines.push("      if (!token && resolved.getAuthToken) {");
+	lines.push("        token = await resolved.getAuthToken();");
+	lines.push("      }");
+	lines.push("      if (token) {");
+	lines.push("        const scheme = metadata.authScheme ?? \"Bearer\";");
+	lines.push("        headers[\"Authorization\"] = scheme === \"Bearer\" ? `Bearer ${token}` : token;");
+	lines.push("      } else {");
+	lines.push("        console.warn(`Procedure \"${String(name)}\" requires authentication but no auth token was provided.`);");
+	lines.push("      }");
+	lines.push("    }");
+	lines.push("");
 	lines.push("    const response = await resolved.fetch(`${resolved.baseUrl}/rpc/${String(name)}`, {");
 	lines.push("      method: \"POST\",");
-	lines.push("      headers: resolved.headers,");
+	lines.push("      headers,");
 	lines.push("      body: JSON.stringify(input),");
 	lines.push("    });");
 	lines.push("    if (!response.ok) {");
