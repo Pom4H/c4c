@@ -1,6 +1,6 @@
 # Integrations Example
 
-This package demonstrates how to turn OpenAPI-generated clients into tsdev contracts and procedures.
+This package demonstrates how to turn OpenAPI-generated clients into c4c contracts and procedures.
 
 ## Generating Contracts & Procedures
 
@@ -12,7 +12,7 @@ pnpm --filter integrations generate
 
 Each generated file:
 - creates `Contract` objects backed by the auto-generated Zod schemas,
-- wraps the SDK call in a tsdev `Procedure`,
+- wraps the SDK call in a c4c `Procedure`,
 - applies the `withOAuth` policy so tokens are injected automatically.
 
 ## Supplying OAuth Tokens
@@ -39,4 +39,4 @@ By default the server listens on `http://localhost:3100`. Override `PORT` or set
 Workflows are defined as TypeScript modules inside `examples/integrations/workflows/`. Each file exports one or more `WorkflowDefinition` objects, and the optional `index.ts` aggregates them for convenience:
 
 - `*.ts` workflow files can cite generated Zod schemas with `satisfies Partial<z.infer<...>>` to guarantee contract compatibility at compile time.
-- `pnpm --filter integrations dev` (or `tsdev serve --root examples/integrations`) will load these modules directly via the tsx loader—no JSON serialization step required.
+- `pnpm --filter integrations dev` (or `c4c serve --root examples/integrations`) will load these modules directly via the tsx loader—no JSON serialization step required.

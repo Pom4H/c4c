@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Contract } from "@tsdev/core";
+import type { Contract } from "@c4c/core";
 
 /**
  * User creation contract

@@ -1,7 +1,7 @@
 {
-  "name": "@tsdev/adapters",
+  "name": "@c4c/adapters",
   "version": "0.1.0",
-  "description": "Transport adapters (HTTP, CLI, REST) for tsdev",
+  "description": "Transport adapters (HTTP, CLI, REST) for c4c",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -25,9 +25,9 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@tsdev/core": "workspace:*",
-    "@tsdev/workflow": "workspace:*",
-    "@tsdev/generators": "workspace:*",
+    "@c4c/core": "workspace:*",
+    "@c4c/workflow": "workspace:*",
+    "@c4c/generators": "workspace:*",
     "@hono/node-server": "^1.19.5",
     "@hono/zod-validator": "^0.7.4",
     "hono": "^4.9.12"

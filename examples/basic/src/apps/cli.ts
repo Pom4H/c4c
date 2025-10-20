@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { collectRegistry } from "@tsdev/core";
-import { runCli } from "@tsdev/adapters";
+import { collectRegistry } from "@c4c/core";
+import { runCli } from "@c4c/adapters";
 
 async function main() {
   const registry = await collectRegistry("./src/handlers");

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { createExecutionContext, executeProcedure, isProcedureVisible, type Registry } from "@tsdev/core";
+import { createExecutionContext, executeProcedure, isProcedureVisible, type Registry } from "@c4c/core";
 
 interface Parameter {
 	name: string;

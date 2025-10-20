@@ -1,4 +1,4 @@
-import type { Procedure } from "@tsdev/core";
+import type { Procedure } from "@c4c/core";
 import { addContract, multiplyContract, subtractContract } from "../contracts/math.js";
 
 /**

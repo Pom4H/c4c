@@ -1,4 +1,4 @@
-import type { Procedure } from "@tsdev/core";
+import type { Procedure } from "@c4c/core";
 import { createUserContract, getUserContract } from "../contracts/users.js";
 
 // In-memory storage for demo

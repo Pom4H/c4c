@@ -1,5 +1,5 @@
 /**
- * @tsdev/adapters - Transport adapters
+ * @c4c/adapters - Transport adapters
  * 
  * HTTP, REST, CLI adapters for tsdev procedures
  */

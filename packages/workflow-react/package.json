@@ -1,7 +1,7 @@
 {
-  "name": "@tsdev/workflow-react",
+  "name": "@c4c/workflow-react",
   "version": "0.1.0",
-  "description": "React hooks for tsdev workflow system",
+  "description": "React hooks for c4c workflow system",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -17,7 +17,7 @@
     "lint:fix": "biome check --write ."
   },
   "keywords": [
-    "tsdev",
+    "c4c",
     "workflow",
     "react",
     "hooks"
@@ -26,7 +26,7 @@
   "license": "MIT",
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
-    "@tsdev/workflow": "workspace:*"
+    "@c4c/workflow": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",
@@ -34,6 +34,6 @@
     "typescript": "^5.9.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "@tsdev/workflow": "workspace:*"
+    "@c4c/workflow": "workspace:*"
   }
 }

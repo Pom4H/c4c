@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Procedure, Registry } from "@tsdev/core";
+import type { Procedure, Registry } from "@c4c/core";
 import { executeWorkflow } from "./runtime.js";
 import type { WorkflowDefinition } from "./types.js";
 import type { SubWorkflowConfig } from "./types.js";

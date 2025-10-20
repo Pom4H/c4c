@@ -1,12 +1,12 @@
 {
-  "name": "@tsdev/cli",
+  "name": "@c4c/cli",
   "version": "0.1.0",
-  "description": "Command line tools for tsdev",
+  "description": "Command line tools for c4c (Code For Coders)",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "tsdev": "./dist/bin.js"
+    "c4c": "./dist/bin.js"
   },
   "scripts": {
     "build": "tsc",
@@ -14,16 +14,16 @@
     "lint:fix": "biome check --write ."
   },
   "keywords": [
-    "tsdev",
+    "c4c",
     "cli",
     "workflow"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@tsdev/adapters": "workspace:*",
-    "@tsdev/core": "workspace:*",
-    "@tsdev/generators": "workspace:*",
+    "@c4c/adapters": "workspace:*",
+    "@c4c/core": "workspace:*",
+    "@c4c/generators": "workspace:*",
     "commander": "^14.0.1"
   },
   "devDependencies": {

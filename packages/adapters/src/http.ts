@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import type { Registry } from "@tsdev/core";
-import { generateOpenAPIJSON } from "@tsdev/generators";
+import type { Registry } from "@c4c/core";
+import { generateOpenAPIJSON } from "@c4c/generators";
 import { createRestRouter, listRESTRoutes } from "./rest.js";
 import { createWorkflowRouter } from "./workflow-http.js";
 import { createRpcRouter } from "./rpc.js";

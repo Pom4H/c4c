@@ -1,5 +1,5 @@
-import { createExecutionContext, executeProcedure } from "@tsdev/core";
-import type { Registry } from "@tsdev/core";
+import { createExecutionContext, executeProcedure } from "@c4c/core";
+import type { Registry } from "@c4c/core";
 
 /**
  * CLI adapter for tsdev

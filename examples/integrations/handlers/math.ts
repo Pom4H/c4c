@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Procedure } from "@tsdev/core";
+import type { Procedure } from "@c4c/core";
 
 const mathInput = z.object({
 	a: z.number(),

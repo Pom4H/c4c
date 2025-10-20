@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { createExecutionContext, executeProcedure, isProcedureVisible, type Registry } from "@tsdev/core";
+import { createExecutionContext, executeProcedure, isProcedureVisible, type Registry } from "@c4c/core";
 
 export function createRpcRouter(registry: Registry) {
 	const router = new Hono();

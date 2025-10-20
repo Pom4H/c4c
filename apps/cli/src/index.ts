@@ -1,8 +1,8 @@
 import { promises as fs } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { collectRegistry } from "@tsdev/core";
-import { createHttpServer, type HttpAppOptions } from "@tsdev/adapters";
-import { generateRpcClientModule, type RpcClientGeneratorOptions } from "@tsdev/generators";
+import { collectRegistry } from "@c4c/core";
+import { createHttpServer, type HttpAppOptions } from "@c4c/adapters";
+import { generateRpcClientModule, type RpcClientGeneratorOptions } from "@c4c/generators";
 
 export type ServeMode = "all" | "rest" | "workflow" | "rpc";
 
@@ -11,7 +11,7 @@ export interface ServeOptions extends HttpAppOptions {
 	apiBaseUrl?: string;
 }
 
-const DEFAULT_WORKFLOWS_PATH = process.env.TSDEV_WORKFLOWS_DIR ?? "workflows";
+const DEFAULT_WORKFLOWS_PATH = process.env.C4C_WORKFLOWS_DIR ?? "workflows";
 
 const DEFAULTS: Record<ServeMode, Required<Omit<HttpAppOptions, "port">>> = {
 	all: {
@@ -45,7 +45,7 @@ const DEFAULTS: Record<ServeMode, Required<Omit<HttpAppOptions, "port">>> = {
 };
 
 export async function serve(mode: ServeMode, options: ServeOptions = {}) {
-	const handlersPath = options.handlersPath ?? process.env.TSDEV_HANDLERS ?? "src/handlers";
+	const handlersPath = options.handlersPath ?? process.env.C4C_HANDLERS ?? "src/handlers";
 	const registry = await collectRegistry(handlersPath);
 
 	const defaults = DEFAULTS[mode] ?? DEFAULTS.all;
@@ -67,7 +67,7 @@ export interface GenerateClientOptions extends RpcClientGeneratorOptions {
 }
 
 export async function generateClient(options: GenerateClientOptions): Promise<string> {
-	const handlersPath = options.handlersPath ?? process.env.TSDEV_HANDLERS ?? "src/handlers";
+	const handlersPath = options.handlersPath ?? process.env.C4C_HANDLERS ?? "src/handlers";
 	const registry = await collectRegistry(handlersPath);
 	const moduleSource = generateRpcClientModule(registry, { baseUrl: options.baseUrl });
 	const outFile = resolve(process.cwd(), options.outFile);

@@ -7,7 +7,7 @@
 
 import { trace, type Span, SpanStatusCode } from "@opentelemetry/api";
 import { inspect } from "node:util";
-import { executeProcedure, createExecutionContext, type Registry } from "@tsdev/core";
+import { executeProcedure, createExecutionContext, type Registry } from "@c4c/core";
 import type {
 	WorkflowDefinition,
 	WorkflowContext,

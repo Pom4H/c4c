@@ -2,15 +2,15 @@
   "name": "basic-example",
   "version": "0.1.0",
   "private": true,
-  "description": "Basic usage example of tsdev framework",
+  "description": "Basic usage example of c4c framework",
   "type": "module",
   "scripts": {
     "dev": "tsx src/apps/http.ts",
     "cli": "tsx src/apps/cli.ts"
   },
   "dependencies": {
-    "@tsdev/core": "workspace:*",
-    "@tsdev/adapters": "workspace:*",
+    "@c4c/core": "workspace:*",
+    "@c4c/adapters": "workspace:*",
     "zod": "^4.1.12"
   },
   "devDependencies": {

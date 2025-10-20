@@ -1,5 +1,5 @@
-import { workflow, step } from "@tsdev/workflow";
-import type { StepContext } from "@tsdev/workflow";
+import { workflow, step } from "@c4c/workflow";
+import type { StepContext } from "@c4c/workflow";
 import { z } from "zod";
 
 type AnyStepContext = StepContext<unknown>;

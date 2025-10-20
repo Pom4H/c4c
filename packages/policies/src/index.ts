@@ -1,5 +1,5 @@
 /**
- * @tsdev/policies - Composable policies
+ * @c4c/policies - Composable policies
  * 
  * Retry, logging, tracing, rate limiting policies
  */
