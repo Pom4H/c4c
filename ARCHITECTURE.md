@@ -1409,6 +1409,330 @@ export function generateOpenAPISpec(registry: Registry): OpenAPISpec {
 
 ---
 
+## Authentication & Authorization
+
+### Auth Policy
+
+**Location:** `packages/policies/src/withAuth.ts`
+
+**Purpose:** Validates authentication and authorization data from execution context.
+
+```typescript
+export function withAuth(options: AuthPolicyOptions = {}): Policy {
+  const {
+    metadataKey = "auth",
+    requiredFields = [],
+    requiredRoles = [],
+    requiredPermissions = [],
+    authorize,
+    allowAnonymous = false,
+  } = options;
+
+  return (handler) => {
+    return async (input, context) => {
+      // Extract auth data from context.metadata.auth
+      const authData = getAuthData(context, metadataKey);
+
+      // Validate presence
+      if (!authData && !allowAnonymous) {
+        throw new Error("Unauthorized: Authentication required");
+      }
+
+      if (authData) {
+        // Validate required fields
+        for (const field of requiredFields) {
+          if (!(field in authData)) {
+            throw new Error(`Missing required auth field "${field}"`);
+          }
+        }
+
+        // Validate roles
+        if (requiredRoles.length > 0) {
+          const hasRequiredRole = requiredRoles.some(role => 
+            authData.roles?.includes(role)
+          );
+          if (!hasRequiredRole) {
+            throw new Error(`User must have one of roles: ${requiredRoles.join(", ")}`);
+          }
+        }
+
+        // Validate permissions
+        if (requiredPermissions.length > 0) {
+          const missingPerms = requiredPermissions.filter(
+            perm => !authData.permissions?.includes(perm)
+          );
+          if (missingPerms.length > 0) {
+            throw new Error(`Missing permissions: ${missingPerms.join(", ")}`);
+          }
+        }
+
+        // Check token expiration
+        if (authData.expiresAt) {
+          const expiresAt = new Date(authData.expiresAt);
+          if (expiresAt < new Date()) {
+            throw new Error("Authentication token has expired");
+          }
+        }
+
+        // Custom authorization
+        if (authorize) {
+          const authorized = await authorize(authData, context);
+          if (!authorized) {
+            throw new Error("Custom authorization check failed");
+          }
+        }
+      }
+
+      return handler(input, context);
+    };
+  };
+}
+```
+
+**Usage patterns:**
+
+```typescript
+// Simple authentication
+export const getProfile = {
+  contract: profileContract,
+  handler: applyPolicies(
+    async (input, context) => { /* ... */ },
+    withAuthRequired()
+  )
+};
+
+// Role-based
+export const deleteUser = {
+  contract: deleteUserContract,
+  handler: applyPolicies(
+    async (input, context) => { /* ... */ },
+    withRole(["admin"])
+  )
+};
+
+// Permission-based
+export const exportData = {
+  contract: exportContract,
+  handler: applyPolicies(
+    async (input, context) => { /* ... */ },
+    withPermission(["export:users"])
+  )
+};
+
+// Custom authorization
+export const updateSettings = {
+  contract: settingsContract,
+  handler: applyPolicies(
+    async (input, context) => { /* ... */ },
+    withAuth({
+      authorize: async (authData, context) => {
+        // Custom logic
+        return authData.userId === context.metadata.targetUserId ||
+               authData.roles?.includes("admin");
+      }
+    })
+  )
+};
+```
+
+### Helper Functions
+
+**Simplified procedure creation:**
+
+```typescript
+// createAuthProcedure - combines contract metadata + auth policy
+export const deleteUser = createAuthProcedure({
+  contract: deleteUserContract,
+  handler: async (input, context) => { /* ... */ },
+  auth: {
+    requiredRoles: ["admin"],
+  },
+});
+// → Adds auth metadata to contract AND applies withRole policy
+
+// requireAuth - just adds metadata (for client generation)
+const contract = requireAuth(baseContract, {
+  requiredRoles: ["admin"],
+  authScheme: "Bearer",
+});
+```
+
+### HTTP Adapter Integration
+
+**Location:** `packages/adapters/src/rpc.ts`
+
+**Auth extraction from headers:**
+
+```typescript
+export function extractAuthFromHeaders(c: Context): Record<string, unknown> | null {
+  const authHeader = c.req.header("authorization");
+  
+  if (!authHeader) return null;
+
+  // Bearer token
+  if (authHeader.startsWith("Bearer ")) {
+    const token = authHeader.substring(7);
+    // In production: verify JWT, extract claims
+    return { token };
+  }
+
+  // Basic auth
+  if (authHeader.startsWith("Basic ")) {
+    const encoded = authHeader.substring(6);
+    const decoded = Buffer.from(encoded, "base64").toString("utf-8");
+    const [username, password] = decoded.split(":");
+    // In production: validate credentials, return user data
+    return { username };
+  }
+
+  // API Key
+  const apiKey = c.req.header("x-api-key");
+  if (apiKey) {
+    // In production: look up key in database
+    return { apiKey };
+  }
+
+  return null;
+}
+```
+
+**Integration in RPC endpoint:**
+
+```typescript
+router.post("/rpc/:procedureName", async (c) => {
+  const procedure = registry.get(procedureName);
+  const input = await c.req.json();
+  
+  // Extract auth data from HTTP headers
+  const authData = extractAuthFromHeaders(c);
+
+  const context = createExecutionContext({
+    transport: "http",
+    // Auth data available to withAuth policy
+    ...(authData && { auth: authData }),
+  });
+
+  try {
+    const result = await executeProcedure(procedure, input, context);
+    return c.json(result, 200);
+  } catch (error) {
+    const isUnauthorized = error.message.includes("Unauthorized");
+    const statusCode = isUnauthorized ? 401 : 400;
+    return c.json({ error: error.message }, statusCode);
+  }
+});
+```
+
+### Client Generation with Auth
+
+**Location:** `packages/generators/src/client.ts`
+
+**Auth metadata in contracts:**
+
+```typescript
+interface AuthRequirements {
+  requiresAuth?: boolean;
+  requiredRoles?: string[];
+  requiredPermissions?: string[];
+  authScheme?: string;
+}
+
+interface ContractMetadata {
+  exposure?: ProcedureExposure;
+  roles?: ProcedureRole[];
+  // Auth requirements for client generation
+  auth?: AuthRequirements;
+}
+```
+
+**Generated client includes:**
+
+```typescript
+export interface TsdevClientOptions {
+  baseUrl?: string;
+  fetch?: typeof fetch;
+  headers?: Record<string, string>;
+  
+  /** Static authentication token */
+  authToken?: string;
+  
+  /** Dynamic token retrieval */
+  getAuthToken?: () => string | undefined | Promise<string | undefined>;
+}
+
+const PROCEDURE_METADATA = {
+  "deleteUser": {
+    requiresAuth: true,
+    requiredRoles: ["admin"],
+    authScheme: "Bearer",
+  },
+  "getUserProfile": {
+    requiresAuth: true,
+    authScheme: "Bearer",
+  },
+  // ...
+} as const;
+
+export function createTsdevClient(options: TsdevClientOptions = {}) {
+  const invoke = async (name, input) => {
+    const metadata = PROCEDURE_METADATA[name] ?? { requiresAuth: false };
+    const headers = { ...resolved.headers };
+
+    // Automatically add Authorization header for protected procedures
+    if (metadata.requiresAuth) {
+      let token = resolved.authToken;
+      if (!token && resolved.getAuthToken) {
+        token = await resolved.getAuthToken();
+      }
+      if (token) {
+        const scheme = metadata.authScheme ?? "Bearer";
+        headers["Authorization"] = `${scheme} ${token}`;
+      } else {
+        console.warn(`Procedure "${name}" requires auth but no token provided`);
+      }
+    }
+
+    const response = await resolved.fetch(`${baseUrl}/rpc/${name}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(input),
+    });
+    
+    return await response.json();
+  };
+
+  return { invoke, procedures: { /* ... */ } };
+}
+```
+
+**Client usage:**
+
+```typescript
+// Static token
+const client = createTsdevClient({
+  baseUrl: "http://localhost:3000",
+  authToken: "jwt-token-here",
+});
+
+// Dynamic token (refreshes automatically)
+const client = createTsdevClient({
+  baseUrl: "http://localhost:3000",
+  getAuthToken: async () => {
+    const token = localStorage.getItem("token");
+    if (isExpired(token)) {
+      return await refreshToken();
+    }
+    return token;
+  },
+});
+
+// Protected procedure - auth header added automatically
+await client.procedures.deleteUser({ userId: "123" });
+
+// Public procedure - no auth header
+await client.procedures.add({ a: 1, b: 2 });
+```
+
 ## Policy Implementation
 
 ### withRetry
@@ -1575,6 +1899,15 @@ packages:
   ├── @c4c/core
   └── zod-to-json-schema
 ```
+
+### Package Documentation
+
+- **[@c4c/core](./packages/core)** - Contract-based procedures and execution
+- **[@c4c/policies](./packages/policies/README.md)** - Composable policies including auth
+- **[@c4c/generators](./packages/generators/README.md)** - OpenAPI and TypeScript client generation
+- **[@c4c/adapters](./packages/adapters)** - HTTP, REST, and CLI adapters
+- **[@c4c/workflow](./packages/workflow)** - Workflow runtime with OpenTelemetry
+- **[Auth Examples](./examples/basic/AUTH_EXAMPLES.md)** - Complete authentication examples
 
 ### Build Order
 

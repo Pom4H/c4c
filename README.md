@@ -206,9 +206,11 @@ c4c serve workflow --root ./examples/integrations --port 4000
 # Launch the workflow visualizer UI (defaults to ./workflows under the root)
 c4c serve ui --root . --port 3100 --api-base http://localhost:3000
 
-# Generate a typed RPC client based on discovered procedures
-c4c generate client --root ./examples/integrations --out ./src/generated/c4c-client.ts
+# Generate a typed RPC client with auth support
+c4c generate client --root ./examples/integrations --out ./src/generated/client.ts
 
+# Generate OpenAPI specification
+c4c generate openapi --root ./src/handlers --out ./openapi.json
 ```
 
 **Create procedures:**
@@ -596,10 +598,69 @@ workflows/order-processing.ts
 @c4c/core             # Contracts, registry, execution
 @c4c/workflow         # Workflow runtime + OpenTelemetry
 @c4c/adapters         # HTTP, CLI, REST adapters
-@c4c/policies         # Composable policies (retry, logging, etc.)
-@c4c/generators       # OpenAPI generation
+@c4c/policies         # Composable policies (retry, logging, auth, etc.)
+@c4c/generators       # OpenAPI + TypeScript client generation
 @c4c/workflow-react   # React hooks for workflows
 ```
+
+## Authentication & Authorization
+
+**Protect procedures and auto-generate auth-aware clients:**
+
+```typescript
+import { createAuthProcedure } from "@c4c/policies";
+
+// Define protected procedure
+export const deleteUser = createAuthProcedure({
+  contract: {
+    name: "deleteUser",
+    description: "Delete user - requires admin role",
+    input: z.object({ userId: z.string() }),
+    output: z.object({ success: z.boolean() }),
+    metadata: {
+      exposure: "external",
+      roles: ["api-endpoint", "sdk-client"],
+    },
+  },
+  handler: async (input) => {
+    // Only admins can execute this
+    return { success: true };
+  },
+  auth: {
+    requiredRoles: ["admin"],
+  },
+});
+
+// Generate TypeScript client
+const clientCode = generateRpcClientModule(registry);
+// → Client automatically includes auth headers for protected procedures
+```
+
+**Use the generated client:**
+
+```typescript
+import { createTsdevClient } from "./generated/client";
+
+const client = createTsdevClient({
+  baseUrl: "http://localhost:3000",
+  authToken: "your-jwt-token", // Auto-added to protected procedures
+});
+
+// Protected - Authorization: Bearer your-jwt-token added automatically
+await client.procedures.deleteUser({ userId: "123" });
+
+// Public - No auth header
+await client.procedures.add({ a: 1, b: 2 });
+```
+
+**Features:**
+- ✅ Role-based access control (RBAC)
+- ✅ Permission-based authorization
+- ✅ Custom authorization logic
+- ✅ Auto-detection in generated clients
+- ✅ Static or dynamic token support
+- ✅ Token expiration validation
+- ✅ HTTP header extraction (Bearer, Basic, API Key)
 
 ---
 
@@ -632,8 +693,18 @@ pnpm dev  # http://localhost:3000
 
 ## Documentation
 
-- [PHILOSOPHY.md](./PHILOSOPHY.md) - Why AI agents need this
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - Technical implementation
+### Core Documentation
+- **[PHILOSOPHY.md](./PHILOSOPHY.md)** - Why AI agents need this
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Technical implementation details
+
+### Package Documentation
+- **[@c4c/policies](./packages/policies/README.md)** - Composable policies (retry, logging, auth)
+- **[@c4c/generators](./packages/generators/README.md)** - OpenAPI & TypeScript client generation
+
+### Examples & Guides
+- **[Auth Examples](./examples/basic/AUTH_EXAMPLES.md)** - Complete authentication & authorization guide
+- **[Basic Example](./examples/basic)** - HTTP server with procedures
+- **[Integrations Example](./examples/integrations)** - Google Drive & Avito integrations
 
 ---
 

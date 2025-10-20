@@ -15,6 +15,7 @@ export type {
 	ContractMetadata,
 	ProcedureExposure,
 	ProcedureRole,
+	AuthRequirements,
 } from "./types.js";
 
 export {
