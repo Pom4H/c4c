@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { createExecutionContext, executeProcedure, isProcedureVisible, type Registry } from "@c4c/core";
+import { extractAuthFromHeaders } from "./rpc.js";
 
 interface Parameter {
 	name: string;
@@ -47,11 +48,16 @@ export function createRestRouter(registry: Registry) {
 			try {
 				const input = await buildRestInput(c, mapping);
 
+				// Extract auth data from headers
+				const authData = extractAuthFromHeaders(c);
+
 				const context = createExecutionContext({
 					transport: "rest",
 					method: c.req.method,
 					url: c.req.path,
 					userAgent: c.req.header("user-agent"),
+					// Add auth data to context metadata if present
+					...(authData && { auth: authData }),
 				});
 
 				const result = await executeProcedure(procedure, input, context);
@@ -59,7 +65,9 @@ export function createRestRouter(registry: Registry) {
 				return c.json(result, statusCode);
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				const statusCode = message.includes("not found") ? 404 : 400;
+				// Check for auth errors
+				const isUnauthorized = message.includes("Unauthorized") || message.includes("Forbidden");
+				const statusCode = isUnauthorized ? 401 : message.includes("not found") ? 404 : 400;
 				return c.json({ error: message }, statusCode);
 			}
 		});
