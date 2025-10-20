@@ -1,5 +1,5 @@
 /**
- * @tsdev/generators - Code generators
+ * @c4c/generators - Code generators
  * 
  * Generate OpenAPI specs, SDKs, and more from contracts
  */

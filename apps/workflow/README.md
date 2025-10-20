@@ -6,7 +6,7 @@ Live visual workflow execution with full distributed tracing.
 
 ## What This Demonstrates
 
-This example shows how tsdev workflows automatically provide:
+This example shows how c4c workflows automatically provide:
 
 1. **Visual workflow composition** - Drag-and-drop style node graphs
 2. **Real-time execution tracing** - OpenTelemetry spans for every node
@@ -279,7 +279,7 @@ const mockProcedures = {
 
 ```typescript
 // Real (integration)
-import { collectRegistry } from '@tsdev/core';
+import { collectRegistry } from '@c4c/core';
 
 const registry = await collectRegistry("./handlers");
 const result = await executeWorkflow(workflow, registry);

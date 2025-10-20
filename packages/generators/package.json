@@ -1,7 +1,7 @@
 {
-  "name": "@tsdev/generators",
+  "name": "@c4c/generators",
   "version": "0.1.0",
-  "description": "Code generators (OpenAPI, SDK) for tsdev",
+  "description": "Code generators (OpenAPI, SDK) for c4c",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -24,8 +24,8 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@tsdev/core": "workspace:*",
-    "@tsdev/workflow": "workspace:*",
+    "@c4c/core": "workspace:*",
+    "@c4c/workflow": "workspace:*",
     "zod": "^4.1.12",
     "zod-openapi": "^5.4.3"
   },

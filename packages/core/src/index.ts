@@ -1,5 +1,5 @@
 /**
- * @tsdev/core - Core framework
+ * @c4c/core - Core framework
  * 
  * Contracts-first, transport-agnostic application framework
  */

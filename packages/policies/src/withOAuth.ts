@@ -1,4 +1,4 @@
-import type { ExecutionContext, Handler, Policy } from "@tsdev/core";
+import type { ExecutionContext, Handler, Policy } from "@c4c/core";
 
 export interface OAuthPolicyOptions {
 	/**

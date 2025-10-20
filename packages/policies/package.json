@@ -1,7 +1,7 @@
 {
-  "name": "@tsdev/policies",
+  "name": "@c4c/policies",
   "version": "0.1.0",
-  "description": "Composable policies (retry, logging, tracing, rate limiting) for tsdev",
+  "description": "Composable policies (retry, logging, tracing, rate limiting) for c4c",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -27,7 +27,7 @@
   "license": "MIT",
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
-    "@tsdev/core": "workspace:*"
+    "@c4c/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",

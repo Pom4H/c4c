@@ -1,5 +1,5 @@
 /**
- * @tsdev/workflow-react - React hooks for workflow execution
+ * @c4c/workflow-react - React hooks for workflow execution
  */
 
 "use client";

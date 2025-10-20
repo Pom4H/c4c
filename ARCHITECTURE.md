@@ -1,12 +1,12 @@
-# tsdev Architecture
+# c4c Architecture
 
-**Implementation details for AI agent integration and workflow management.**
+**Implementation details for workflow automation with full type safety.**
 
-This document explains the internals of tsdev with focus on:
-- Agent discovery mechanisms
+This document explains the internals of c4c with focus on:
+- Procedure discovery mechanisms
 - Workflow composition and validation
 - Git-based workflow versioning
-- OpenTelemetry feedback loop
+- OpenTelemetry distributed tracing
 
 ---
 
@@ -14,12 +14,12 @@ This document explains the internals of tsdev with focus on:
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                      AI Agent                            │
-│  • Introspects procedures (GET /procedures)              │
-│  • Composes workflows (JSON DSL)                         │
+│                    Developer / CI                        │
+│  • Discovers procedures (GET /procedures)                │
+│  • Writes workflows (TypeScript)                         │
 │  • Validates workflows (POST /workflow/validate)         │
 │  • Executes workflows (POST /workflow/execute)           │
-│  • Analyzes traces (OpenTelemetry spans)                 │
+│  • Debugs with traces (OpenTelemetry spans)              │
 │  • Commits workflows (git)                               │
 └────────────────┬─────────────────────────────────────────┘
                  │
@@ -27,7 +27,7 @@ This document explains the internals of tsdev with focus on:
 ┌──────────────────────────────────────────────────────────┐
 │                  Transport Layer                         │
 │  HTTP Server with introspection endpoints                │
-│  • GET /procedures       - Agent discovery               │
+│  • GET /procedures       - Procedure discovery           │
 │  • GET /openapi.json     - OpenAPI spec                  │
 │  • POST /rpc/:name       - Direct procedure calls        │
 │  • POST /workflow/*      - Workflow operations           │
@@ -38,12 +38,12 @@ This document explains the internals of tsdev with focus on:
                  ▼
 ┌──────────────────────────────────────────────────────────┐
 │                    Core Layer                            │
-│  @tsdev/core - Registry & Execution                      │
+│  @c4c/core - Registry & Execution                        │
 │  • Auto-discovery via collectRegistry()                  │
 │  • Contract validation (Zod)                             │
 │  • Procedure execution with policies                     │
 │                                                          │
-│  @tsdev/workflow - Workflow Runtime                      │
+│  @c4c/workflow - Workflow Runtime                        │
 │  • Workflow validation                                   │
 │  • Node execution (procedure, condition, parallel)       │
 │  • OpenTelemetry span creation                          │
@@ -63,8 +63,8 @@ This document explains the internals of tsdev with focus on:
                  │    Git Repo      │
                  │   workflows/     │
                  │   ├── *.ts       │
-                 │   Agent commits  │
-                 │   Human reviews  │
+                 │   Team commits   │
+                 │   PR reviews     │
                  └──────────────────┘
 ```
 
@@ -1550,29 +1550,29 @@ packages:
 ### Package Dependencies
 
 ```
-@tsdev/core (base)
+@c4c/core (base)
   ↓ depends on
   └── zod
 
-@tsdev/workflow
+@c4c/workflow
   ↓ depends on
-  ├── @tsdev/core
+  ├── @c4c/core
   └── @opentelemetry/api
 
-@tsdev/adapters
+@c4c/adapters
   ↓ depends on
-  ├── @tsdev/core
-  ├── @tsdev/workflow
-  └── @tsdev/generators
+  ├── @c4c/core
+  ├── @c4c/workflow
+  └── @c4c/generators
 
-@tsdev/policies
+@c4c/policies
   ↓ depends on
-  ├── @tsdev/core
+  ├── @c4c/core
   └── @opentelemetry/api
 
-@tsdev/generators
+@c4c/generators
   ↓ depends on
-  ├── @tsdev/core
+  ├── @c4c/core
   └── zod-to-json-schema
 ```
 
@@ -1649,7 +1649,7 @@ const handler = applyPolicies(baseHandler, ...policies);
 Create an adapter:
 
 ```typescript
-import { createExecutionContext, executeProcedure, type Registry } from '@tsdev/core';
+import { createExecutionContext, executeProcedure, type Registry } from '@c4c/core';
 
 export function createWebSocketServer(registry: Registry) {
   const wss = new WebSocketServer({ port: 8080 });
@@ -1728,7 +1728,7 @@ switch (node.type) {
 ### Unit Testing Handlers
 
 ```typescript
-import { createExecutionContext } from '@tsdev/core';
+import { createExecutionContext } from '@c4c/core';
 import { createUser } from './handlers/users';
 
 test('createUser creates a user', async () => {
@@ -1748,8 +1748,8 @@ test('createUser creates a user', async () => {
 ### Integration Testing Adapters
 
 ```typescript
-import { collectRegistry } from '@tsdev/core';
-import { createHttpServer } from '@tsdev/adapters';
+import { collectRegistry } from '@c4c/core';
+import { createHttpServer } from '@c4c/adapters';
 
 test('HTTP server executes procedures', async () => {
   const registry = await collectRegistry("./handlers");
@@ -1773,7 +1773,7 @@ test('HTTP server executes procedures', async () => {
 ### Testing Workflows
 
 ```typescript
-import { executeWorkflow } from '@tsdev/workflow';
+import { executeWorkflow } from '@c4c/workflow';
 
 test('workflow executes all nodes', async () => {
   const workflow = { /* ... */ };

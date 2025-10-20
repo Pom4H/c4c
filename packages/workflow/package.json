@@ -1,7 +1,7 @@
 {
-  "name": "@tsdev/workflow",
+  "name": "@c4c/workflow",
   "version": "0.1.0",
-  "description": "Workflow system with OpenTelemetry tracing for tsdev",
+  "description": "Workflow system with OpenTelemetry tracing for c4c",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -27,7 +27,7 @@
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/context-async-hooks": "^1.30.1",
     "@opentelemetry/sdk-trace-base": "^1.30.1",
-    "@tsdev/core": "workspace:*",
+    "@c4c/core": "workspace:*",
     "zod": "^4.1.12"
   },
   "devDependencies": {

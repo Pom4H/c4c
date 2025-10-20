@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createDocument } from "zod-openapi";
-import { isProcedureVisible, type Contract, type Registry } from "@tsdev/core";
+import { isProcedureVisible, type Contract, type Registry } from "@c4c/core";
 
 export interface OpenAPISpec {
 	openapi: string;

@@ -1,64 +1,49 @@
-# tsdev Philosophy
+# c4c Philosophy
 
-> **AI agents should build with procedures, not prompts.**  
-> Workflows are the compiled logic agents reuse instead of re-thinking.
+> **n8n but for coders.**  
+> Workflow automation with the developer experience you deserve.
 
 ---
 
 ## The Core Problem
 
-**AI agents are stateless problem-solvers.**
+**Visual workflow tools are great for non-technical users, but painful for developers.**
 
-Every interaction, they:
-1. Re-read available context
-2. Re-reason about the task
-3. Re-compose the solution
-4. Re-execute similar patterns
+When you use tools like n8n, Zapier, or Make.com:
+1. Click through UIs instead of writing code
+2. Limited version control (if any)
+3. Hard to test workflows systematically
+4. Difficult to reuse logic across workflows
+5. Vendor lock-in to proprietary platforms
 
-**This is wasteful.**
+**This is inefficient.**
 
-If an agent successfully completes "create user → send email → track analytics", why should it re-solve this next time?
+If you're already writing TypeScript, why should workflow automation force you into a visual UI?
 
-**What if agents could cache solutions as executable workflows?**
+**What if workflows were just TypeScript code?**
 
 ---
 
-## 1. Procedures as Agent Building Blocks
+## 1. Procedures as Workflow Nodes
 
-### Traditional Approach: Documentation
+### Visual Tools Approach: Click-Based Nodes
 
-Agents read human documentation:
-
-```markdown
-# Users API
-
-## Create User
-POST /api/users
-
-**Request:**
-{
-  "name": "string",
-  "email": "string"
-}
-
-**Response:**
-{
-  "id": "string",
-  "name": "string",
-  "email": "string"
-}
-```
+In n8n or Zapier, you:
+1. Click to add a node
+2. Configure via forms
+3. Map data between nodes manually
+4. Hope everything works at runtime
 
 **Problems:**
-- Documentation drifts from reality
-- Agents must parse unstructured text
-- No validation schema
-- No introspection
-- No compositional semantics
+- No type safety
+- Manual data mapping
+- Hard to refactor
+- No autocomplete
+- Locked in visual editor
 
-### tsdev Approach: Machine-Readable Contracts
+### c4c Approach: Type-Safe Procedures
 
-Agents introspect structured contracts:
+Write procedures as TypeScript code:
 
 ```typescript
 // GET /procedures
@@ -89,33 +74,34 @@ Agents introspect structured contracts:
 ```
 
 **Benefits:**
-- ✅ Always accurate (generated from code)
-- ✅ Structured (JSON schema)
-- ✅ Validated (runtime + compile-time)
-- ✅ Introspectable (agents discover automatically)
-- ✅ Composable (procedures → workflows)
+- ✅ Full type safety (TypeScript)
+- ✅ Autocomplete in your IDE
+- ✅ Validated at compile time + runtime
+- ✅ Refactorable with IDE tools
+- ✅ Composable into workflows
 
 ---
 
-## 2. Workflows as Cached Agent Logic
+## 2. Workflows as Code
 
 ### The Insight
 
-**Workflows are compiled agent reasoning.**
+**Workflows should be version-controlled TypeScript files, not JSON in a database.**
 
-When an agent successfully solves a task, that solution is valuable:
-- It works (proven by execution)
-- It's optimized (debugged through iterations)
-- It's reusable (same pattern recurs)
+When you build a workflow in code:
+- It's testable (unit tests, integration tests)
+- It's versionable (git history)
+- It's reviewable (PR workflow)
+- It's reusable (import like any module)
 
-**Why not save it?**
+**Your IDE becomes your workflow editor.**
 
-### Workflow as DSL
+### Workflow Builder API
 
-Agents compose procedures into workflows with the builder API:
+Compose procedures into workflows with full type safety:
 
 ```typescript
-import { workflow, step } from "@tsdev/workflow";
+import { workflow, step } from "@c4c/workflow";
 import { z } from "zod";
 
 const createAccount = step({
@@ -152,31 +138,44 @@ export const userOnboarding = workflow("user-onboarding")
 
 **This is executable TypeScript.**
 
-The agent can:
+You can:
 - Execute it: `POST /workflow/execute`
-- Save it: commit the `.ts` module to git
-- Reuse it: import the module next time
-- Improve it: edit the TypeScript and re-run validation
+- Version it: commit the `.ts` file to git
+- Test it: write unit tests for each step
+- Reuse it: import in other workflows
+- Refactor it: leverage IDE refactoring tools
 
-### Performance Impact
+### Developer Experience
 
-**Without workflow caching:**
+**Visual tools (n8n, Zapier):**
 ```
-Task: "Onboard user Alice"
-Agent reasoning: 30s
-API calls: 1.5min
-Total: 2min
+Click "Add Node" (10s)
+  ↓
+Fill form fields (30s)
+  ↓
+Map data manually (20s)
+  ↓
+Click "Execute" and pray (5s)
+  ↓
+Debug in UI (2min)
+
+Total: ~3 minutes per change
 ```
 
-**With workflow caching:**
+**c4c (Code For Coders):**
 ```
-Task: "Onboard user Alice"
-Load workflow: 0.1s
-Execute workflow: 5s
-Total: 5s
+Write TypeScript step (30s)
+  ↓
+Types guide you automatically
+  ↓
+Execute with full tracing (5s)
+  ↓
+Fix errors with stack traces
+
+Total: ~35 seconds per change
 ```
 
-**40x speedup** by reusing compiled logic.
+**5x faster development** with better quality.
 
 ---
 
@@ -190,35 +189,36 @@ Workflows are TypeScript modules:
 - **Testable** - Validate before merge
 - **Deployable** - CI/CD integration
 
-### Agent + Human Collaboration
+### Team Collaboration
 
 **Workflow lifecycle:**
 
 ```
-1. Agent discovers task pattern
+1. Developer writes workflow in TypeScript
    ↓
-2. Agent composes initial workflow
+2. Commits to feature branch
    ↓
-3. Agent commits to git (branch)
+3. Opens PR for review
    ↓
-4. Human reviews PR
+4. Team reviews code:
+   - Check error handling
+   - Verify performance
+   - Ensure best practices
    ↓
-5. Human suggests improvements:
-   - Add error handling
-   - Optimize parallel execution
-   - Add monitoring
+5. Developer addresses feedback
    ↓
-6. Agent or human updates workflow
+6. CI runs tests
    ↓
 7. Merge to main → workflow deployed
    ↓
-8. Agent uses improved workflow
+8. Team benefits from improved workflow
 ```
 
-**This is collaborative intelligence:**
-- Agents contribute automation
-- Humans contribute domain expertise
-- Both iterate on shared codebase
+**This is standard software development:**
+- Code review ensures quality
+- Version control tracks changes
+- CI/CD automates deployment
+- Everyone works on the same codebase
 
 ### Decomposition at Scale
 
@@ -252,15 +252,15 @@ workflows/
 
 ---
 
-## 4. OpenTelemetry as Agent Feedback
+## 4. OpenTelemetry as Developer Feedback
 
 ### Workflows Create Traces Automatically
 
-Every workflow execution produces:
+Every workflow execution produces distributed traces:
 - **Span hierarchy** - Shows execution flow
 - **Timing data** - Reveals bottlenecks
-- **Error details** - Explains failures
-- **Input/output** - Validates behavior
+- **Error details** - Explains failures with stack traces
+- **Input/output** - Validates data flow
 
 **Example trace:**
 
@@ -277,57 +277,43 @@ workflow.execute (2.5s)
     └── procedure.analytics.track (100ms)
 ```
 
-### Agents Learn from Traces
+### Developers Debug with Traces
 
-Agents can:
+You can:
 
-**1. Detect bottlenecks**
+**1. Find bottlenecks**
 ```typescript
-// Agent analyzes trace
+// Analyze trace to find slow steps
 const slowestNode = trace.spans
   .filter(s => s.name.includes('workflow.node'))
   .sort((a, b) => b.duration - a.duration)[0];
 
-if (slowestNode.duration > 1000) {
-  // Agent suggests: "send-email is slow, add async processing"
-  suggestWorkflowImprovement({
-    node: "send-email",
-    optimization: "make-async"
-  });
-}
+console.log(`Slowest node: ${slowestNode.name} (${slowestNode.duration}ms)`);
+// Output: "Slowest node: send-email (1200ms)"
+// Action: Optimize email sending or make it async
 ```
 
-**2. Detect failures**
+**2. Debug failures**
 ```typescript
-// Agent sees error pattern
+// See exactly where and why workflow failed
 const failedSpans = trace.spans.filter(s => s.status.code === 'ERROR');
 
-if (failedSpans.length > 0) {
-  // Agent suggests: "payment-charge fails, add retry policy"
-  suggestWorkflowImprovement({
-    node: "payment-charge",
-    fix: "add-retry",
-    policy: { maxAttempts: 3, backoff: "exponential" }
-  });
-}
+failedSpans.forEach(span => {
+  console.log(`Error in ${span.name}: ${span.attributes.error}`);
+  console.log(`Stack trace:`, span.attributes.stackTrace);
+});
+// Full context for debugging
 ```
 
-**3. Optimize execution**
+**3. Optimize parallel execution**
 ```typescript
-// Agent detects independent nodes
-const nodeA = workflow.nodes.find(n => n.id === 'send-email');
-const nodeB = workflow.nodes.find(n => n.id === 'track-analytics');
-
-if (!nodeB.dependsOn(nodeA)) {
-  // Agent suggests: "execute in parallel"
-  suggestWorkflowImprovement({
-    change: "parallelize",
-    nodes: ["send-email", "track-analytics"]
-  });
-}
+// Visualize which steps can run in parallel
+const timeline = visualizeSpanTimeline(trace.spans);
+// See exactly which operations overlap
+// Identify opportunities for parallelization
 ```
 
-**Agents evolve workflows based on production data.**
+**Better debugging than visual tools.**
 
 ---
 
@@ -335,22 +321,21 @@ if (!nodeB.dependsOn(nodeA)) {
 
 ### Zero Configuration
 
-Agents don't need configuration files or setup:
+Developers can start immediately:
 
 ```typescript
-// Agent starts exploring
+// Discover available procedures
 const response = await fetch('http://api/procedures');
 const { procedures } = await response.json();
 
-// Agent now knows everything available
+// See what's available to use in workflows
 procedures.forEach(proc => {
-  agent.knowledgeBase.add({
-    name: proc.name,
-    capability: proc.description,
-    interface: { input: proc.input, output: proc.output },
-    constraints: proc.metadata
-  });
+  console.log(`${proc.name}: ${proc.description}`);
+  console.log(`Input schema:`, proc.input);
+  console.log(`Output schema:`, proc.output);
 });
+
+// Now compose workflows using these procedures
 ```
 
 ### Naming Conventions as Semantics
@@ -370,17 +355,22 @@ payments.charge  → Charges payment
 payments.refund  → Refunds payment
 ```
 
-**Agents infer relationships:**
+**Developers understand semantics:**
 
 ```typescript
-// Agent reasoning:
-// - "users.create" creates a resource
-// - "emails.send" is an action
-// - After creating user, sending email makes sense
-// - Compose workflow: users.create → emails.send
+// Clear naming makes workflows self-documenting:
+// - "users.create" creates a user
+// - "emails.send" sends an email
+// - "analytics.track" tracks an event
+
+// Natural workflow composition:
+workflow("user-onboarding")
+  .step(createUser)
+  .step(sendEmail)
+  .step(trackAnalytics);
 ```
 
-**Convention eliminates documentation.**
+**Convention makes code readable.**
 
 ---
 
@@ -409,8 +399,8 @@ type Procedure = (input: Input, context: Context) => Promise<Output>
 Cross-cutting concerns compose via policies:
 
 ```typescript
-import { applyPolicies } from '@tsdev/core';
-import { withRetry, withLogging, withSpan, withRateLimit } from '@tsdev/policies';
+import { applyPolicies } from '@c4c/core';
+import { withRetry, withLogging, withSpan, withRateLimit } from '@c4c/policies';
 
 const handler = applyPolicies(
   baseHandler,
@@ -421,39 +411,42 @@ const handler = applyPolicies(
 );
 ```
 
-**Agents can suggest policies:**
+**Add policies as needed:**
 
 ```typescript
-// Agent analyzes failure trace
-if (error.type === 'NetworkError') {
-  suggestPolicy("withRetry", { maxAttempts: 3 });
-}
+// Add retry for network operations
+const resilientHandler = applyPolicies(
+  apiCallHandler,
+  withRetry({ maxAttempts: 3, backoff: "exponential" })
+);
 
-if (trace.duration > SLA_THRESHOLD) {
-  suggestPolicy("withCache", { ttl: 3600 });
-}
+// Add caching for expensive operations
+const cachedHandler = applyPolicies(
+  expensiveHandler,
+  withCache({ ttl: 3600 })
+);
 ```
 
 ---
 
 ## 7. Self-Describing Systems
 
-### The Agent's View
+### The Developer's View
 
-Traditional API:
+Traditional workflow tools:
 ```
-Agent: "What can I do?"
-System: "Read the docs at /docs"
-Agent: *parses HTML*
-Agent: *hopes docs are current*
+Developer: "What nodes are available?"
+UI: "Click through menus to find out"
+Developer: *clicks around*
+Developer: *reads tooltips*
 ```
 
-tsdev API:
+c4c API:
 ```
-Agent: "What can I do?"
-System: GET /procedures → [{ name, input, output, description }]
-Agent: *structured data*
-Agent: *guaranteed accurate*
+Developer: "What procedures are available?"
+API: GET /procedures → [{ name, input, output, description }]
+Developer: *structured data in terminal*
+Developer: *autocomplete in IDE*
 ```
 
 ### Introspection as First-Class Feature
@@ -469,44 +462,31 @@ GET /workflow/:id/definition // Workflow structure
 GET /workflow/:id/history    // Past executions
 ```
 
-**Agents build mental models:**
+**Build tools around c4c:**
 
 ```typescript
-class AgentKnowledge {
-  procedures: Map<string, ProcedureContract>;
-  workflows: Map<string, WorkflowDefinition>;
-  executionHistory: ExecutionTrace[];
-  
-  async learn() {
-    // Discover procedures
-    const procs = await fetch('/procedures').then(r => r.json());
-    procs.forEach(p => this.procedures.set(p.name, p));
-    
-    // Discover workflows
-    const workflows = await fetch('/workflow/list').then(r => r.json());
-    workflows.forEach(w => this.workflows.set(w.id, w));
-    
-    // Analyze past executions
-    const history = await fetch('/workflow/history').then(r => r.json());
-    this.executionHistory = history;
-  }
-  
-  findWorkflowForTask(task: string): WorkflowDefinition | null {
-    // Agent matches task to existing workflow
-    for (const [id, workflow] of this.workflows) {
-      if (this.matchesTask(workflow, task)) {
-        return workflow;
-      }
-    }
-    return null;
-  }
-  
-  composeNewWorkflow(task: string): WorkflowDefinition {
-    // Agent creates new workflow from procedures
-    const relevantProcs = this.findRelevantProcedures(task);
-    return this.combineIntoWorkflow(relevantProcs);
-  }
-}
+// Generate TypeScript client for procedures
+import { generateClient } from '@c4c/generators';
+
+const client = await generateClient({
+  apiUrl: 'http://localhost:3000',
+  outputPath: './src/generated/client.ts'
+});
+
+// Now use with full type safety
+import { client } from './generated/client';
+
+const user = await client.users.create({
+  name: "Alice",
+  email: "alice@example.com"
+});
+// Full autocomplete and type checking!
+
+// Generate OpenAPI spec
+import { generateOpenAPI } from '@c4c/generators';
+
+const spec = await generateOpenAPI(registry);
+// Use with Postman, Swagger UI, etc.
 ```
 
 ---
@@ -537,50 +517,56 @@ mutation { createUser(name: "Alice", email: "alice@example.com") { id } }
 UsersService.Create({ name: "Alice", email: "alice@example.com" })
 ```
 
-**Agent doesn't care about transport.**
+**Developer chooses the best transport.**
 
-Agent just knows:
+You just define:
 - Procedure name
 - Input schema
 - Output schema
 
-**Execute via any adapter.**
+**Execute via any adapter:**
+- HTTP for web APIs
+- CLI for command-line tools
+- Workflow for orchestration
+- gRPC for microservices (future)
+- GraphQL for flexible queries (future)
 
 ---
 
 ## Design Principles
 
-| Principle | Meaning | Agent Benefit |
-|-----------|---------|---------------|
-| **Contracts-first** | Procedures defined by schema | Introspectable interface |
-| **Workflow caching** | Save successful compositions | Reuse instead of re-think |
-| **Git versioning** | Workflows as code | Evolve logic over time |
-| **OpenTelemetry** | Automatic tracing | Learn from production data |
-| **Convention-driven** | Names encode semantics | Infer relationships |
+| Principle | Meaning | Developer Benefit |
+|-----------|---------|------------------|
+| **Contracts-first** | Procedures defined by schema | Full type safety |
+| **Code over clicks** | Workflows as TypeScript | Use your IDE |
+| **Git versioning** | Workflows are files | Standard version control |
+| **OpenTelemetry** | Automatic tracing | Debug with full context |
+| **Convention-driven** | Names encode semantics | Self-documenting code |
 | **Composable** | Pure functions + policies | Safe to combine |
-| **Self-describing** | Built-in introspection | Zero configuration |
+| **Self-describing** | Built-in introspection | API discovery |
 | **Transport-agnostic** | Logic independent of API | Future-proof |
 
 ---
 
-## Agent Workflow Lifecycle
+## Developer Workflow Lifecycle
 
 ```
 ┌─────────────────────────────────────────────────┐
-│ 1. Agent explores available procedures         │
-│    GET /procedures                              │
+│ 1. Developer explores available procedures      │
+│    c4c procedures list                          │
+│    or GET /procedures                           │
 └─────────────┬───────────────────────────────────┘
               │
               ▼
 ┌─────────────────────────────────────────────────┐
-│ 2. Agent receives task                          │
+│ 2. Developer needs automation                   │
 │    "Onboard new user with premium features"     │
 └─────────────┬───────────────────────────────────┘
               │
               ▼
 ┌─────────────────────────────────────────────────┐
-│ 3. Agent checks: Do I have workflow for this?  │
-│    git ls workflows/user-*                      │
+│ 3. Check existing workflows                     │
+│    ls workflows/user-*.ts                       │
 └─────────────┬───────────────────────────────────┘
               │
          ┌────┴────┐
@@ -589,16 +575,16 @@ Agent just knows:
          │         │
          ▼         ▼
     ┌────────┐  ┌──────────────────────────┐
-    │ Reuse  │  │ 4. Compose new workflow  │
-    │ existing│  │    - Select procedures   │
-    │ workflow│  │    - Define order        │
+    │ Import │  │ 4. Write new workflow    │
+    │ existing│  │    - Create .ts file     │
+    │ workflow│  │    - Define steps        │
     └────┬───┘  │    - Add error handling  │
          │      └────────┬─────────────────┘
          │               │
          │               ▼
          │      ┌──────────────────────────┐
-         │      │ 5. Validate workflow     │
-         │      │    POST /workflow/validate│
+         │      │ 5. Test locally          │
+         │      │    npm test              │
          │      └────────┬─────────────────┘
          │               │
          └───────┬───────┘
@@ -606,29 +592,29 @@ Agent just knows:
                  ▼
         ┌──────────────────────────┐
         │ 6. Execute workflow      │
-        │    POST /workflow/execute │
+        │    c4c workflow execute  │
         └────────┬─────────────────┘
                  │
                  ▼
         ┌──────────────────────────┐
-        │ 7. Analyze trace         │
-        │    - Check for errors    │
-        │    - Measure performance │
-        │    - Suggest improvements│
+        │ 7. Review traces         │
+        │    - Check timing        │
+        │    - Debug errors        │
+        │    - Optimize            │
         └────────┬─────────────────┘
                  │
                  ▼
         ┌──────────────────────────┐
-        │ 8. Commit workflow       │
+        │ 8. Commit to git         │
         │    git add workflows/    │
-        │    git commit            │
+        │    git commit -m "..."   │
         │    git push              │
         └────────┬─────────────────┘
                  │
                  ▼
         ┌──────────────────────────┐
-        │ 9. Next task uses        │
-        │    cached workflow       │
+        │ 9. CI/CD deploys         │
+        │    Team uses workflow    │
         └──────────────────────────┘
 ```
 
@@ -636,77 +622,84 @@ Agent just knows:
 
 ## Real-World Impact
 
-### Before tsdev
+### Before c4c (Using n8n/Zapier)
 
 ```
-Agent task: "Process customer order"
+Task: "Process customer order"
 
-Agent reasoning (30s):
-- Need to validate order
-- Check inventory
-- Process payment
-- Create shipment
-- Send confirmation
+Development time:
+- Click through UI to add nodes (5min)
+- Configure each node via forms (10min)
+- Map data between nodes (5min)
+- Test and debug in UI (10min)
 
-Agent execution (90s):
-- Call validation API
-- Call inventory API
-- Call payment API
-- Call shipping API
-- Call email API
+Total: 30 minutes to build
 
-Total: 2 minutes per order
+Changes:
+- Find workflow in UI (2min)
+- Click edit (1min)
+- Reconfigure nodes (5min)
+- Test again (5min)
+
+Total: 13 minutes per change
 ```
 
-### After tsdev
+### After c4c (Code-First)
 
 ```
-Agent task: "Process customer order"
+Task: "Process customer order"
 
-Agent checks: workflows/order-processing.ts exists
+Development time:
+- Write TypeScript workflow (5min)
+- Types guide you automatically
+- Test with full traces (2min)
 
-Agent execution (5s):
-- Load workflow
-- Execute with order data
-- Return result
+Total: 7 minutes to build
 
-Total: 5 seconds per order
+Changes:
+- Open workflow.ts in editor (5s)
+- Edit code with autocomplete (2min)
+- Run tests (30s)
+
+Total: 3 minutes per change
 ```
 
-**24x faster for repeated tasks.**
+**4x faster development, 4x faster iteration.**
 
-### Scaling to 100 Agents
+### Scaling to Teams
 
-**Without workflow caching:**
-- Each agent re-solves same tasks
-- 100 agents = 100x duplicated work
-- No knowledge transfer
+**Without code-first:**
+- Workflows locked in visual UI
+- Hard to collaborate
+- No code review
+- Difficult to test
 
-**With workflow caching:**
-- First agent solves task → commits workflow
-- Other 99 agents reuse workflow
-- Knowledge compounds across agents
+**With c4c:**
+- Workflows in git
+- Standard PR workflow
+- Code review best practices
+- CI/CD integration
 
-**This is how agent systems scale.**
+**This is how dev teams scale automation.**
 
 ---
 
 ## Conclusion
 
-tsdev is built on one insight:
+c4c is built on one insight:
 
-**Agents should compose with procedures, not prompts.**
+**Developers shouldn't be forced into visual UIs for workflow automation.**
 
-When agents can:
-- Discover procedures automatically
-- Compose workflows declaratively
-- Cache successful solutions in git
-- Learn from execution traces
-- Evolve workflows over time
+When you can:
+- Write workflows in TypeScript
+- Version them in git
+- Test them like regular code
+- Debug with full traces
+- Deploy via CI/CD
 
-**They become 10-100x more effective.**
+**You're 4-10x more productive.**
 
-The framework doesn't just serve agents—it turns them into software engineers who commit their work to version control.
+c4c doesn't replace n8n for non-technical users—it gives developers the code-first experience they deserve.
 
 ---
 

@@ -1,5 +1,5 @@
 /**
- * @tsdev/workflow - Workflow system with OpenTelemetry
+ * @c4c/workflow - Workflow system with OpenTelemetry
  * 
  * Compose procedures into visual workflows with automatic tracing
  */
@@ -42,4 +42,4 @@ export { workflow, step, parallel, condition, sequence } from "./builder.js";
 export type { StepContext, ConditionContext } from "./builder.js";
 
 // Re-export selected core types for app/example convenience
-export type { Registry, Procedure } from "@tsdev/core";
+export type { Registry, Procedure } from "@c4c/core";

@@ -1,4 +1,4 @@
-import type { Handler, Policy } from "@tsdev/core";
+import type { Handler, Policy } from "@c4c/core";
 
 /**
  * Logging policy for observability

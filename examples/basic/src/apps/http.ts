@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { collectRegistry } from "@tsdev/core";
-import { createHttpServer } from "@tsdev/adapters";
+import { collectRegistry } from "@c4c/core";
+import { createHttpServer } from "@c4c/adapters";
 
 const PORT = Number.parseInt(process.env.PORT || "3000", 10);
 

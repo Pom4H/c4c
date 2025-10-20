@@ -1,5 +1,5 @@
 {
-  "name": "@tsdev/app-workflow",
+  "name": "@c4c/app-workflow",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -14,8 +14,8 @@
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-tabs": "^1.1.13",
-    "@tsdev/workflow": "workspace:*",
-    "@tsdev/workflow-react": "workspace:*",
+    "@c4c/workflow": "workspace:*",
+    "@c4c/workflow-react": "workspace:*",
     "@xyflow/react": "^12.8.6",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

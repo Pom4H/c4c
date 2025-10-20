@@ -2,8 +2,8 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { collectRegistry } from "@tsdev/core";
-import { createHttpServer } from "@tsdev/adapters";
+import { collectRegistry } from "@c4c/core";
+import { createHttpServer } from "@c4c/adapters";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

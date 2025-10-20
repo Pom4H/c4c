@@ -1,34 +1,32 @@
-# tsdev
+# c4c - Code For Coders
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue.svg)](https://www.typescriptlang.org/)
 [![Zod](https://img.shields.io/badge/Zod-Schema-green.svg)](https://zod.dev/)
 [![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-Enabled-orange.svg)](https://opentelemetry.io/)
 
-> **The framework where AI agents build logic from procedures.**  
-> Introspect, compose, cache, version, and release workflows as code.
+> **n8n but for coders.**  
+> Build, version, and deploy workflows as TypeScript code. Full type safety, git versioning, and OpenTelemetry tracing out of the box.
 
-## Core Insight
+## Why c4c?
 
-**AI agents solve the same tasks repeatedly.**
+**Love n8n's visual workflows but prefer code?**
 
-Every time an agent needs to "create user → send email → update analytics", it:
-- Re-reads documentation
-- Re-thinks the logic
-- Re-makes the same calls
-- Re-handles the same errors
+c4c gives you the power of visual workflow automation tools like n8n, Zapier, and Make.com—but with the developer experience you deserve:
 
-**What if agents could cache solved problems as workflows?**
+- ✅ **TypeScript-first** - Full type safety, autocomplete, and refactoring
+- ✅ **Git versioning** - Version control your workflows like any other code
+- ✅ **Code review** - PR workflows for automation changes
+- ✅ **Test your workflows** - Unit test nodes, integration test flows
+- ✅ **OpenTelemetry** - Automatic distributed tracing for every execution
+- ✅ **No vendor lock-in** - Your workflows are just TypeScript files
+
+**Think of it as n8n meets your IDE.**
 
 ```typescript
-// AI discovers available procedures
-const procedures = await fetch('/procedures').then(r => r.json());
-// [
-//   { name: "users.create", input: {...}, output: {...} },
-//   { name: "emails.send", input: {...}, output: {...} },
-//   { name: "analytics.track", input: {...}, output: {...} }
-// ]
+import { workflow, step } from "@c4c/workflow";
+import { z } from "zod";
 
-// AI composes workflow (builder API)
+// Define workflow steps with full type safety
 const createUser = step({
   id: "create",
   input: z.object({ name: z.string(), email: z.string().email() }),
@@ -38,83 +36,73 @@ const createUser = step({
 
 const sendEmail = step({
   id: "email",
-  input: createUser.output,
+  input: createUser.output, // Type-safe data flow
   output: z.object({ delivered: z.boolean() }),
   execute: ({ engine }) => engine.run("emails.send"),
 });
 
+// Compose workflow
 export const userOnboarding = workflow("user-onboarding")
   .step(createUser)
   .step(sendEmail)
   .commit();
 
-// Save to git
-await git.commit("workflows/user-onboarding.ts", userOnboarding);
-
-// Reuse forever
+// Execute with full OpenTelemetry tracing
 const result = await executeWorkflow(userOnboarding, registry);
+
+// Commit to git like any other code
+// git add workflows/user-onboarding.ts
+// git commit -m "Add user onboarding workflow"
 ```
 
-**The agent never solves this problem again.**
+**Your workflow is now versioned, testable, and traceable.**
 
 ---
 
 ## What This Enables
 
-### 1. AI Agents as Workflow Composers
+### 1. Visual Workflow Power, Code-First Developer Experience
 
-Agents can:
-- **Discover** available procedures via introspection (`GET /procedures`)
-- **Compose** workflows from procedures (visual DSL)
-- **Execute** workflows with full tracing
-- **Cache** successful workflows for reuse
-- **Version** workflows in git
+**Like n8n, but with TypeScript:**
 
-**Example flow:**
+- **Define nodes as procedures** - Each procedure is a reusable workflow node
+- **Compose workflows in code** - Full IDE support with autocomplete
+- **Type-safe data flow** - Know what data flows between nodes at compile time
+- **Version in git** - Track changes, rollback, collaborate via PRs
+- **Test like regular code** - Unit tests, integration tests, CI/CD
 
-```
-AI Agent receives task: "Onboard new user Alice"
-  ↓
-Agent calls: GET /procedures
-  ↓
-Agent sees: users.create, emails.send, analytics.track
-  ↓
-Agent composes workflow (builder):
-```ts
-export const userOnboarding = workflow("user-onboarding")
-  .step(step({ id: "create", ... }))
-  .step(step({ id: "email", ... }))
-  .step(step({ id: "track", ... }))
+**Example: User Onboarding Workflow**
+
+```typescript
+// Each step is type-safe and composable
+const workflow = workflow("user-onboarding")
+  .step(createUser)      // Returns { id: string }
+  .step(sendEmail)       // Uses createUser.output
+  .step(trackAnalytics)  // All data flow is type-checked
   .commit();
-```
-  ↓
-Agent executes: POST /workflow/execute
-  ↓
-Workflow runs with full OpenTelemetry tracing
-  ↓
-Agent commits workflow to git: workflows/user-onboarding.ts
-  ↓
-Next time: Agent reuses workflow instead of re-thinking
+
+// Execute with automatic tracing
+const result = await executeWorkflow(workflow, registry);
 ```
 
 ### 2. Git-Based Workflow Management
 
-**Workflows are just TypeScript modules** → version control works perfectly:
+**Workflows are TypeScript files** → perfect for version control:
 
 ```bash
-git/
-├── workflows/
-│   ├── user-onboarding.ts        # AI-composed workflow
-│   ├── payment-processing.ts     # Human-decomposed workflow
-│   └── data-pipeline.ts          # Complex multi-step workflow
+workflows/
+├── user-onboarding.ts        # User registration flow
+├── payment-processing.ts     # Payment handling
+└── data-pipeline.ts          # ETL workflow
 ```
 
-**Benefits:**
-- **Decomposition** - Break complex workflows into smaller ones
-- **Code review** - PR for workflow changes
-- **Release** - Merge PR to deploy new workflow
-- **Rollback** - Git revert to previous version
-- **Collaboration** - Humans and AI edit same workflows
+**Better than visual tools:**
+- ✅ **Code review** - Review workflow changes in PRs
+- ✅ **Version history** - See who changed what and when
+- ✅ **Branching** - Test workflow changes in feature branches
+- ✅ **Rollback** - Revert to previous versions with `git revert`
+- ✅ **Collaboration** - Multiple devs working on same workflows
+- ✅ **CI/CD** - Test and deploy workflows automatically
 
 **Example PR workflow:**
 
@@ -136,13 +124,13 @@ git checkout main
 git merge feat/user-onboarding
 ```
 
-### 3. Procedures as Building Blocks
+### 3. Procedures as Reusable Nodes
 
-**Each procedure is discoverable:**
+**Each procedure is a workflow node:**
 
 ```typescript
-// Contract defines everything agent needs to know
-const contract = {
+// Define a procedure (like an n8n node)
+const createUserContract = {
   name: "users.create",
   description: "Creates a new user account",
   input: z.object({
@@ -159,9 +147,17 @@ const contract = {
     rateLimit: { maxTokens: 10, windowMs: 60000 }
   }
 };
+
+export const createUser: Procedure = {
+  contract: createUserContract,
+  handler: async (input) => {
+    const user = await db.users.create(input);
+    return user;
+  }
+};
 ```
 
-**Agent sees this via `/procedures`:**
+**Introspectable via API:**
 
 ```json
 {
@@ -183,11 +179,11 @@ const contract = {
 }
 ```
 
-**Agent can now:**
-- Understand what each procedure does
-- Know required inputs/outputs
-- See relationships via tags
+**Benefits:**
+- Discover available procedures programmatically
+- Understand inputs/outputs with full schemas
 - Compose procedures into workflows
+- Build integrations and automations with full type safety
 
 ---
 
@@ -202,16 +198,16 @@ pnpm dev:basic        # Start API server with procedures
 
 ```bash
 # Start all transports (RPC, REST, workflow) on port 3000
-tsdev serve
+c4c serve
 
 # Serve only the workflow HTTP surface from a specific project root
-tsdev serve workflow --root ./examples/integrations --port 4000
+c4c serve workflow --root ./examples/integrations --port 4000
 
 # Launch the workflow visualizer UI (defaults to ./workflows under the root)
-tsdev serve ui --root . --port 3100 --api-base http://localhost:3000
+c4c serve ui --root . --port 3100 --api-base http://localhost:3000
 
 # Generate a typed RPC client based on discovered procedures
-tsdev generate client --root ./examples/integrations --out ./src/generated/tsdev-client.ts
+c4c generate client --root ./examples/integrations --out ./src/generated/c4c-client.ts
 
 ```
 
@@ -258,115 +254,6 @@ POST /workflow/execute       # Execute workflow
 # Workflow management
 GET /workflow/list           # List workflows
 POST /workflow/validate      # Validate workflow definition
-```
-
----
-
-## AI Agent Integration
-
-### Agent Discovers Procedures
-
-```typescript
-// Agent explores API
-const { procedures } = await fetch('http://localhost:3000/procedures').then(r => r.json());
-
-// Agent sees structured information
-procedures.forEach(proc => {
-  console.log(`${proc.name}: ${proc.description}`);
-  console.log(`Input:`, proc.input);
-  console.log(`Output:`, proc.output);
-});
-```
-
-### Agent Composes Workflow
-
-```typescript
-// Agent reasons: "To onboard user, I need to create account, send email, track event"
-const workflow: WorkflowDefinition = {
-  id: "user-onboarding",
-  name: "User Onboarding Flow",
-  version: "1.0.0",
-  startNode: "create-user",
-  nodes: [
-    {
-      id: "create-user",
-      type: "procedure",
-      procedureName: "users.create",  // Found via introspection
-      config: {
-        // Agent can use variables
-        name: "{{ input.userName }}",
-        email: "{{ input.userEmail }}"
-      },
-      next: "send-welcome"
-    },
-    {
-      id: "send-welcome",
-      type: "procedure",
-      procedureName: "emails.sendWelcome",
-      config: {
-        userId: "{{ createUser.id }}"  // Use previous node output
-      },
-      next: "track-signup"
-    },
-    {
-      id: "track-signup",
-      type: "procedure",
-      procedureName: "analytics.track",
-      config: {
-        event: "user.signup",
-        userId: "{{ createUser.id }}"
-      }
-    }
-  ]
-};
-```
-
-### Agent Executes and Caches
-
-```typescript
-// Execute workflow
-const result = await fetch('http://localhost:3000/workflow/execute', {
-  method: 'POST',
-  body: JSON.stringify({
-    workflow,
-    input: { userName: "Alice", userEmail: "alice@example.com" }
-  })
-});
-
-// Result includes full trace
-const { executionId, status, outputs, spans } = await result.json();
-
-// Agent saves workflow to git
-await saveToGit('workflows/user-onboarding.ts', workflow);
-
-// Next time agent sees "onboard user" task:
-// 1. Loads workflow from git
-// 2. Executes with new input
-// 3. No re-composition needed
-```
-
-### Agent Improves Workflow
-
-```typescript
-// Agent detects failure pattern in traces
-// Adds retry logic to email step
-
-const improvedWorkflow = {
-  ...workflow,
-  nodes: workflow.nodes.map(node => {
-    if (node.id === "send-welcome") {
-      return {
-        ...node,
-        onError: "retry-email"  // Add error handling
-      };
-    }
-    return node;
-  })
-};
-
-// Commit improvement
-await git.commit("workflows/user-onboarding.ts", improvedWorkflow);
-await git.createPR("Improve user onboarding: add email retry");
 ```
 
 ---
@@ -488,52 +375,36 @@ jobs:
 
 ## Why This Matters
 
-### For AI Agents
+### For Developers
 
-**Before tsdev:**
-```
-Task: "Onboard new user"
-  ↓
-Agent thinks through logic (30s)
-  ↓
-Agent makes API calls
-  ↓
-Agent handles errors
-  ↓
-Agent completes task (2min total)
+**Visual workflow tools (n8n, Zapier, Make.com):**
+- ❌ Click-driven UI (slow, hard to scale)
+- ❌ No version control
+- ❌ Difficult to test
+- ❌ Limited code reuse
+- ❌ Vendor lock-in
 
-Next time: Repeat everything (2min again)
-```
+**c4c (Code For Coders):**
+- ✅ TypeScript workflows (fast, scalable)
+- ✅ Git version control
+- ✅ Test like regular code
+- ✅ Maximum code reuse
+- ✅ Open source, no lock-in
 
-**With tsdev:**
-```
-Task: "Onboard new user"
-  ↓
-Agent checks: "Do I have workflow for this?"
-  ↓
-Agent finds: workflows/user-onboarding.ts
-  ↓
-Agent executes workflow (5s)
-  ↓
-Task done
+### For Teams
 
-Speedup: 24x faster
-```
+**Before c4c:**
+- Workflows buried in visual tools
+- No code review process
+- Hard to track changes
+- Difficult to collaborate
 
-### For Development Teams
-
-**Before:**
-- AI agent outputs are ephemeral
-- No way to version agent logic
-- No code review for agent workflows
-- Can't rollback agent decisions
-
-**With tsdev:**
-- ✅ Workflows in git (version controlled)
-- ✅ PR review for workflow changes
-- ✅ CI/CD validation
-- ✅ Rollback via git revert
-- ✅ Collaboration: humans improve AI workflows
+**With c4c:**
+- ✅ Workflows in git repository
+- ✅ PR-based code review
+- ✅ Full change history
+- ✅ Easy collaboration via branches
+- ✅ CI/CD integration
 
 ### For Complex Systems
 
@@ -670,16 +541,16 @@ workflows/order-processing.ts
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                   AI Agent                          │
+│              Developer / AI Agent                    │
+│  - Writes workflows in TypeScript                   │
 │  - Discovers procedures via /procedures             │
-│  - Composes workflows (JSON)                        │
 │  - Executes workflows via /workflow/execute         │
-│  - Commits workflows to git                         │
+│  - Versions workflows in git                        │
 └────────────┬────────────────────────────────────────┘
              │
              ▼
 ┌─────────────────────────────────────────────────────┐
-│              tsdev HTTP Server                      │
+│              c4c HTTP Server                         │
 │  ┌──────────────────────────────────────────────┐  │
 │  │ Introspection Endpoints                      │  │
 │  │ GET /procedures    - List all procedures     │  │
@@ -722,11 +593,12 @@ workflows/order-processing.ts
 ## Packages
 
 ```
-@tsdev/core           # Contracts, registry, execution
-@tsdev/workflow       # Workflow runtime + OpenTelemetry
-@tsdev/adapters       # HTTP, CLI, REST adapters
-@tsdev/policies       # Composable policies (retry, logging, etc.)
-@tsdev/generators     # OpenAPI generation
+@c4c/core             # Contracts, registry, execution
+@c4c/workflow         # Workflow runtime + OpenTelemetry
+@c4c/adapters         # HTTP, CLI, REST adapters
+@c4c/policies         # Composable policies (retry, logging, etc.)
+@c4c/generators       # OpenAPI generation
+@c4c/workflow-react   # React hooks for workflows
 ```
 
 ---
@@ -771,4 +643,4 @@ MIT
 
 ---
 
-**Built for AI agents to compose, cache, and evolve workflows as code.**
+**n8n but for coders. Built by developers, for developers.**

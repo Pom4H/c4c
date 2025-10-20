@@ -9,8 +9,8 @@ import {
 	getProcedureExposure,
 	getProcedureRoles,
 	type Registry,
-} from "@tsdev/core";
-import { generateOpenAPISpec } from "@tsdev/generators";
+} from "@c4c/core";
+import { generateOpenAPISpec } from "@c4c/generators";
 import {
 	executeWorkflow,
 	validateWorkflow,
@@ -21,7 +21,7 @@ import {
 	type WorkflowDefinition,
 	type WorkflowResumeState,
 	type WorkflowSummary,
-} from "@tsdev/workflow";
+} from "@c4c/workflow";
 import { listRESTRoutes } from "./rest.js";
 
 interface WorkflowUIPayload {

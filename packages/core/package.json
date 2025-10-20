@@ -1,7 +1,7 @@
 {
-  "name": "@tsdev/core",
+  "name": "@c4c/core",
   "version": "0.1.0",
-  "description": "Core framework for contracts-first, transport-agnostic applications",
+  "description": "c4c (Code For Coders) - Core framework for workflow automation",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

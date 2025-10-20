@@ -6,9 +6,9 @@
     "dev": "tsx src/apps/http.ts"
   },
   "dependencies": {
-    "@tsdev/adapters": "workspace:*",
-    "@tsdev/core": "workspace:*",
-    "@tsdev/policies": "workspace:*",
+    "@c4c/adapters": "workspace:*",
+    "@c4c/core": "workspace:*",
+    "@c4c/policies": "workspace:*",
     "zod": "^4"
   },
   "devDependencies": {
