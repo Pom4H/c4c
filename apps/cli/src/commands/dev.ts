@@ -1,6 +1,6 @@
 import { resolve, relative } from "node:path";
 import { dev as runDev, type ServeOptions } from "../lib/server.js";
-import type { DevUserType, ServeMode } from "../lib/types.js";
+import type { ServeMode } from "../lib/types.js";
 import { determineHandlersPath, determineWorkflowsPath } from "../internal/utils/project-paths.js";
 import { stopDevServer } from "../lib/stop.js";
 import { readDevLogs } from "../lib/logs.js";
@@ -13,7 +13,6 @@ interface DevCommandOptions {
 	docs?: boolean;
 	disableDocs?: boolean;
 	quiet?: boolean;
-	agent?: boolean;
 }
 
 export async function devCommand(modeArg: string, options: DevCommandOptions): Promise<void> {
@@ -31,14 +30,12 @@ export async function devCommand(modeArg: string, options: DevCommandOptions): P
 
 	const enableDocs = options.docs ? true : options.disableDocs ? false : undefined;
 
-	const userType: DevUserType = options.agent ? "agent" : "human";
 	const serveOptions: ServeOptions = {
 		port: options.port,
 		handlersPath,
 		workflowsPath,
 		enableDocs,
 		projectRoot: rootDir,
-		userType,
 	};
 
 	await runDev(modeArg, serveOptions);

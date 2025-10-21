@@ -12,7 +12,7 @@ import {
 	removeDevSessionArtifacts,
 	writeDevSessionMetadata,
 } from "./session.js";
-import type { DevSessionMetadata, DevUserType, ServeMode } from "./types.js";
+import type { DevSessionMetadata, ServeMode } from "./types.js";
 import { watchHandlers } from "./watcher.js";
 import { createDevControlProcedures, type DevControlProcedureDescriptor } from "../internal/handlers/dev-control.js";
 
@@ -26,7 +26,6 @@ export interface ServeOptions {
 	enableWorkflow?: boolean;
 	apiBaseUrl?: string;
 	projectRoot?: string;
-	userType?: DevUserType;
 }
 
 export async function serve(mode: ServeMode, options: ServeOptions = {}) {
@@ -37,7 +36,6 @@ export async function serve(mode: ServeMode, options: ServeOptions = {}) {
 
 export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 	const { handlersPath, httpOptions, projectRoot } = resolveServeConfiguration(mode, options);
-	const userType: DevUserType = options.userType ?? "human";
 	const sessionPaths = getDevSessionPaths(projectRoot);
 	await ensureDevSessionAvailability(sessionPaths);
 
@@ -64,7 +62,6 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 		mode,
 		projectRoot,
 		handlersPath,
-		userType,
 		logFile: sessionPaths.logFile,
 		startedAt: new Date().toISOString(),
 		status: "running",
@@ -170,11 +167,7 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 
 	const handlersLabel = formatHandlersLabel(handlersPath);
 	console.log(`[c4c] Watching handlers in ${handlersLabel}`);
-	if (userType === "agent") {
-		console.log(`[c4c] pnpm "c4c dev stop" to stop the dev server`);
-	} else {
-		console.log(`[c4c] Press Ctrl+C to stop the dev server`);
-	}
+    console.log(`[c4c] Press Ctrl+C or run \"pnpm \"c4c dev stop\"\" to stop the dev server`);
 
 	const watchTask = watchHandlers(
 		handlersPath,

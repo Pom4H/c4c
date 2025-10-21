@@ -49,8 +49,7 @@ const devCommandDef = program
 	.option("--workflows <path>", "Custom workflows directory (overrides root)")
 	.option("--docs", "Force enable docs endpoints")
 	.option("--disable-docs", "Disable docs endpoints")
-	.option("--quiet", "Reduce startup logging")
-	.option("--agent", "Mark this CLI invocation as running on behalf of an agent")
+    .option("--quiet", "Reduce startup logging")
 	.action(async (modeArg: string, options) => {
 		try {
 			await devCommand(modeArg, options);
