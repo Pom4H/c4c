@@ -1,9 +1,10 @@
 import { promises as fs } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { resolve, join } from "node:path";
+import { resolve } from "node:path";
+import { watch } from "node:fs/promises";
 import { collectRegistry, collectRegistryDetailed, type Registry, type RegistryModuleIndex } from "@c4c/core";
 import { createHttpServer, type HttpAppOptions } from "@c4c/adapters";
-import { DEFAULTS, DEV_CONTROLS_LABEL } from "./constants.js";
+import { DEFAULTS } from "./constants.js";
 import { formatHandlersLabel, logProcedureChange } from "./formatting.js";
 import { createLogWriter, interceptConsole } from "./logging.js";
 import {
@@ -14,7 +15,7 @@ import {
 } from "./session.js";
 import type { DevSessionMetadata, ServeMode } from "./types.js";
 import { watchHandlers } from "./watcher.js";
-import { createDevControlProcedures, type DevControlProcedureDescriptor } from "../internal/handlers/dev-control.js";
+// Dev control RPCs removed; file-based control is used instead.
 
 export interface ServeOptions {
 	port?: number;
@@ -137,23 +138,11 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 		}
 	};
 
-	const controlProcedures: DevControlProcedureDescriptor[] = createDevControlProcedures({
-		requestStop: (reason) => {
-		if (reason) {
-			console.log(`[c4c] Stop requested: ${reason}`);
-		} else {
-			console.log("[c4c] Stop requested");
-		}
-		triggerShutdown("rpc");
-		},
-		logFile: sessionPaths.logFile,
-		sourcePath: join(handlersPath, DEV_CONTROLS_LABEL),
-	});
-
-	for (const control of controlProcedures) {
-		registry.set(control.name, control.procedure);
-		logProcedureChange("Registered", control.name, control.procedure, handlersPath, control.sourcePath);
-	}
+    // Start watching for stop-file trigger to initiate shutdown.
+    startStopFileWatcher(sessionPaths.directory, sessionPaths.stopFile, controller.signal, () => {
+        console.log("[c4c] Stop requested (stop file detected)");
+        triggerShutdown("stop-file");
+    });
 
 	server = createHttpServer(registry, port, httpOptions);
 
@@ -167,7 +156,7 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 
 	const handlersLabel = formatHandlersLabel(handlersPath);
 	console.log(`[c4c] Watching handlers in ${handlersLabel}`);
-    console.log(`[c4c] Press Ctrl+C or run \"pnpm \"c4c dev stop\"\" to stop the dev server`);
+    console.log(`[c4c] Press Ctrl+C or run: pnpm "c4c dev stop" to stop the dev server`);
 
 	const watchTask = watchHandlers(
 		handlersPath,
@@ -213,4 +202,49 @@ async function closeServer(server: unknown): Promise<void> {
 			resolvePromise();
 		});
 	});
+}
+
+function startStopFileWatcher(
+    sessionDir: string,
+    stopFilePath: string,
+    signal: AbortSignal,
+    onStopRequested: () => void
+): void {
+    // Immediate check in case the file already exists
+    import("node:fs").then(({ existsSync }) => {
+        try {
+            if (existsSync(stopFilePath)) {
+                onStopRequested();
+            }
+        } catch {
+            // ignore
+        }
+    });
+
+    (async () => {
+        try {
+            const watcher = watch(sessionDir, { signal });
+            for await (const event of watcher) {
+                if (!event || !event.filename) continue;
+                if (event.filename === "stop") {
+                    // Double-check existence to avoid false positives on rm
+                    const { access } = await import("node:fs/promises");
+                    try {
+                        await access(stopFilePath);
+                        onStopRequested();
+                        return;
+                    } catch {
+                        // no file yet
+                    }
+                }
+            }
+        } catch (error) {
+            // ignore AbortError; log others
+            if (!(error instanceof Error && error.name === "AbortError")) {
+                console.warn(
+                    `[c4c] Stop file watcher error: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+        }
+    })().catch(() => {});
 }

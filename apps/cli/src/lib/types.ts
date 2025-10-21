@@ -1,6 +1,7 @@
 export type ServeMode = "all" | "rest" | "workflow" | "rpc";
 
 export type DevSessionStatus = "running" | "stopping";
+export type DevOverallStatus = DevSessionStatus | "none";
 
 export interface DevSessionMetadata {
 	id: string;
@@ -19,6 +20,7 @@ export interface DevSessionPaths {
 	sessionFile: string;
 	logFile: string;
 	logStateFile: string;
+    stopFile: string;
 }
 
 export interface DevLogState {
@@ -29,6 +31,16 @@ export interface DevLogState {
 export interface DevLogReadResult {
 	lines: string[];
 	nextOffset: number;
+}
+
+export interface DevStatusReport {
+    status: DevOverallStatus;
+    pid?: number;
+    port?: number;
+    mode?: ServeMode;
+    projectRoot?: string;
+    handlersPath?: string;
+    startedAt?: string;
 }
 
 export interface DiscoveredSession {

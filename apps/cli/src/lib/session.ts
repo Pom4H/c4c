@@ -1,13 +1,14 @@
 import { promises as fs } from "node:fs";
 import { join, resolve } from "node:path";
 import {
-	DEV_DIR_NAME,
-	DEV_LOG_FILE_NAME,
-	DEV_LOG_STATE_FILE_NAME,
-	DEV_SESSION_FILE_NAME,
-	DEV_SESSION_SUBDIR,
-	SESSION_DISCOVERY_IGNORE_DIRS,
-	SESSION_DISCOVERY_MAX_DEPTH,
+    DEV_DIR_NAME,
+    DEV_LOG_FILE_NAME,
+    DEV_LOG_STATE_FILE_NAME,
+    DEV_SESSION_FILE_NAME,
+    DEV_SESSION_SUBDIR,
+    DEV_STOP_FILE_NAME,
+    SESSION_DISCOVERY_IGNORE_DIRS,
+    SESSION_DISCOVERY_MAX_DEPTH,
 } from "./constants.js";
 import { isProcessAlive } from "./process.js";
 import type { DevLogState, DevSessionMetadata, DevSessionPaths, DiscoveredSession } from "./types.js";
@@ -19,6 +20,7 @@ export function getDevSessionPaths(projectRoot: string): DevSessionPaths {
 		sessionFile: resolve(directory, DEV_SESSION_FILE_NAME),
 		logFile: resolve(directory, DEV_LOG_FILE_NAME),
 		logStateFile: resolve(directory, DEV_LOG_STATE_FILE_NAME),
+        stopFile: resolve(directory, DEV_STOP_FILE_NAME),
 	};
 }
 
@@ -42,6 +44,7 @@ export async function writeDevSessionMetadata(paths: DevSessionPaths, metadata: 
 export async function removeDevSessionArtifacts(paths: DevSessionPaths): Promise<void> {
 	await removeIfExists(paths.sessionFile);
 	await removeIfExists(paths.logStateFile);
+    await removeIfExists(paths.stopFile);
 }
 
 async function removeIfExists(path: string): Promise<void> {
@@ -56,53 +59,31 @@ async function removeIfExists(path: string): Promise<void> {
 }
 
 export async function ensureDevSessionAvailability(paths: DevSessionPaths): Promise<void> {
-	const existing = await readDevSessionMetadata(paths);
-	if (!existing) return;
+    const existing = await readDevSessionMetadata(paths);
+    if (!existing) return;
 
-	const { pid, status, startedAt } = existing;
-	const processAlive = Boolean(pid && isProcessAlive(pid));
-	let serverResponsive = false;
+    const { pid, status, startedAt } = existing;
+    const processAlive = Boolean(pid && isProcessAlive(pid));
 
-	if (processAlive) {
-		serverResponsive = await isDevServerResponsive(existing);
-	}
+    if (processAlive) {
+        // If a dev server process is alive, consider it running and prevent starting another.
+        throw new Error(
+            `A c4c dev server already appears to be running (pid ${pid}). Use "pnpm \"c4c dev stop\"" before starting a new session.`
+        );
+    }
 
-	if (processAlive && serverResponsive) {
-		throw new Error(
-			`A c4c dev server already appears to be running (pid ${pid}). Use "pnpm \"c4c dev stop\"" before starting a new session.`
-		);
-	}
+    // If the previous process died very recently during startup, ask to retry shortly.
+    if (status === "running") {
+        const startedMs = startedAt ? Date.parse(startedAt) : Number.NaN;
+        const recentlyStarted = Number.isFinite(startedMs) && Date.now() - startedMs < 10_000;
+        if (recentlyStarted) {
+            throw new Error(
+                `A c4c dev server is still starting up (pid ${pid}). Try again shortly or run "pnpm \"c4c dev stop\"".`
+            );
+        }
+    }
 
-	if (processAlive && status === "running") {
-		const startedMs = startedAt ? Date.parse(startedAt) : Number.NaN;
-		const recentlyStarted = Number.isFinite(startedMs) && Date.now() - startedMs < 10_000;
-		if (recentlyStarted) {
-			throw new Error(
-				`A c4c dev server is still starting up (pid ${pid}). Try again shortly or run "pnpm \"c4c dev stop\"".`
-			);
-		}
-	}
-
-	await removeDevSessionArtifacts(paths);
-}
-
-async function isDevServerResponsive(metadata: DevSessionMetadata): Promise<boolean> {
-	if (!metadata.port) {
-		return false;
-	}
-	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), 750);
-	try {
-		const response = await fetch(`http://127.0.0.1:${metadata.port}/health`, {
-			method: "GET",
-			signal: controller.signal,
-		});
-		return response.ok;
-	} catch {
-		return false;
-	} finally {
-		clearTimeout(timeout);
-	}
+    await removeDevSessionArtifacts(paths);
 }
 
 export async function discoverActiveSession(projectRoot: string): Promise<DiscoveredSession | null> {
