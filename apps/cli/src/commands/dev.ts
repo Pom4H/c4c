@@ -1,21 +1,20 @@
 import { resolve, relative } from "node:path";
 import { dev as runDev, type ServeOptions } from "../lib/server.js";
-import { determineHandlersPath, determineWorkflowsPath } from "../internal/utils/project-paths.js";
+import { determineHandlersPath, determineWorkflowsPath } from "../lib/project-paths.js";
 import { stopDevServer } from "../lib/stop.js";
 import { readDevLogs } from "../lib/logs.js";
 import { getDevStatus } from "../lib/status.js";
 
 interface DevCommandOptions {
-	port?: number;
-	root?: string;
-	handlers?: string;
-	workflows?: string;
-	docs?: boolean;
+    port?: number;
+    root?: string;
+    workflows?: string;
+    docs?: boolean;
 }
 
 export async function devCommand(options: DevCommandOptions): Promise<void> {
 	const rootDir = resolve(options.root ?? process.cwd());
-	const handlersPath = determineHandlersPath(rootDir, options.handlers);
+    const handlersPath = determineHandlersPath(rootDir);
 	const workflowsPath = determineWorkflowsPath(rootDir, options.workflows);
 
     const enableDocs = options.docs ? true : undefined;
@@ -59,30 +58,25 @@ export async function devLogsCommand(options: DevLogsOptions): Promise<void> {
 		console.log(`[c4c] No running dev server found (searched from ${rootLabel}).`);
 		return;
 	}
+    if (result.lines.length === 0) {
+        console.log("[c4c] No new log entries.");
+        return;
+    }
+    // If --json is specified, print raw JSONL lines as-is.
     if (options.json) {
-        const entries = result.lines.map(parseStructuredLogLine).filter(Boolean) as Array<{
-            timestamp: string;
-            level: string;
-            message: string;
-        }>;
-        console.log(
-            JSON.stringify(
-                {
-                    entries,
-                    nextOffset: result.nextOffset,
-                },
-                null,
-                2
-            )
-        );
-    } else {
-        if (result.lines.length === 0) {
-            console.log("[c4c] No new log entries.");
-            return;
-        }
         for (const line of result.lines) {
             console.log(line);
         }
+        return;
+    }
+    // Otherwise, pretty-print parsed entries.
+    for (const line of result.lines) {
+        const entry = parseJsonlLogLine(line);
+        if (!entry) {
+            console.log(line);
+            continue;
+        }
+        console.log(formatPrettyLogEntry(entry));
     }
 }
 
@@ -113,10 +107,96 @@ function parsePositiveInteger(value: unknown, label: string): number {
 	return parsed;
 }
 
-function parseStructuredLogLine(line: string): { timestamp: string; level: string; message: string } | null {
-    // Format: [ISO_TIMESTAMP] [LEVEL] message
-    const match = /^\[(?<ts>[^\]]+)\]\s+\[(?<lvl>[^\]]+)\]\s*(?<msg>[\s\S]*)$/.exec(line);
-    if (!match || !match.groups) return null;
-    const { ts, lvl, msg } = match.groups as { ts: string; lvl: string; msg: string };
-    return { timestamp: ts, level: lvl, message: msg };
+// No parsing helpers needed; dev logs are JSONL.
+interface DevLogEntry {
+    timestamp: string;
+    level: string;
+    message: string;
+}
+
+function parseJsonlLogLine(line: string): DevLogEntry | null {
+    try {
+        const parsed = JSON.parse(line) as Partial<DevLogEntry>;
+        if (!parsed || typeof parsed !== "object") return null;
+        if (typeof parsed.timestamp !== "string") return null;
+        if (typeof parsed.level !== "string") return null;
+        if (typeof parsed.message !== "string") return null;
+        return { timestamp: parsed.timestamp, level: parsed.level, message: parsed.message };
+    } catch {
+        return null;
+    }
+}
+
+function formatPrettyLogEntry(entry: DevLogEntry): string {
+    const ts = formatTime(entry.timestamp);
+    const level = normalizeLevel(entry.level);
+    const icon = levelIcon(level);
+    const coloredLevel = colorizeLevel(level);
+    return `${dim(`[${ts}]`)} ${icon} ${coloredLevel} ${entry.message}`.trim();
+}
+
+function formatTime(iso: string): string {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return iso;
+    const h = String(date.getHours()).padStart(2, "0");
+    const m = String(date.getMinutes()).padStart(2, "0");
+    const s = String(date.getSeconds()).padStart(2, "0");
+    return `${h}:${m}:${s}`;
+}
+
+function normalizeLevel(lvl: string): "info" | "warn" | "error" | "log" {
+    const v = String(lvl).toLowerCase();
+    if (v === "warn" || v === "warning") return "warn";
+    if (v === "error" || v === "err") return "error";
+    if (v === "info") return "info";
+    if (v === "log") return "log";
+    return "info";
+}
+
+function levelIcon(level: ReturnType<typeof normalizeLevel>): string {
+    switch (level) {
+        case "warn":
+            return "⚠";
+        case "error":
+            return "✖";
+        case "info":
+        case "log":
+        default:
+            return "ℹ";
+    }
+}
+
+// Minimal color utilities (mirrors style used elsewhere)
+const COLOR_RESET = "\u001B[0m";
+const COLOR_CYAN = "\u001B[36m";
+const COLOR_YELLOW = "\u001B[33m";
+const COLOR_RED = "\u001B[31m";
+const COLOR_DIM = "\u001B[90m";
+
+function colorEnabled(): boolean {
+    return Boolean(process.stdout?.isTTY && !process.env.NO_COLOR);
+}
+
+function dim(text: string): string {
+    if (!colorEnabled()) return text;
+    return `${COLOR_DIM}${text}${COLOR_RESET}`;
+}
+
+function colorize(text: string, colorCode: string): string {
+    if (!colorEnabled()) return text;
+    return `${colorCode}${text}${COLOR_RESET}`;
+}
+
+function colorizeLevel(level: ReturnType<typeof normalizeLevel>): string {
+    switch (level) {
+        case "warn":
+            return colorize("WARN", COLOR_YELLOW);
+        case "error":
+            return colorize("ERROR", COLOR_RED);
+        case "info":
+            return colorize("INFO", COLOR_CYAN);
+        case "log":
+        default:
+            return colorize("INFO", COLOR_CYAN);
+    }
 }

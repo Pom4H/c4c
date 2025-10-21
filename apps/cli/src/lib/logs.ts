@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import { DEV_LOG_TAIL_LIMIT } from "./constants.js";
-import { splitLines, tailLines } from "../internal/utils/logs.js";
+import { splitLines, tailLines } from "./log-utils.js";
 import { discoverActiveSession, readLogState, writeLogState } from "./session.js";
 import type { DevLogReadResult, DevSessionMetadata } from "./types.js";
 

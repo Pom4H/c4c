@@ -11,17 +11,22 @@ export function createLogWriter(logFile: string): LogWriter {
 			.catch(() => {});
 	};
 
-	return {
-		write(method: ConsoleMethod, args: unknown[]) {
-			const timestamp = new Date().toISOString();
-			const message = format(...args);
-			const line = `[${timestamp}] [${method.toUpperCase()}] ${message}\n`;
-			enqueue(line);
-		},
-		flush() {
-			return pending.catch(() => {});
-		},
-	};
+    return {
+        write(method: ConsoleMethod, args: unknown[]) {
+            const timestamp = new Date().toISOString();
+            const message = format(...args);
+            const level = method === "log" ? "info" : method;
+            const entry = {
+                timestamp,
+                level,
+                message,
+            } as const;
+            enqueue(JSON.stringify(entry) + "\n");
+        },
+        flush() {
+            return pending.catch(() => {});
+        },
+    };
 }
 
 export function interceptConsole(logWriter: LogWriter): () => void {
