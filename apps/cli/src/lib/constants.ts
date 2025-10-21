@@ -6,7 +6,6 @@ export const DEV_SESSION_SUBDIR = "dev";
 export const DEV_SESSION_FILE_NAME = "session.json";
 export const DEV_LOG_FILE_NAME = "dev.log";
 export const DEV_LOG_STATE_FILE_NAME = "log-state.json";
-export const DEV_STOP_FILE_NAME = "stop";
 export const DEV_LOG_TAIL_LIMIT = 500;
 export const DEV_CONTROLS_LABEL = "[dev-controls]";
 export const SESSION_DISCOVERY_MAX_DEPTH = 3;

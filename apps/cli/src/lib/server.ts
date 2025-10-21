@@ -138,10 +138,20 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 		}
 	};
 
-    // Start watching for stop-file trigger to initiate shutdown.
-    startStopFileWatcher(sessionPaths.directory, sessionPaths.stopFile, controller.signal, () => {
-        console.log("[c4c] Stop requested (stop file detected)");
-        triggerShutdown("stop-file");
+    // Watch session.json for status changes. If status != running, shutdown.
+    startSessionWatcher(sessionPaths.directory, sessionPaths.sessionFile, controller.signal, async () => {
+        try {
+            const raw = await fs.readFile(sessionPaths.sessionFile, "utf8");
+            const meta = JSON.parse(raw) as DevSessionMetadata;
+            if (meta.status !== "running") {
+                console.log("[c4c] Stop requested (session status changed)");
+                triggerShutdown("session-status");
+            }
+        } catch {
+            // If the file is removed or unreadable, initiate shutdown as a safe default
+            console.log("[c4c] Session file missing or unreadable. Stopping.");
+            triggerShutdown("session-file-missing");
+        }
     });
 
 	server = createHttpServer(registry, port, httpOptions);
@@ -204,45 +214,25 @@ async function closeServer(server: unknown): Promise<void> {
 	});
 }
 
-function startStopFileWatcher(
+function startSessionWatcher(
     sessionDir: string,
-    stopFilePath: string,
+    sessionFilePath: string,
     signal: AbortSignal,
-    onStopRequested: () => void
+    onSessionChanged: () => void
 ): void {
-    // Immediate check in case the file already exists
-    import("node:fs").then(({ existsSync }) => {
-        try {
-            if (existsSync(stopFilePath)) {
-                onStopRequested();
-            }
-        } catch {
-            // ignore
-        }
-    });
-
     (async () => {
         try {
             const watcher = watch(sessionDir, { signal });
             for await (const event of watcher) {
                 if (!event || !event.filename) continue;
-                if (event.filename === "stop") {
-                    // Double-check existence to avoid false positives on rm
-                    const { access } = await import("node:fs/promises");
-                    try {
-                        await access(stopFilePath);
-                        onStopRequested();
-                        return;
-                    } catch {
-                        // no file yet
-                    }
+                if (event.filename === "session.json") {
+                    onSessionChanged();
                 }
             }
         } catch (error) {
-            // ignore AbortError; log others
             if (!(error instanceof Error && error.name === "AbortError")) {
                 console.warn(
-                    `[c4c] Stop file watcher error: ${error instanceof Error ? error.message : String(error)}`
+                    `[c4c] Session watcher error: ${error instanceof Error ? error.message : String(error)}`
                 );
             }
         }

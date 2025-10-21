@@ -20,7 +20,6 @@ export interface DevSessionPaths {
 	sessionFile: string;
 	logFile: string;
 	logStateFile: string;
-    stopFile: string;
 }
 
 export interface DevLogState {

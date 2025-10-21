@@ -6,7 +6,6 @@ import {
     DEV_LOG_STATE_FILE_NAME,
     DEV_SESSION_FILE_NAME,
     DEV_SESSION_SUBDIR,
-    DEV_STOP_FILE_NAME,
     SESSION_DISCOVERY_IGNORE_DIRS,
     SESSION_DISCOVERY_MAX_DEPTH,
 } from "./constants.js";
@@ -20,7 +19,6 @@ export function getDevSessionPaths(projectRoot: string): DevSessionPaths {
 		sessionFile: resolve(directory, DEV_SESSION_FILE_NAME),
 		logFile: resolve(directory, DEV_LOG_FILE_NAME),
 		logStateFile: resolve(directory, DEV_LOG_STATE_FILE_NAME),
-        stopFile: resolve(directory, DEV_STOP_FILE_NAME),
 	};
 }
 
@@ -44,7 +42,6 @@ export async function writeDevSessionMetadata(paths: DevSessionPaths, metadata: 
 export async function removeDevSessionArtifacts(paths: DevSessionPaths): Promise<void> {
 	await removeIfExists(paths.sessionFile);
 	await removeIfExists(paths.logStateFile);
-    await removeIfExists(paths.stopFile);
 }
 
 async function removeIfExists(path: string): Promise<void> {
