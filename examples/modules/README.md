@@ -7,7 +7,8 @@ This example demonstrates how to organize procedures into modular components and
 - **Modular Architecture**: Separation of concerns with dedicated modules for different domains
 - **Business Logic Separation**: Database, validation, and procedure logic in separate files
 - **Cross-Module Operations**: Analytics procedures that aggregate data from multiple modules
-- **Type-Safe Client Generation**: Automatically generate a fully-typed TypeScript client
+- **Type-Safe Client Generation**: Using c4c CLI to automatically generate a fully-typed TypeScript client
+- **c4c CLI Usage**: Development server, client generation, and OpenAPI spec generation
 - **End-to-End Testing**: Complete test suite using the generated client
 
 ## 📁 Project Structure
@@ -24,10 +25,7 @@ examples/modules/
 │   │   └── procedures.ts      # Product procedures (CRUD)
 │   └── analytics/
 │       └── procedures.ts      # Cross-module analytics
-├── src/
-│   └── server.ts              # HTTP server
 ├── scripts/
-│   ├── generate-client.ts     # Client generator
 │   └── test-client.ts         # Test suite
 ├── generated/
 │   └── client.ts              # Auto-generated typed client
@@ -46,9 +44,12 @@ pnpm install
 
 ### 2. Start the Server
 
+Using the c4c CLI:
+
 ```bash
 cd examples/modules
 pnpm dev
+# or directly: c4c serve --root .
 ```
 
 The server will start on `http://localhost:3000` with the following endpoints:
@@ -60,11 +61,12 @@ The server will start on `http://localhost:3000` with the following endpoints:
 
 ### 3. Generate the Client
 
-In a new terminal:
+In a new terminal, use the c4c CLI to generate a typed client:
 
 ```bash
 cd examples/modules
 pnpm generate:client
+# or directly: c4c generate client --root . --out ./generated/client.ts
 ```
 
 This will create a fully-typed TypeScript client at `generated/client.ts`.
@@ -113,6 +115,8 @@ Each domain (users, products, analytics) is organized in its own directory with:
 - **Database layer**: Simulated data storage
 - **Validators**: Business rules and data validation
 - **Procedures**: API contracts and handlers
+
+All procedures are automatically discovered by the c4c CLI from the `procedures/` directory.
 
 ### 2. Type Safety
 
@@ -184,6 +188,47 @@ export const createUser: Procedure = {
     // ... rest of the logic
   }
 };
+```
+
+## 🔧 c4c CLI Commands
+
+### Development Server
+
+```bash
+# Start the server with all procedures (using npm script)
+pnpm dev
+
+# Or directly with c4c CLI:
+# c4c serve --root .
+```
+
+The c4c CLI automatically:
+- Discovers all procedures from the `procedures/` directory
+- Starts HTTP server with RPC, REST, and Workflow endpoints
+- Provides interactive Swagger documentation
+- Enables OpenAPI spec generation
+
+### Client Generation
+
+```bash
+# Generate a typed TypeScript client (using npm script)
+pnpm generate:client
+
+# Or directly with c4c CLI:
+# c4c generate client --root . --out ./generated/client.ts
+```
+
+### Other CLI Commands
+
+```bash
+# Generate OpenAPI specification
+c4c generate openapi --root . --out ./openapi.json
+
+# Start only workflow transport
+c4c serve workflow --root . --port 4000
+
+# Run in development mode (alternative)
+c4c dev --root .
 ```
 
 ## 🔧 Using the Generated Client
@@ -265,8 +310,8 @@ pnpm test:client
 
 1. **Start with the procedures**: Explore `procedures/users/procedures.ts` to see how procedures are defined
 2. **Check the modules**: Look at `database.ts` and `validators.ts` to see separation of concerns
-3. **Run the server**: Start the dev server and explore the Swagger docs at http://localhost:3000/docs
-4. **Generate the client**: Run the generator and examine the output in `generated/client.ts`
+3. **Run the server**: Use `c4c serve --root .` and explore the Swagger docs at http://localhost:3000/docs
+4. **Generate the client**: Use `c4c generate client --root . --out ./generated/client.ts` and examine the output
 5. **Test it out**: Run the test suite and modify it to try different scenarios
 
 ## 🌟 Best Practices Demonstrated
