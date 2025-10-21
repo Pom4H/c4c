@@ -1,6 +1,6 @@
 import { resolve, relative } from "node:path";
 import { generateClient as runGenerateClient, type GenerateClientOptions } from "../lib/generate.js";
-import { determineHandlersPath, resolveOutputPath } from "../lib/project-paths.js";
+import { determineProceduresPath, resolveOutputPath } from "../lib/project-paths.js";
 
 interface GenerateClientCommandOptions {
     root?: string;
@@ -10,12 +10,12 @@ interface GenerateClientCommandOptions {
 
 export async function generateClientCommand(options: GenerateClientCommandOptions): Promise<void> {
 	const rootDir = resolve(options.root ?? process.cwd());
-    const handlersPath = determineHandlersPath(rootDir);
+    const proceduresPath = determineProceduresPath(rootDir);
 	const outFile = resolveOutputPath(options.out ?? "c4c-client.ts");
 
 	const clientOptions: GenerateClientOptions = {
 		outFile,
-		handlersPath,
+		proceduresPath,
 		baseUrl: options.baseUrl,
 	};
 

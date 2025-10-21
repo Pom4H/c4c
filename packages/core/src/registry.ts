@@ -36,7 +36,7 @@ async function ensureTypeScriptLoader() {
 				}
 			} catch (error) {
 				console.warn(
-					"[Registry] Unable to register TypeScript loader. Only JavaScript handlers will be loaded.",
+					"[Registry] Unable to register TypeScript loader. Only JavaScript procedures will be loaded.",
 					error
 				);
 			}
@@ -46,21 +46,21 @@ async function ensureTypeScriptLoader() {
 }
 
 /**
- * Collects all procedures from handlers directory
+ * Collects all procedures from procedures directory
  * This implements the "zero boilerplate, maximum reflection" principle
  */
-export async function collectRegistry(handlersPath = "src/handlers"): Promise<Registry> {
-	const { registry } = await collectRegistryDetailed(handlersPath);
+export async function collectRegistry(proceduresPath = "src/procedures"): Promise<Registry> {
+	const { registry } = await collectRegistryDetailed(proceduresPath);
 	return registry;
 }
 
-export async function collectRegistryDetailed(handlersPath = "src/handlers"): Promise<RegistryLoadResult> {
+export async function collectRegistryDetailed(proceduresPath = "src/procedures"): Promise<RegistryLoadResult> {
 	const registry: Registry = new Map();
 	const moduleIndex: RegistryModuleIndex = new Map();
-	const absoluteRoot = resolve(handlersPath);
-	const handlerFiles = await findHandlerFiles(absoluteRoot);
+	const absoluteRoot = resolve(proceduresPath);
+	const procedureFiles = await findProcedureFiles(absoluteRoot);
 
-	for (const file of handlerFiles) {
+	for (const file of procedureFiles) {
 		try {
 			const procedures = await loadProceduresFromModule(file);
 			const names = new Set<string>();
@@ -73,7 +73,7 @@ export async function collectRegistryDetailed(handlersPath = "src/handlers"): Pr
 
 			moduleIndex.set(file, names);
 		} catch (error) {
-			console.error(`[Registry] Failed to load handler from ${file}:`, error);
+			console.error(`[Registry] Failed to load procedure from ${file}:`, error);
 		}
 	}
 
@@ -113,7 +113,7 @@ export function isSupportedHandlerFile(filePath: string): boolean {
 	return ALLOWED_EXTENSIONS.has(extension);
 }
 
-async function findHandlerFiles(root: string): Promise<string[]> {
+async function findProcedureFiles(root: string): Promise<string[]> {
 	const result: string[] = [];
 
 	async function walk(directory: string) {
@@ -190,7 +190,7 @@ function logProcedureEvent(
 	action: string,
 	procedureName: string,
 	procedure: Procedure,
-	handlersRoot?: string,
+	proceduresRoot?: string,
 	sourcePath?: string
 ) {
 	const parts: string[] = [];
@@ -206,7 +206,7 @@ function logProcedureEvent(
 		parts.push(metadataLine);
 	}
 
-	const location = handlersRoot && sourcePath ? formatProcedureLocation(handlersRoot, sourcePath) : "";
+	const location = proceduresRoot && sourcePath ? formatProcedureLocation(proceduresRoot, sourcePath) : "";
 	if (location) {
 		parts.push(location);
 	}
@@ -227,8 +227,8 @@ function formatRegistryAction(action: string): string {
 	}
 }
 
-function formatProcedureLocation(handlersRoot: string, sourcePath: string): string {
-	const relativePath = relative(handlersRoot, sourcePath);
+function formatProcedureLocation(proceduresRoot: string, sourcePath: string): string {
+	const relativePath = relative(proceduresRoot, sourcePath);
 	if (relativePath === "") {
 		return dim("@internal");
 	}

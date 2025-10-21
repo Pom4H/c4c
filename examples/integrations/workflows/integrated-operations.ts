@@ -115,7 +115,7 @@ const finalize = step({
 
 export const integratedOperationsWorkflow = workflow("integrated-operations")
 	.name("Cross-Provider Operations")
-	.description("Coordinates Google Drive telemetry with Avito performance data using real handlers.")
+	.description("Coordinates Google Drive telemetry with Avito performance data using real procedures.")
 	.version("1.0.0")
 	.metadata({ tags: ["google", "avito", "orchestration"] })
 	.step(initialDriveSnapshot)

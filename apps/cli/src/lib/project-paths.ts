@@ -7,9 +7,9 @@ export function resolveProjectRoot(projectRoot?: string): string {
   return isAbsolute(projectRoot) ? projectRoot : resolve(process.cwd(), projectRoot);
 }
 
-// Handlers must live strictly under <root>/handlers
-export function determineHandlersPath(root: string): string {
-  return join(root, "handlers");
+// Procedures must live strictly under <root>/procedures
+export function determineProceduresPath(root: string): string {
+  return join(root, "procedures");
 }
 
 // Workflows must live strictly under <root>/workflows

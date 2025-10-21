@@ -281,7 +281,7 @@ const mockProcedures = {
 // Real (integration)
 import { collectRegistry } from '@c4c/core';
 
-const registry = await collectRegistry("./handlers");
+const registry = await collectRegistry("./procedures");
 const result = await executeWorkflow(workflow, registry);
 ```
 

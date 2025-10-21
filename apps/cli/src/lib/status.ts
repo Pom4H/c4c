@@ -13,7 +13,7 @@ export async function getDevStatus(projectRoot: string): Promise<DevStatusReport
     port: metadata.port,
     mode: metadata.mode,
     projectRoot: metadata.projectRoot,
-    handlersPath: metadata.handlersPath,
+    proceduresPath: metadata.proceduresPath,
     startedAt: metadata.startedAt,
   };
 }

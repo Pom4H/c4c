@@ -5,7 +5,7 @@ import { watch } from "node:fs/promises";
 import { collectRegistry, collectRegistryDetailed, type Registry, type RegistryModuleIndex } from "@c4c/core";
 import { createHttpServer, type HttpAppOptions } from "@c4c/adapters";
 import { DEFAULTS } from "./constants.js";
-import { formatHandlersLabel, logProcedureChange } from "./formatting.js";
+import { formatProceduresLabel, logProcedureChange } from "./formatting.js";
 import { createLogWriter, interceptConsole } from "./logging.js";
 import {
 	ensureDevSessionAvailability,
@@ -14,12 +14,12 @@ import {
 	writeDevSessionMetadata,
 } from "./session.js";
 import type { DevSessionMetadata, ServeMode } from "./types.js";
-import { watchHandlers } from "./watcher.js";
+import { watchProcedures } from "./watcher.js";
 // Dev control RPCs removed; file-based control is used instead.
 
 export interface ServeOptions {
 	port?: number;
-	handlersPath?: string;
+	proceduresPath?: string;
 	workflowsPath?: string;
 	enableDocs?: boolean;
 	enableRest?: boolean;
@@ -30,13 +30,13 @@ export interface ServeOptions {
 }
 
 export async function serve(mode: ServeMode, options: ServeOptions = {}) {
-	const { handlersPath, httpOptions } = resolveServeConfiguration(mode, options);
-	const registry = await collectRegistry(handlersPath);
+	const { proceduresPath, httpOptions } = resolveServeConfiguration(mode, options);
+	const registry = await collectRegistry(proceduresPath);
 	return createHttpServer(registry, httpOptions.port ?? 3000, httpOptions);
 }
 
 export async function dev(mode: ServeMode, options: ServeOptions = {}) {
-	const { handlersPath, httpOptions, projectRoot } = resolveServeConfiguration(mode, options);
+	const { proceduresPath, httpOptions, projectRoot } = resolveServeConfiguration(mode, options);
 	const sessionPaths = getDevSessionPaths(projectRoot);
 	await ensureDevSessionAvailability(sessionPaths);
 
@@ -47,7 +47,7 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 	const restoreConsole = interceptConsole(logWriter);
 
 	const sessionId = randomUUID();
-	const { registry, moduleIndex } = await collectRegistryDetailed(handlersPath);
+	const { registry, moduleIndex } = await collectRegistryDetailed(proceduresPath);
 
 	if (!httpOptions.enableRpc) {
 		httpOptions.enableRpc = true;
@@ -62,7 +62,7 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 		port,
 		mode,
 		projectRoot,
-		handlersPath,
+		proceduresPath,
 		logFile: sessionPaths.logFile,
 		startedAt: new Date().toISOString(),
 		status: "running",
@@ -164,12 +164,12 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 		process.on(signal, handler);
 	}
 
-	const handlersLabel = formatHandlersLabel(handlersPath);
-	console.log(`[c4c] Watching handlers in ${handlersLabel}`);
+	const proceduresLabel = formatProceduresLabel(proceduresPath);
+	console.log(`[c4c] Watching procedures in ${proceduresLabel}`);
     console.log(`[c4c] Press Ctrl+C or run: pnpm "c4c dev stop" to stop the dev server`);
 
-	const watchTask = watchHandlers(
-		handlersPath,
+	const watchTask = watchProcedures(
+		proceduresPath,
 		moduleIndex,
 		registry,
 		controller.signal,
@@ -185,8 +185,8 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 
 function resolveServeConfiguration(mode: ServeMode, options: ServeOptions = {}) {
 	const projectRoot = options.projectRoot ? resolve(options.projectRoot) : process.cwd();
-	const handlersOption = options.handlersPath ?? process.env.C4C_HANDLERS ?? "src/handlers";
-	const handlersPath = resolve(projectRoot, handlersOption);
+	const proceduresOption = options.proceduresPath ?? process.env.C4C_PROCEDURES ?? "src/procedures";
+	const proceduresPath = resolve(projectRoot, proceduresOption);
 	const defaults = DEFAULTS[mode] ?? DEFAULTS.all;
 	const httpOptions: HttpAppOptions = {
 		port: options.port ?? 3000,
@@ -197,7 +197,7 @@ function resolveServeConfiguration(mode: ServeMode, options: ServeOptions = {}) 
 		workflowsPath: options.workflowsPath ?? defaults.workflowsPath,
 	};
 
-	return { handlersPath, httpOptions, projectRoot };
+	return { proceduresPath, httpOptions, projectRoot };
 }
 
 async function closeServer(server: unknown): Promise<void> {
