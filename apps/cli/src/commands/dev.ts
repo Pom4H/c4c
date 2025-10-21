@@ -1,6 +1,6 @@
 import { resolve, relative } from "node:path";
 import { dev as runDev, type ServeOptions } from "../lib/server.js";
-import { determineHandlersPath, determineWorkflowsPath } from "../lib/project-paths.js";
+import { determineProceduresPath, determineWorkflowsPath } from "../lib/project-paths.js";
 import { stopDevServer } from "../lib/stop.js";
 import { readDevLogs } from "../lib/logs.js";
 import { getDevStatus } from "../lib/status.js";
@@ -14,14 +14,14 @@ interface DevCommandOptions {
 
 export async function devCommand(options: DevCommandOptions): Promise<void> {
 	const rootDir = resolve(options.root ?? process.cwd());
-    const handlersPath = determineHandlersPath(rootDir);
-	const workflowsPath = determineWorkflowsPath(rootDir, options.workflows);
+    const proceduresPath = determineProceduresPath(rootDir);
+	const workflowsPath = options.workflows ?? determineWorkflowsPath(rootDir);
 
     const enableDocs = options.docs ? true : undefined;
 
 	const serveOptions: ServeOptions = {
 		port: options.port,
-		handlersPath,
+		proceduresPath,
 		workflowsPath,
 		enableDocs,
 		projectRoot: rootDir,

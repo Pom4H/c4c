@@ -5,7 +5,7 @@ export async function reloadModuleProcedures(
 	moduleIndex: RegistryModuleIndex,
 	registry: Registry,
 	filePath: string,
-	handlersRoot: string
+	proceduresRoot: string
 ) {
 	const previous = moduleIndex.get(filePath) ?? new Set<string>();
 	try {
@@ -18,7 +18,7 @@ export async function reloadModuleProcedures(
 			if (!nextNames.has(name)) {
 				const existing = registry.get(name);
 				if (existing) {
-					logProcedureChange("Removed", name, existing, filePath, handlersRoot);
+					logProcedureChange("Removed", name, existing, filePath, proceduresRoot);
 				}
 				registry.delete(name);
 			}
@@ -27,12 +27,12 @@ export async function reloadModuleProcedures(
 		for (const [name, procedure] of procedures) {
 			const action = previous.has(name) ? "Updated" : "Registered";
 			registry.set(name, procedure);
-			logProcedureChange(action, name, procedure, filePath, handlersRoot);
+			logProcedureChange(action, name, procedure, filePath, proceduresRoot);
 		}
 
 		moduleIndex.set(filePath, nextNames);
 	} catch (error) {
-		console.error(`[Registry] Failed to reload handler from ${filePath}:`, error);
+		console.error(`[Registry] Failed to reload procedure from ${filePath}:`, error);
 	}
 }
 
@@ -40,7 +40,7 @@ export async function removeModuleProcedures(
 	moduleIndex: RegistryModuleIndex,
 	registry: Registry,
 	filePath: string,
-	handlersRoot: string
+	proceduresRoot: string
 ) {
 	const previous = moduleIndex.get(filePath);
 	if (!previous) return;
@@ -48,7 +48,7 @@ export async function removeModuleProcedures(
 	for (const name of previous) {
 		const existing = registry.get(name);
 		if (existing) {
-			logProcedureChange("Removed", name, existing, filePath, handlersRoot);
+			logProcedureChange("Removed", name, existing, filePath, proceduresRoot);
 		}
 		registry.delete(name);
 	}

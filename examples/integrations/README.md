@@ -26,7 +26,7 @@ Set the right env var before executing a procedure or attach the token to the ex
 
 ## Running the Runtime
 
-The runtime script loads `.env` automatically, discovers all generated procedures via `src/handlers/generated.ts`, and exposes them through the HTTP adapter.
+The runtime script loads `.env` automatically, discovers all generated procedures via `src/procedures/generated.ts`, and exposes them through the HTTP adapter.
 
 ```bash
 pnpm --filter integrations dev

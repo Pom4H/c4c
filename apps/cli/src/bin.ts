@@ -21,7 +21,7 @@ program
 	.description("Start the c4c HTTP server")
 	.argument("[mode]", "Mode to run (all|rest|workflow|rpc|ui)", "all")
 	.option("-p, --port <number>", "Port to listen on", parsePort)
-	.option("--root <path>", "Project root containing handlers/ and workflows", process.cwd())
+	.option("--root <path>", "Project root containing procedures/ and workflows", process.cwd())
     .option("--docs", "Force enable docs endpoints")
 	.option("--api-base <url>", "Workflow API base URL used in UI mode", process.env.C4C_API_BASE)
 	.action(async (modeArg: string, options) => {
@@ -39,7 +39,7 @@ const devCommandDef = program
     .command("dev")
     .description("Start the c4c HTTP server with watch mode")
     .option("-p, --port <number>", "Port to listen on", parsePort)
-	.option("--root <path>", "Project root containing handlers/", process.cwd())
+	.option("--root <path>", "Project root containing procedures/", process.cwd())
     .option("--docs", "Force enable docs endpoints")
     .action(async (options) => {
 		try {
@@ -55,7 +55,7 @@ const devCommandDef = program
 devCommandDef
 	.command("stop")
 	.description("Stop the running c4c dev server")
-	.option("--root <path>", "Project root containing handlers/", process.cwd())
+	.option("--root <path>", "Project root containing procedures/", process.cwd())
 	.action(async (options) => {
 		try {
 			await devStopCommand(options);
@@ -70,7 +70,7 @@ devCommandDef
 devCommandDef
 	.command("logs")
 	.description("Print stdout logs from the running c4c dev server")
-	.option("--root <path>", "Project root containing handlers/", process.cwd())
+	.option("--root <path>", "Project root containing procedures/", process.cwd())
     .option("--json", "Output raw JSONL instead of pretty output")
 	.option("--tail <number>", "Number of log lines from the end of the file to display")
 	.action(async (options) => {
@@ -107,7 +107,7 @@ const generate = program
 generate
 	.command("client")
 	.description("Generate a typed client from contracts")
-	.option("--root <path>", "Project root containing handlers/", process.cwd())
+	.option("--root <path>", "Project root containing procedures/", process.cwd())
 	.option("--out <file>", "Output file for the generated client", "c4c-client.ts")
 	.option("--base-url <url>", "Base URL embedded in generated client")
 	.action(async (options) => {

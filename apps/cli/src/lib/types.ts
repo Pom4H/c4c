@@ -9,7 +9,7 @@ export interface DevSessionMetadata {
 	port: number;
 	mode: ServeMode;
 	projectRoot: string;
-	handlersPath: string;
+	proceduresPath: string;
 	logFile: string;
 	startedAt: string;
 	status: DevSessionStatus;
@@ -38,7 +38,7 @@ export interface DevStatusReport {
     port?: number;
     mode?: ServeMode;
     projectRoot?: string;
-    handlersPath?: string;
+    proceduresPath?: string;
     startedAt?: string;
 }
 

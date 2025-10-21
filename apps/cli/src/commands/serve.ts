@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { serve as runServe, type ServeOptions } from "../lib/server.js";
 import type { ServeMode } from "../lib/types.js";
-import { determineHandlersPath, determineWorkflowsPath } from "../lib/project-paths.js";
+import { determineProceduresPath, determineWorkflowsPath } from "../lib/project-paths.js";
 
 interface ServeCommandOptions {
     port?: number;
@@ -14,14 +14,14 @@ interface ServeCommandOptions {
 
 export async function serveCommand(modeArg: string, options: ServeCommandOptions): Promise<void> {
 	const rootDir = resolve(options.root ?? process.cwd());
-    const handlersPath = determineHandlersPath(rootDir);
-	const workflowsPath = determineWorkflowsPath(rootDir, options.workflows);
+    const proceduresPath = determineProceduresPath(rootDir);
+	const workflowsPath = options.workflows ?? determineWorkflowsPath(rootDir);
 
     const enableDocs = options.docs ? true : undefined;
 
 	const serveOptions: ServeOptions = {
 		port: options.port,
-		handlersPath,
+		proceduresPath,
 		workflowsPath,
 		enableDocs,
 		projectRoot: rootDir,

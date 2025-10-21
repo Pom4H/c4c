@@ -57,8 +57,8 @@ export function formatRegistryAction(action: string): string {
 	}
 }
 
-export function formatProcedureLocation(sourcePath: string, handlersRoot: string): string {
-	const relativePathRaw = sourcePath ? relative(handlersRoot, sourcePath) : null;
+export function formatProcedureLocation(sourcePath: string, proceduresRoot: string): string {
+	const relativePathRaw = sourcePath ? relative(proceduresRoot, sourcePath) : null;
 	const relativePath = relativePathRaw === null ? null : relativePathRaw === "" ? "." : relativePathRaw;
 	if (!relativePath) return "";
 	if (relativePath === ".") {
@@ -117,7 +117,7 @@ export function logProcedureChange(
 	procedureName: string,
 	procedure: Procedure | undefined,
 	sourcePath: string,
-	handlersRoot: string
+	proceduresRoot: string
 ) {
 	const parts: string[] = [];
 	parts.push(`[Registry] ${formatRegistryAction(action)} ${procedureName}`);
@@ -132,7 +132,7 @@ export function logProcedureChange(
 		parts.push(metadata);
 	}
 
-	const location = formatProcedureLocation(sourcePath, handlersRoot);
+	const location = formatProcedureLocation(sourcePath, proceduresRoot);
 	if (location) {
 		parts.push(location);
 	}
@@ -140,7 +140,7 @@ export function logProcedureChange(
 	console.log(parts.join(" "));
 }
 
-export function formatHandlersLabel(handlersPath: string): string {
-	const label = relative(process.cwd(), handlersPath) || handlersPath;
+export function formatProceduresLabel(proceduresPath: string): string {
+	const label = relative(process.cwd(), proceduresPath) || proceduresPath;
 	return label;
 }

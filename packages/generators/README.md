@@ -24,7 +24,7 @@ Generate OpenAPI 3.0 specifications from your procedure registry:
 import { generateOpenAPIJSON } from "@c4c/generators";
 import { collectRegistry } from "@c4c/core";
 
-const registry = await collectRegistry("src/handlers");
+const registry = await collectRegistry("src/procedures");
 
 const spec = generateOpenAPIJSON(registry, {
   title: "My API",
@@ -69,7 +69,7 @@ Generate type-safe TypeScript clients:
 import { generateRpcClientModule } from "@c4c/generators";
 import { collectRegistry } from "@c4c/core";
 
-const registry = await collectRegistry("src/handlers");
+const registry = await collectRegistry("src/procedures");
 
 const clientCode = generateRpcClientModule(registry, {
   baseUrl: "http://localhost:3000",
@@ -314,7 +314,7 @@ app.get("/admin/users", async (req, res) => {
 
 ```bash
 c4c generate openapi \
-  --root ./src/handlers \
+  --root ./src/procedures \
   --out ./openapi.json \
   --title "My API" \
   --version "1.0.0"
@@ -324,7 +324,7 @@ c4c generate openapi \
 
 ```bash
 c4c generate client \
-  --root ./src/handlers \
+  --root ./src/procedures \
   --out ./src/generated/client.ts \
   --base-url "http://localhost:3000"
 ```
@@ -568,7 +568,7 @@ try {
 ## Examples
 
 See [examples/basic](../../examples/basic) for complete examples:
-- `src/handlers/auth-example.ts` - Protected procedures
+- `src/procedures/auth-example.ts` - Protected procedures
 - `src/client-auth-example.ts` - Client usage examples
 - `scripts/generate-client-demo.ts` - Generation demo
 

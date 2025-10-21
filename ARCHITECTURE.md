@@ -53,7 +53,7 @@ This document explains the internals of c4c with focus on:
                  ▼
 ┌──────────────────────────────────────────────────────────┐
 │                  Business Logic                          │
-│  handlers/ - Procedure implementations                   │
+│  procedures/ - Procedure implementations                 │
 │  • Pure functions: input → output                        │
 │  • No transport coupling                                 │
 │  • Fully testable                                        │
@@ -121,7 +121,7 @@ interface Procedure<TInput = unknown, TOutput = unknown> {
 }
 ```
 
-**This is what you export from handlers/:**
+**This is what you export from procedures/:**
 
 ```typescript
 export const createUser: Procedure = {
@@ -143,7 +143,7 @@ type Registry = Map<string, Procedure>;
 **Created via auto-discovery:**
 
 ```typescript
-const registry = await collectRegistry("./handlers");
+const registry = await collectRegistry("./procedures");
 // Key: contract.name (e.g., "users.create")
 // Value: Procedure object
 ```
@@ -185,13 +185,13 @@ const withRetry: Policy = (handler) => {
 **How it works:**
 
 ```typescript
-export async function collectRegistryDetailed(handlersPath = "src/handlers") {
+export async function collectRegistryDetailed(proceduresPath = "src/procedures") {
   const registry: Registry = new Map();
   const moduleIndex = new Map<string, Set<string>>();
-  const handlersRoot = resolve(handlersPath);
-  const handlerFiles = await findHandlerFiles(handlersRoot);
+  const proceduresRoot = resolve(proceduresPath);
+  const procedureFiles = await findProcedureFiles(proceduresRoot);
 
-  for (const file of handlerFiles) {
+  for (const file of procedureFiles) {
     const procedures = await loadProceduresFromModule(file, {
       versionHint: Date.now().toString(36),
     });
@@ -200,7 +200,7 @@ export async function collectRegistryDetailed(handlersPath = "src/handlers") {
     for (const [name, procedure] of procedures) {
       registry.set(name, procedure);
       names.add(name);
-      logProcedureEvent("Registered", name, procedure, handlersRoot, file);
+      logProcedureEvent("Registered", name, procedure, proceduresRoot, file);
     }
 
     moduleIndex.set(file, names);
@@ -226,7 +226,7 @@ export async function collectRegistryDetailed(handlersPath = "src/handlers") {
 The CLI writes runtime information to `.c4c/dev/dev.log` and exposes it through `pnpm c4c dev logs`. Registry events use the compact formatter introduced above:
 
 ```
-[Registry] + data.secureAction [external] [auth] roles=workflow-node,api-endpoint | cat=demo | tags=data,auth | auth=Bearer roles:moderator @examples/integrations/handlers/data.ts
+[Registry] + data.secureAction [external] [auth] roles=workflow-node,api-endpoint | cat=demo | tags=data,auth | auth=Bearer roles:moderator @examples/integrations/procedures/data.ts
 ```
 
 - `+ / ~ / -` convey add/update/remove.
@@ -1944,7 +1944,7 @@ cd packages/adapters && pnpm build
 **Happens once at startup:**
 
 ```typescript
-const registry = await collectRegistry("./handlers");
+const registry = await collectRegistry("./procedures");
 ```
 
 **Cost:**
@@ -2071,7 +2071,7 @@ switch (node.type) {
 
 ```typescript
 import { createExecutionContext } from '@c4c/core';
-import { createUser } from './handlers/users';
+import { createUser } from './procedures/users';
 
 test('createUser creates a user', async () => {
   const input = { name: "Alice", email: "alice@example.com" };
@@ -2094,7 +2094,7 @@ import { collectRegistry } from '@c4c/core';
 import { createHttpServer } from '@c4c/adapters';
 
 test('HTTP server executes procedures', async () => {
-  const registry = await collectRegistry("./handlers");
+  const registry = await collectRegistry("./procedures");
   const server = createHttpServer(registry, 3001);
   
   const response = await fetch("http://localhost:3001/rpc/users.create", {
@@ -2119,7 +2119,7 @@ import { executeWorkflow } from '@c4c/workflow';
 
 test('workflow executes all nodes', async () => {
   const workflow = { /* ... */ };
-  const registry = await collectRegistry("./handlers");
+  const registry = await collectRegistry("./procedures");
   
   const result = await executeWorkflow(workflow, registry);
   

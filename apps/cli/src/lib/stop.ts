@@ -1,5 +1,5 @@
 import { promises as fs } from "node:fs";
-import { formatHandlersLabel } from "./formatting.js";
+import { formatProceduresLabel } from "./formatting.js";
 import { isProcessAlive, waitForProcessExit } from "./process.js";
 import { discoverActiveSession, removeDevSessionArtifacts, writeDevSessionMetadata } from "./session.js";
 import type { DevSessionMetadata } from "./types.js";
@@ -7,7 +7,7 @@ import type { DevSessionMetadata } from "./types.js";
 export async function stopDevServer(projectRoot: string): Promise<void> {
 	const resolved = await discoverActiveSession(projectRoot);
 	if (!resolved) {
-		const label = formatHandlersLabel(projectRoot);
+		const label = formatProceduresLabel(projectRoot);
 		console.log(`[c4c] No running dev server found (searched from ${label}).`);
 		return;
 	}

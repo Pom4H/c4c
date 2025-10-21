@@ -25,8 +25,8 @@ export function isAbortError(error: unknown): boolean {
 	return error instanceof Error && error.name === "AbortError";
 }
 
-export async function watchHandlers(
-	handlersPath: string,
+export async function watchProcedures(
+	proceduresPath: string,
 	moduleIndex: RegistryModuleIndex,
 	registry: Registry,
 	signal: AbortSignal,
@@ -35,16 +35,16 @@ export async function watchHandlers(
 	try {
 		let watcher: AsyncIterable<FileChangeInfo<string>>;
 		try {
-			watcher = watch(handlersPath, {
+			watcher = watch(proceduresPath, {
 				recursive: true,
 				signal,
 			});
 		} catch (error) {
 			if (isRecursiveWatchUnavailable(error)) {
 				console.warn(
-					"[c4c] Recursive watching is not supported on this platform. Watching the top-level handlers directory only."
+					"[c4c] Recursive watching is not supported on this platform. Watching the top-level procedures directory only."
 				);
-				watcher = watch(handlersPath, { signal });
+				watcher = watch(proceduresPath, { signal });
 			} else {
 				throw error;
 			}
@@ -53,17 +53,17 @@ export async function watchHandlers(
 		for await (const event of watcher) {
 			const fileName = event.filename;
 			if (!fileName) continue;
-			const filePath = resolve(handlersPath, fileName);
+			const filePath = resolve(proceduresPath, fileName);
 			if (!isSupportedHandlerFile(filePath)) continue;
 
 			const exists = await fileExists(filePath);
 			if (event.eventType === "rename" && !exists) {
-				await removeModuleProcedures(moduleIndex, registry, filePath, handlersPath);
+				await removeModuleProcedures(moduleIndex, registry, filePath, proceduresPath);
 				continue;
 			}
 
 			if (!exists) continue;
-			await reloadModuleProcedures(moduleIndex, registry, filePath, handlersPath);
+			await reloadModuleProcedures(moduleIndex, registry, filePath, proceduresPath);
 		}
 	} catch (error) {
 		if (!isAbortError(error)) {
