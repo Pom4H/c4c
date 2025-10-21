@@ -95,7 +95,17 @@ export async function execProcedureCommand(
 export async function execWorkflowCommand(options: ExecWorkflowOptions): Promise<void> {
 	const rootDir = resolve(options.root ?? process.cwd());
 	const proceduresPath = determineProceduresPath(rootDir);
-	const workflowPath = resolve(rootDir, options.file);
+	const workflowsPath = determineWorkflowsPath(rootDir);
+	
+	// Try to resolve workflow path - check if it's already a full path or needs to be resolved
+	let workflowPath: string;
+	if (options.file.endsWith('.ts') || options.file.endsWith('.js')) {
+		// If it has an extension, treat as relative path from root or absolute
+		workflowPath = resolve(rootDir, options.file);
+	} else {
+		// Otherwise, try to find it in workflows directory
+		workflowPath = resolve(workflowsPath, `${options.file}.ts`);
+	}
 
 	// Load registry
 	if (!options.json) {
@@ -105,7 +115,7 @@ export async function execWorkflowCommand(options: ExecWorkflowOptions): Promise
 
 	// Load workflow
 	if (!options.json) {
-		console.log(`[c4c] Loading workflow from ${options.file}...`);
+		console.log(`[c4c] Loading workflow from ${workflowPath}...`);
 	}
 
 	let workflow: any;
@@ -119,7 +129,7 @@ export async function execWorkflowCommand(options: ExecWorkflowOptions): Promise
 		}
 	} catch (error) {
 		throw new Error(
-			`Failed to load workflow from '${options.file}': ${error instanceof Error ? error.message : String(error)}`
+			`Failed to load workflow from '${workflowPath}': ${error instanceof Error ? error.message : String(error)}`
 		);
 	}
 

@@ -210,38 +210,59 @@ The c4c CLI automatically:
 
 ### Execute Procedures
 
-Execute procedures directly from the command line:
+Execute procedures directly from the command line (procedures are default):
 
 ```bash
-# Execute a procedure with inline JSON input
-c4c exec procedure users.create --input '{"name":"John","email":"john@example.com","role":"admin"}'
+# Execute a procedure - direct call (default behavior)
+c4c exec users.create -i '{"name":"John","email":"john@example.com","role":"admin"}'
 
-# Or use the short alias
-c4c exec proc users.create -i '{"name":"John","email":"john@example.com"}'
+# Or explicitly use procedure/ prefix
+c4c exec procedure/users.create -i '{"name":"John","email":"john@example.com"}'
 
 # Execute with input from file
-c4c exec proc products.list --input-file ./test-input.json
+c4c exec products.list -f input.json
 
 # Get JSON output only (no logging)
-c4c exec proc analytics.stats --json
+c4c exec analytics.stats --json
+
+# Tab completion support!
+c4c exec <TAB>  # Shows all available procedures and workflows
 ```
 
 ### Execute Workflows
 
-Execute workflows defined as TypeScript files:
+Execute workflows using the `workflow/` prefix:
 
 ```bash
-# Execute a workflow with inline input
-c4c exec workflow workflows/test-workflow.ts --input '{"name":"Alice","email":"alice@example.com"}'
+# Execute a workflow with workflow/ prefix
+c4c exec workflow/test-workflow -i '{"name":"Alice","email":"alice@example.com"}'
 
-# Or use the short alias
-c4c exec wf workflows/test-workflow.ts -i '{"name":"Alice"}'
-
-# Execute with input from file
-c4c exec wf workflows/test-workflow.ts -f ./workflow-input.json
+# Workflows can be called by name (without .ts extension)
+c4c exec workflow/test-workflow -f workflow-input.json
 
 # Get JSON output only
-c4c exec wf workflows/test-workflow.ts --json
+c4c exec workflow/test-workflow --json
+```
+
+### Shell Autocomplete (like kubectl!)
+
+Enable Tab completion for procedures and workflows:
+
+```bash
+# For Bash
+eval "$(c4c completion bash)"
+# Or add to ~/.bashrc
+
+# For Zsh
+eval "$(c4c completion zsh)"
+# Or add to ~/.zshrc
+
+# Now try:
+c4c exec <TAB><TAB>
+# Shows:
+# analytics.health    products.create    users.create    workflow/test-workflow
+# analytics.stats     products.get       users.delete
+# ...
 ```
 
 ### Client Generation
