@@ -41,4 +41,4 @@ export {
 export type { RegistryLoadResult, RegistryModuleIndex } from "./registry.js";
 
 // Executor
-export { executeProcedure, createExecutionContext, applyPolicies } from "./executor.js";
+export { executeProcedure, execute, createExecutionContext, applyPolicies } from "./executor.js";

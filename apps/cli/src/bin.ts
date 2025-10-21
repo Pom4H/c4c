@@ -5,6 +5,7 @@ import process from "node:process";
 import { serveCommand } from "./commands/serve.js";
 import { devCommand, devLogsCommand, devStopCommand, devStatusCommand } from "./commands/dev.js";
 import { generateClientCommand } from "./commands/generate.js";
+import { execProcedureCommand, execWorkflowCommand } from "./commands/exec.js";
 
 const pkg = JSON.parse(
 	readFileSync(new URL("../package.json", import.meta.url), "utf8")
@@ -113,6 +114,48 @@ generate
 	.action(async (options) => {
 		try {
 			await generateClientCommand(options);
+		} catch (error) {
+			console.error(
+				`[c4c] ${error instanceof Error ? error.message : String(error)}`
+			);
+			process.exit(1);
+		}
+	});
+
+const exec = program
+	.command("exec")
+	.description("Execute procedures and workflows");
+
+exec
+	.command("procedure <name>")
+	.alias("proc")
+	.description("Execute a procedure")
+	.option("--root <path>", "Project root containing procedures/", process.cwd())
+	.option("-i, --input <json>", "Input data as JSON string")
+	.option("-f, --input-file <file>", "Input data from JSON file")
+	.option("--json", "Output only JSON result (no logging)")
+	.action(async (name: string, options) => {
+		try {
+			await execProcedureCommand(name, options);
+		} catch (error) {
+			console.error(
+				`[c4c] ${error instanceof Error ? error.message : String(error)}`
+			);
+			process.exit(1);
+		}
+	});
+
+exec
+	.command("workflow <file>")
+	.alias("wf")
+	.description("Execute a workflow from file")
+	.option("--root <path>", "Project root containing procedures/", process.cwd())
+	.option("-i, --input <json>", "Input data as JSON string")
+	.option("-f, --input-file <file>", "Input data from JSON file")
+	.option("--json", "Output only JSON result (no logging)")
+	.action(async (file: string, options) => {
+		try {
+			await execWorkflowCommand({ ...options, file });
 		} catch (error) {
 			console.error(
 				`[c4c] ${error instanceof Error ? error.message : String(error)}`

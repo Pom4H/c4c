@@ -208,6 +208,42 @@ The c4c CLI automatically:
 - Provides interactive Swagger documentation
 - Enables OpenAPI spec generation
 
+### Execute Procedures
+
+Execute procedures directly from the command line:
+
+```bash
+# Execute a procedure with inline JSON input
+c4c exec procedure users.create --input '{"name":"John","email":"john@example.com","role":"admin"}'
+
+# Or use the short alias
+c4c exec proc users.create -i '{"name":"John","email":"john@example.com"}'
+
+# Execute with input from file
+c4c exec proc products.list --input-file ./test-input.json
+
+# Get JSON output only (no logging)
+c4c exec proc analytics.stats --json
+```
+
+### Execute Workflows
+
+Execute workflows defined as TypeScript files:
+
+```bash
+# Execute a workflow with inline input
+c4c exec workflow workflows/test-workflow.ts --input '{"name":"Alice","email":"alice@example.com"}'
+
+# Or use the short alias
+c4c exec wf workflows/test-workflow.ts -i '{"name":"Alice"}'
+
+# Execute with input from file
+c4c exec wf workflows/test-workflow.ts -f ./workflow-input.json
+
+# Get JSON output only
+c4c exec wf workflows/test-workflow.ts --json
+```
+
 ### Client Generation
 
 ```bash
@@ -310,9 +346,11 @@ pnpm test:client
 
 1. **Start with the procedures**: Explore `procedures/users/procedures.ts` to see how procedures are defined
 2. **Check the modules**: Look at `database.ts` and `validators.ts` to see separation of concerns
-3. **Run the server**: Use `c4c serve --root .` and explore the Swagger docs at http://localhost:3000/docs
-4. **Generate the client**: Use `c4c generate client --root . --out ./generated/client.ts` and examine the output
-5. **Test it out**: Run the test suite and modify it to try different scenarios
+3. **Execute procedures**: Try `c4c exec proc users.create -i '{"name":"Test","email":"test@test.com"}'`
+4. **Execute workflows**: Try `c4c exec wf workflows/test-workflow.ts -f workflow-input.json`
+5. **Run the server**: Use `c4c serve --root .` and explore the Swagger docs at http://localhost:3000/docs
+6. **Generate the client**: Use `c4c generate client --root . --out ./generated/client.ts` and examine the output
+7. **Test it out**: Run the test suite and modify it to try different scenarios
 
 ## 🌟 Best Practices Demonstrated
 
