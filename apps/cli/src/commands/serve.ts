@@ -10,7 +10,6 @@ interface ServeCommandOptions {
 	handlers?: string;
 	workflows?: string;
 	docs?: boolean;
-	quiet?: boolean;
 	apiBase?: string;
 }
 
@@ -18,10 +17,6 @@ export async function serveCommand(modeArg: string, options: ServeCommandOptions
 	const rootDir = resolve(options.root ?? process.cwd());
 	const handlersPath = determineHandlersPath(rootDir, options.handlers);
 	const workflowsPath = determineWorkflowsPath(rootDir, options.workflows);
-
-	if (options.quiet) {
-		process.env.C4C_QUIET = "1";
-	}
 
     const enableDocs = options.docs ? true : undefined;
 
