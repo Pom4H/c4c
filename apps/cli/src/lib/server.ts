@@ -1,9 +1,10 @@
 import { promises as fs } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { resolve, join } from "node:path";
+import { resolve } from "node:path";
+import { watch } from "node:fs/promises";
 import { collectRegistry, collectRegistryDetailed, type Registry, type RegistryModuleIndex } from "@c4c/core";
 import { createHttpServer, type HttpAppOptions } from "@c4c/adapters";
-import { DEFAULTS, DEV_CONTROLS_LABEL } from "./constants.js";
+import { DEFAULTS } from "./constants.js";
 import { formatHandlersLabel, logProcedureChange } from "./formatting.js";
 import { createLogWriter, interceptConsole } from "./logging.js";
 import {
@@ -12,9 +13,9 @@ import {
 	removeDevSessionArtifacts,
 	writeDevSessionMetadata,
 } from "./session.js";
-import type { DevSessionMetadata, DevUserType, ServeMode } from "./types.js";
+import type { DevSessionMetadata, ServeMode } from "./types.js";
 import { watchHandlers } from "./watcher.js";
-import { createDevControlProcedures, type DevControlProcedureDescriptor } from "../internal/handlers/dev-control.js";
+// Dev control RPCs removed; file-based control is used instead.
 
 export interface ServeOptions {
 	port?: number;
@@ -26,7 +27,6 @@ export interface ServeOptions {
 	enableWorkflow?: boolean;
 	apiBaseUrl?: string;
 	projectRoot?: string;
-	userType?: DevUserType;
 }
 
 export async function serve(mode: ServeMode, options: ServeOptions = {}) {
@@ -37,7 +37,6 @@ export async function serve(mode: ServeMode, options: ServeOptions = {}) {
 
 export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 	const { handlersPath, httpOptions, projectRoot } = resolveServeConfiguration(mode, options);
-	const userType: DevUserType = options.userType ?? "human";
 	const sessionPaths = getDevSessionPaths(projectRoot);
 	await ensureDevSessionAvailability(sessionPaths);
 
@@ -64,7 +63,6 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 		mode,
 		projectRoot,
 		handlersPath,
-		userType,
 		logFile: sessionPaths.logFile,
 		startedAt: new Date().toISOString(),
 		status: "running",
@@ -140,23 +138,21 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 		}
 	};
 
-	const controlProcedures: DevControlProcedureDescriptor[] = createDevControlProcedures({
-		requestStop: (reason) => {
-		if (reason) {
-			console.log(`[c4c] Stop requested: ${reason}`);
-		} else {
-			console.log("[c4c] Stop requested");
-		}
-		triggerShutdown("rpc");
-		},
-		logFile: sessionPaths.logFile,
-		sourcePath: join(handlersPath, DEV_CONTROLS_LABEL),
-	});
-
-	for (const control of controlProcedures) {
-		registry.set(control.name, control.procedure);
-		logProcedureChange("Registered", control.name, control.procedure, handlersPath, control.sourcePath);
-	}
+    // Watch session.json for status changes. If status != running, shutdown.
+    startSessionWatcher(sessionPaths.directory, sessionPaths.sessionFile, controller.signal, async () => {
+        try {
+            const raw = await fs.readFile(sessionPaths.sessionFile, "utf8");
+            const meta = JSON.parse(raw) as DevSessionMetadata;
+            if (meta.status !== "running") {
+                console.log("[c4c] Stop requested (session status changed)");
+                triggerShutdown("session-status");
+            }
+        } catch {
+            // If the file is removed or unreadable, initiate shutdown as a safe default
+            console.log("[c4c] Session file missing or unreadable. Stopping.");
+            triggerShutdown("session-file-missing");
+        }
+    });
 
 	server = createHttpServer(registry, port, httpOptions);
 
@@ -170,11 +166,7 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 
 	const handlersLabel = formatHandlersLabel(handlersPath);
 	console.log(`[c4c] Watching handlers in ${handlersLabel}`);
-	if (userType === "agent") {
-		console.log(`[c4c] pnpm "c4c dev stop" to stop the dev server`);
-	} else {
-		console.log(`[c4c] Press Ctrl+C to stop the dev server`);
-	}
+    console.log(`[c4c] Press Ctrl+C or run: pnpm "c4c dev stop" to stop the dev server`);
 
 	const watchTask = watchHandlers(
 		handlersPath,
@@ -220,4 +212,29 @@ async function closeServer(server: unknown): Promise<void> {
 			resolvePromise();
 		});
 	});
+}
+
+function startSessionWatcher(
+    sessionDir: string,
+    sessionFilePath: string,
+    signal: AbortSignal,
+    onSessionChanged: () => void
+): void {
+    (async () => {
+        try {
+            const watcher = watch(sessionDir, { signal });
+            for await (const event of watcher) {
+                if (!event || !event.filename) continue;
+                if (event.filename === "session.json") {
+                    onSessionChanged();
+                }
+            }
+        } catch (error) {
+            if (!(error instanceof Error && error.name === "AbortError")) {
+                console.warn(
+                    `[c4c] Session watcher error: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+        }
+    })().catch(() => {});
 }

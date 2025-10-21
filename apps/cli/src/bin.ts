@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { Command } from "commander";
 import process from "node:process";
 import { serveCommand } from "./commands/serve.js";
-import { devCommand, devLogsCommand, devStopCommand } from "./commands/dev.js";
+import { devCommand, devLogsCommand, devStopCommand, devStatusCommand } from "./commands/dev.js";
 import { generateClientCommand } from "./commands/generate.js";
 
 const pkg = JSON.parse(
@@ -24,9 +24,7 @@ program
 	.option("--root <path>", "Project root containing handlers/ and workflows", process.cwd())
 	.option("--handlers <path>", "Custom handlers directory (overrides root)")
 	.option("--workflows <path>", "Custom workflows directory (overrides root)")
-	.option("--docs", "Force enable docs endpoints")
-	.option("--disable-docs", "Disable docs endpoints")
-	.option("--quiet", "Reduce startup logging")
+    .option("--docs", "Force enable docs endpoints")
 	.option("--api-base <url>", "Workflow API base URL used in UI mode", process.env.C4C_API_BASE)
 	.action(async (modeArg: string, options) => {
 		try {
@@ -40,20 +38,16 @@ program
 	});
 
 const devCommandDef = program
-	.command("dev")
-	.description("Start the c4c HTTP server with watch mode")
-	.argument("[mode]", "Mode to run (all|rest|workflow|rpc)", "all")
-	.option("-p, --port <number>", "Port to listen on", parsePort)
+    .command("dev")
+    .description("Start the c4c HTTP server with watch mode")
+    .option("-p, --port <number>", "Port to listen on", parsePort)
 	.option("--root <path>", "Project root containing handlers/", process.cwd())
 	.option("--handlers <path>", "Custom handlers directory (overrides root)")
 	.option("--workflows <path>", "Custom workflows directory (overrides root)")
-	.option("--docs", "Force enable docs endpoints")
-	.option("--disable-docs", "Disable docs endpoints")
-	.option("--quiet", "Reduce startup logging")
-	.option("--agent", "Mark this CLI invocation as running on behalf of an agent")
-	.action(async (modeArg: string, options) => {
+    .option("--docs", "Force enable docs endpoints")
+    .action(async (options) => {
 		try {
-			await devCommand(modeArg, options);
+            await devCommand(options);
 		} catch (error) {
 			console.error(
 				`[c4c] ${error instanceof Error ? error.message : String(error)}`
@@ -81,6 +75,7 @@ devCommandDef
 	.command("logs")
 	.description("Print stdout logs from the running c4c dev server")
 	.option("--root <path>", "Project root containing handlers/", process.cwd())
+    .option("--json", "Output structured JSON logs")
 	.option("--tail <number>", "Number of log lines from the end of the file to display")
 	.action(async (options) => {
 		try {
@@ -92,6 +87,22 @@ devCommandDef
 			process.exit(1);
 		}
 	});
+
+devCommandDef
+    .command("status")
+    .description("Show status of the running c4c dev server")
+    .option("--root <path>", "Project root containing handlers/", process.cwd())
+    .option("--json", "Output JSON status report")
+    .action(async (options) => {
+        try {
+            await devStatusCommand(options);
+        } catch (error) {
+            console.error(
+                `[c4c] ${error instanceof Error ? error.message : String(error)}`
+            );
+            process.exit(1);
+        }
+    });
 
 const generate = program
 	.command("generate")

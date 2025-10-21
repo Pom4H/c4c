@@ -1,8 +1,7 @@
 export type ServeMode = "all" | "rest" | "workflow" | "rpc";
 
-export type DevUserType = "human" | "agent";
-
 export type DevSessionStatus = "running" | "stopping";
+export type DevOverallStatus = DevSessionStatus | "none";
 
 export interface DevSessionMetadata {
 	id: string;
@@ -11,7 +10,6 @@ export interface DevSessionMetadata {
 	mode: ServeMode;
 	projectRoot: string;
 	handlersPath: string;
-	userType: DevUserType;
 	logFile: string;
 	startedAt: string;
 	status: DevSessionStatus;
@@ -32,6 +30,16 @@ export interface DevLogState {
 export interface DevLogReadResult {
 	lines: string[];
 	nextOffset: number;
+}
+
+export interface DevStatusReport {
+    status: DevOverallStatus;
+    pid?: number;
+    port?: number;
+    mode?: ServeMode;
+    projectRoot?: string;
+    handlersPath?: string;
+    startedAt?: string;
 }
 
 export interface DiscoveredSession {
