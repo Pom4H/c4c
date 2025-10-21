@@ -11,8 +11,8 @@ import WorkflowVisualizer from "@/components/WorkflowVisualizer";
 import TraceViewer from "@/components/TraceViewer";
 import SpanGanttChart from "@/components/SpanGanttChart";
 import ThemeToggle from "@/components/ThemeToggle";
-import { useWorkflow } from "@tsdev/workflow-react";
-import { useWorkflows, useWorkflowDefinition } from "@tsdev/workflow-react";
+import { useWorkflow } from "@c4c/workflow-react";
+import { useWorkflows, useWorkflowDefinition } from "@c4c/workflow-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,7 +26,7 @@ import type {
 	WorkflowExecutionResult,
 	TraceSpan,
 	SerializedWorkflowExecutionResult,
-} from "@tsdev/workflow";
+} from "@c4c/workflow";
 
 function hydrateExecutionResult(result: SerializedWorkflowExecutionResult): WorkflowExecutionResult {
 	const { error, ...rest } = result;
@@ -54,7 +54,7 @@ export default function Home() {
 
 	// Use framework hooks for workflow management
   const apiBase = useMemo(
-    () => (process.env.NEXT_PUBLIC_TSDEV_API_BASE || "http://localhost:3000").replace(/\/$/, ""),
+    () => (process.env.NEXT_PUBLIC_c4c_API_BASE || "http://localhost:3000").replace(/\/$/, ""),
     []
   );
   const workflowApiBase = `${apiBase}/workflow`;
@@ -472,7 +472,7 @@ export default function Home() {
 
 				{/* Footer */}
 				<div className="mt-8 text-center text-muted-foreground text-sm">
-					<p>Built with Next.js 15, React Flow, and tsdev Framework</p>
+					<p>Built with Next.js 15, React Flow, and c4c Framework</p>
 					<p className="mt-1">
 						All workflow execution and OTEL tracing handled by the framework
 					</p>

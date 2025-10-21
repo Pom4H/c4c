@@ -19,6 +19,8 @@ out/
 # Build outputs
 build/
 
+.c4c
+
 # Lock files (keep package-lock.json, but ignore pnpm-lock.yaml duplicates if using both)
 # Uncomment if standardizing on one package manager:
 # package-lock.json

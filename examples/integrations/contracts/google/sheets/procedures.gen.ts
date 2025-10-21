@@ -90,21 +90,21 @@ export const GoogleSheetsSheetsSpreadsheetsGetProcedure: Procedure = {
   handler: sheetsSpreadsheetsGetHandler,
 };
 
-export const GoogleSheetsSheetsSpreadsheetsDeveloperMetadataGetContract: Contract = {
+export const GoogleSheetsSheetsSpreadsheec4celoperMetadataGetContract: Contract = {
   name: "googleSheets.sheets.spreadsheets.developer.metadata.get",
   description: "Returns the developer metadata with the specified ID. The caller must specify the spreadsheet ID and the developer metadata's unique metadataId.",
-  input: zod.zSheetsSpreadsheetsDeveloperMetadataGetData,
-  output: zod.zSheetsSpreadsheetsDeveloperMetadataGetResponse,
+  input: zod.zSheetsSpreadsheec4celoperMetadataGetData,
+  output: zod.zSheetsSpreadsheec4celoperMetadataGetResponse,
   metadata: {
     exposure: "internal",
     roles: ["workflow-node"],
     provider: "googleSheets",
-    operation: "sheetsSpreadsheetsDeveloperMetadataGet",
+    operation: "sheetsSpreadsheec4celoperMetadataGet",
     tags: ["google", "sheets"],
   },
 };
 
-const sheetsSpreadsheetsDeveloperMetadataGetHandler = applyPolicies(
+const sheetsSpreadsheec4celoperMetadataGetHandler = applyPolicies(
   async (input, context) => {
     const headers = getOAuthHeaders(context, "googleSheets");
     const request: Record<string, unknown> = { ...input };
@@ -114,7 +114,7 @@ const sheetsSpreadsheetsDeveloperMetadataGetHandler = applyPolicies(
         ...headers,
       };
     }
-    const result = await sdk.sheetsSpreadsheetsDeveloperMetadataGet(request as any);
+    const result = await sdk.sheetsSpreadsheec4celoperMetadataGet(request as any);
     if (result && typeof result === "object" && "data" in result) {
       return (result as { data: unknown }).data;
     }
@@ -127,26 +127,26 @@ const sheetsSpreadsheetsDeveloperMetadataGetHandler = applyPolicies(
   })
 );
 
-export const GoogleSheetsSheetsSpreadsheetsDeveloperMetadataGetProcedure: Procedure = {
-  contract: GoogleSheetsSheetsSpreadsheetsDeveloperMetadataGetContract,
-  handler: sheetsSpreadsheetsDeveloperMetadataGetHandler,
+export const GoogleSheetsSheetsSpreadsheec4celoperMetadataGetProcedure: Procedure = {
+  contract: GoogleSheetsSheetsSpreadsheec4celoperMetadataGetContract,
+  handler: sheetsSpreadsheec4celoperMetadataGetHandler,
 };
 
-export const GoogleSheetsSheetsSpreadsheetsDeveloperMetadataSearchContract: Contract = {
+export const GoogleSheetsSheetsSpreadsheec4celoperMetadataSearchContract: Contract = {
   name: "googleSheets.sheets.spreadsheets.developer.metadata.search",
   description: "Returns all developer metadata matching the specified DataFilter. If the provided DataFilter represents a DeveloperMetadataLookup object, this will return all DeveloperMetadata entries selected by it. If the DataFilter represents a location in a spreadsheet, this will return all developer metadata associated with locations intersecting that region.",
-  input: zod.zSheetsSpreadsheetsDeveloperMetadataSearchData,
-  output: zod.zSheetsSpreadsheetsDeveloperMetadataSearchResponse,
+  input: zod.zSheetsSpreadsheec4celoperMetadataSearchData,
+  output: zod.zSheetsSpreadsheec4celoperMetadataSearchResponse,
   metadata: {
     exposure: "internal",
     roles: ["workflow-node"],
     provider: "googleSheets",
-    operation: "sheetsSpreadsheetsDeveloperMetadataSearch",
+    operation: "sheetsSpreadsheec4celoperMetadataSearch",
     tags: ["google", "sheets"],
   },
 };
 
-const sheetsSpreadsheetsDeveloperMetadataSearchHandler = applyPolicies(
+const sheetsSpreadsheec4celoperMetadataSearchHandler = applyPolicies(
   async (input, context) => {
     const headers = getOAuthHeaders(context, "googleSheets");
     const request: Record<string, unknown> = { ...input };
@@ -156,7 +156,7 @@ const sheetsSpreadsheetsDeveloperMetadataSearchHandler = applyPolicies(
         ...headers,
       };
     }
-    const result = await sdk.sheetsSpreadsheetsDeveloperMetadataSearch(request as any);
+    const result = await sdk.sheetsSpreadsheec4celoperMetadataSearch(request as any);
     if (result && typeof result === "object" && "data" in result) {
       return (result as { data: unknown }).data;
     }
@@ -169,9 +169,9 @@ const sheetsSpreadsheetsDeveloperMetadataSearchHandler = applyPolicies(
   })
 );
 
-export const GoogleSheetsSheetsSpreadsheetsDeveloperMetadataSearchProcedure: Procedure = {
-  contract: GoogleSheetsSheetsSpreadsheetsDeveloperMetadataSearchContract,
-  handler: sheetsSpreadsheetsDeveloperMetadataSearchHandler,
+export const GoogleSheetsSheetsSpreadsheec4celoperMetadataSearchProcedure: Procedure = {
+  contract: GoogleSheetsSheetsSpreadsheec4celoperMetadataSearchContract,
+  handler: sheetsSpreadsheec4celoperMetadataSearchHandler,
 };
 
 export const GoogleSheetsSheetsSpreadsheetsSheetsCopyToContract: Contract = {
@@ -723,8 +723,8 @@ export const GoogleSheetsSheetsSpreadsheetsGetByDataFilterProcedure: Procedure =
 export const GoogleSheetsProcedures: Procedure[] = [
   GoogleSheetsSheetsSpreadsheetsCreateProcedure,
   GoogleSheetsSheetsSpreadsheetsGetProcedure,
-  GoogleSheetsSheetsSpreadsheetsDeveloperMetadataGetProcedure,
-  GoogleSheetsSheetsSpreadsheetsDeveloperMetadataSearchProcedure,
+  GoogleSheetsSheetsSpreadsheec4celoperMetadataGetProcedure,
+  GoogleSheetsSheetsSpreadsheec4celoperMetadataSearchProcedure,
   GoogleSheetsSheetsSpreadsheetsSheetsCopyToProcedure,
   GoogleSheetsSheetsSpreadsheetsValuesGetProcedure,
   GoogleSheetsSheetsSpreadsheetsValuesUpdateProcedure,

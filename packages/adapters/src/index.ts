@@ -1,7 +1,7 @@
 /**
  * @c4c/adapters - Transport adapters
  * 
- * HTTP, REST, CLI adapters for tsdev procedures
+ * HTTP, REST, CLI adapters for c4c procedures
  */
 
 export { createHttpServer, buildHttpApp } from "./http.js";

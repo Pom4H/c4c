@@ -26,7 +26,19 @@ export {
 } from "./metadata.js";
 
 // Registry
-export { collectRegistry, getProcedure, listProcedures, describeRegistry } from "./registry.js";
+export {
+	collectRegistry,
+	collectRegistryDetailed,
+	describeRegistry,
+	formatProcedureBadges,
+	formatProcedureMetadata,
+	getProcedure,
+	isSupportedHandlerFile,
+	listProcedures,
+	loadProceduresFromModule,
+} from "./registry.js";
+
+export type { RegistryLoadResult, RegistryModuleIndex } from "./registry.js";
 
 // Executor
 export { executeProcedure, createExecutionContext, applyPolicies } from "./executor.js";

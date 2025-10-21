@@ -6,7 +6,7 @@
  */
 
 import { useMemo, useState } from "react";
-import type { TraceSpan } from "@tsdev/workflow";
+import type { TraceSpan } from "@c4c/workflow";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

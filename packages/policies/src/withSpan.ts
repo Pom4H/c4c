@@ -1,7 +1,7 @@
 import { trace, type Span } from "@opentelemetry/api";
 import type { Handler, Policy } from "@c4c/core";
 
-const tracer = trace.getTracer("tsdev");
+const tracer = trace.getTracer("c4c");
 
 /**
  * OpenTelemetry tracing policy

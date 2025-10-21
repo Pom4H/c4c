@@ -16,7 +16,7 @@ export interface HttpAppOptions {
 }
 
 /**
- * HTTP adapter for tsdev
+ * HTTP adapter for c4c
  * Builds a Hono application and starts a Node server
  */
 export function createHttpServer(registry: Registry, port = 3000, options: HttpAppOptions = {}) {
@@ -38,7 +38,7 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 		enableRpc = true,
 		enableRest = true,
 		enableWorkflow = true,
-		workflowsPath = process.env.TSDEV_WORKFLOWS_DIR ?? "workflows",
+		workflowsPath = process.env.c4c_WORKFLOWS_DIR ?? "workflows",
 	} = options;
 
 	const app = new Hono();
@@ -69,9 +69,9 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 	if (enableDocs) {
 		app.get("/openapi.json", (c) => {
 			const spec = generateOpenAPIJSON(registry, {
-				title: "tsdev API",
+				title: "c4c API",
 				version: "1.0.0",
-				description: "Auto-generated API from tsdev contracts",
+				description: "Auto-generated API from c4c contracts",
 				servers: [{ url: `http://localhost:${port}`, description: "Development server" }],
 			});
 
@@ -83,7 +83,7 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 <!DOCTYPE html>
 <html>
 <head>
-	<title>tsdev API Documentation</title>
+	<title>c4c API Documentation</title>
 	<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
 </head>
 <body>
@@ -131,7 +131,7 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 }
 
 function logStartup(registry: Registry, options: HttpAppOptions) {
-	if (process.env.TSDEV_QUIET === "1") {
+	if (process.env.c4c_QUIET === "1") {
 		return;
 	}
 
@@ -141,7 +141,7 @@ function logStartup(registry: Registry, options: HttpAppOptions) {
 		enableRpc = true,
 		enableRest = true,
 		enableWorkflow = true,
-		workflowsPath = process.env.TSDEV_WORKFLOWS_DIR ?? "workflows",
+		workflowsPath = process.env.c4c_WORKFLOWS_DIR ?? "workflows",
 	} = options;
 
 	console.log(`🚀 HTTP server listening on http://localhost:${port}`);

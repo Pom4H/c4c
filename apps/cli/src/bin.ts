@@ -6,7 +6,10 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import process from "node:process";
 import {
 	serve,
+	dev,
 	generateClient,
+	stopDevServer,
+	readDevLogs,
 	type GenerateClientOptions,
 	type ServeMode,
 	type ServeOptions,
@@ -52,6 +55,7 @@ program
 				handlersPath,
 				workflowsPath,
 				enableDocs,
+				projectRoot: rootDir,
 			};
 
 			if (modeArg === "ui") {
@@ -75,6 +79,105 @@ program
 		process.exit(1);
 	}
 });
+
+const devCommand = program
+	.command("dev")
+	.description("Start the c4c HTTP server with watch mode")
+	.argument("[mode]", "Mode to run (all|rest|workflow|rpc)", "all")
+	.option("-p, --port <number>", "Port to listen on", parsePort)
+	.option("--root <path>", "Project root containing handlers/", process.cwd())
+	.option("--handlers <path>", "Custom handlers directory (overrides root)")
+	.option("--workflows <path>", "Custom workflows directory (overrides root)")
+	.option("--docs", "Force enable docs endpoints")
+	.option("--disable-docs", "Disable docs endpoints")
+	.option("--quiet", "Reduce startup logging")
+	.option("--agent", "Mark this CLI invocation as running on behalf of an agent")
+	.action(async (modeArg: string, options) => {
+		try {
+			if (!isServeMode(modeArg)) {
+				console.error(`[c4c] Unknown dev mode '${modeArg}'.`);
+				process.exit(1);
+			}
+
+			const rootDir = resolve(options.root ?? process.cwd());
+			const handlersPath = determineHandlersPath(rootDir, options.handlers);
+			const workflowsPath = determineWorkflowsPath(rootDir, options.workflows);
+
+			if (options.quiet) {
+				process.env.C4C_QUIET = "1";
+			}
+
+			const enableDocs =
+				options.docs ? true : options.disableDocs ? false : undefined;
+
+			const userType = options.agent ? "agent" : "human";
+			const serveOptions: ServeOptions = {
+				port: options.port,
+				handlersPath,
+				workflowsPath,
+				enableDocs,
+				projectRoot: rootDir,
+				userType,
+			};
+
+			await dev(modeArg, serveOptions);
+		} catch (error) {
+			console.error(
+				`[c4c] ${error instanceof Error ? error.message : String(error)}`
+			);
+			process.exit(1);
+		}
+	});
+
+devCommand
+	.command("stop")
+	.description("Stop the running c4c dev server")
+	.option("--root <path>", "Project root containing handlers/", process.cwd())
+	.action(async (options) => {
+		try {
+			const rootDir = resolve(options.root ?? process.cwd());
+			await stopDevServer(rootDir);
+		} catch (error) {
+			console.error(
+				`[c4c] ${error instanceof Error ? error.message : String(error)}`
+			);
+			process.exit(1);
+		}
+	});
+
+devCommand
+	.command("logs")
+	.description("Print stdout logs from the running c4c dev server")
+	.option("--root <path>", "Project root containing handlers/", process.cwd())
+	.option("--tail <number>", "Number of log lines from the end of the file to display")
+	.action(async (options) => {
+		try {
+			const rootDir = resolve(options.root ?? process.cwd());
+			const tailValue = options.tail !== undefined ? parsePositiveInteger(options.tail, "tail") : undefined;
+			const rootLabel = (() => {
+				const relativeRoot = relative(process.cwd(), rootDir);
+				if (!relativeRoot || relativeRoot === "") return rootDir;
+				return relativeRoot;
+			})();
+			const result = await readDevLogs({ projectRoot: rootDir, tail: tailValue });
+			if (!result) {
+				console.log(`[c4c] No running dev server found (searched from ${rootLabel}).`);
+				return;
+			}
+			if (result.lines.length === 0) {
+				console.log("[c4c] No new log entries.");
+				return;
+			}
+			for (const line of result.lines) {
+				console.log(line);
+			}
+		} catch (error) {
+			console.error(
+				`[c4c] ${error instanceof Error ? error.message : String(error)}`
+			);
+			process.exit(1);
+		}
+	});
 
 const generate = program
 	.command("generate")
@@ -119,6 +222,14 @@ function parsePort(value: string): number {
 	const parsed = Number.parseInt(value, 10);
 	if (Number.isNaN(parsed) || parsed <= 0) {
 		throw new Error(`Invalid port '${value}'`);
+	}
+	return parsed;
+}
+
+function parsePositiveInteger(value: string, label: string): number {
+	const parsed = Number.parseInt(value, 10);
+	if (!Number.isFinite(parsed) || parsed <= 0) {
+		throw new Error(`Invalid ${label} '${value}'`);
 	}
 	return parsed;
 }

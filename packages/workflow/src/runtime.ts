@@ -21,7 +21,7 @@ import type {
 import { publish, type SerializedWorkflowExecutionResult } from "./events.js";
 import { SpanCollector, bindCollector, forceFlush, clearActiveCollector } from "./otel.js";
 
-const tracer = trace.getTracer("tsdev.workflow");
+const tracer = trace.getTracer("c4c.workflow");
 
 /**
  * Signal to pause workflow execution gracefully.

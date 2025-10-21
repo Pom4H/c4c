@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { Procedure } from "@c4c/core";
+import { applyPolicies, type Procedure } from "@c4c/core";
+import { withAuthRequired } from "@c4c/policies";
 
 const fetchInput = z.object({
 	userId: z.string(),
@@ -96,4 +97,70 @@ export const dataSave: Procedure<z.infer<typeof saveInput>, z.infer<typeof saveO
 		stored: true,
 		storedAt: new Date().toISOString(),
 	}),
+};
+
+const secureActionInput = z.object({
+	moderatorId: z.string(),
+	targetUserId: z.string(),
+	action: z.enum(["promote", "suspend", "deactivate"]),
+	notes: z.string().optional(),
+});
+
+const secureActionOutput = z.object({
+	action: z.enum(["promote", "suspend", "deactivate"]),
+	moderatorId: z.string(),
+	targetUserId: z.string(),
+	actorRole: z.enum(["moderator", "admin"]),
+	performedAt: z.string(),
+	notes: z.string().optional(),
+});
+
+export const dataSecureAction: Procedure<
+	z.infer<typeof secureActionInput>,
+	z.infer<typeof secureActionOutput>
+> = {
+	contract: {
+		name: "data.secureAction",
+		description: "Performs a privileged moderation action that requires authentication.",
+		input: secureActionInput,
+		output: secureActionOutput,
+		metadata: {
+			exposure: "external",
+			roles: ["workflow-node", "api-endpoint"],
+			category: "demo",
+			tags: ["data", "auth"],
+			auth: {
+				requiresAuth: true,
+				requiredRoles: ["moderator"],
+				authScheme: "Bearer",
+			},
+		},
+	},
+	handler: applyPolicies(
+		async ({ action, moderatorId, targetUserId, notes }, context) => {
+			const auth = context.metadata.auth as { token?: string } | undefined;
+			const tokenRoleMap: Record<string, "moderator" | "admin"> = {
+				"demo-moderator-token": "moderator",
+				"demo-admin-token": "admin",
+			};
+
+			const role = auth?.token ? tokenRoleMap[auth.token] : undefined;
+			if (!role) {
+				throw new Error("Unauthorized: invalid or missing moderator token");
+			}
+
+			return {
+				action,
+				moderatorId,
+				targetUserId,
+				actorRole: role,
+				performedAt: new Date().toISOString(),
+				notes,
+			};
+		},
+		withAuthRequired({
+			requiredFields: ["token"],
+			unauthorizedMessage: "Unauthorized: bearer token required for secure action",
+		})
+	),
 };

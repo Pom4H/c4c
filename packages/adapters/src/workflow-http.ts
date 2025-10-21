@@ -58,7 +58,7 @@ export interface WorkflowRouterOptions {
 
 export function createWorkflowRouter(registry: Registry, options: WorkflowRouterOptions = {}) {
 	const router = new Hono();
-	const workflowsPath = options.workflowsPath ?? process.env.TSDEV_WORKFLOWS_DIR ?? "workflows";
+	const workflowsPath = options.workflowsPath ?? process.env.c4c_WORKFLOWS_DIR ?? "workflows";
 
 	router.get("/workflow/palette", (c) => {
 		const html = generateWorkflowHTML(registry);
@@ -240,7 +240,7 @@ function generateWorkflowHTML(registry: Registry): string {
 <html lang="en">
 <head>
 	<meta charset="utf-8">
-	<title>tsdev Workflow Palette</title>
+	<title>c4c Workflow Palette</title>
 	<style>
 		body { font-family: system-ui, sans-serif; padding: 24px; background: #0b1120; color: #e2e8f0; }
 		h1 { margin-bottom: 8px; }
@@ -273,7 +273,7 @@ function generateWorkflowHTML(registry: Registry): string {
 		</tbody>
 	</table>
 	<script>
-		window.__TSDEV_WORKFLOW_UI__ = ${serializedData};
+		window.__c4c_WORKFLOW_UI__ = ${serializedData};
 	</script>
 </body>
 </html>`;
@@ -285,7 +285,7 @@ function generateWorkflowUI(registry: Registry): WorkflowUIPayload {
 
 function buildWorkflowUIPayload(registry: Registry): WorkflowUIPayload {
 	const openapi = generateOpenAPISpec(registry, {
-		title: "tsdev Workflow API",
+		title: "c4c Workflow API",
 		version: "1.0.0",
 		description: "Auto-generated palette data for workflow tooling",
 	});

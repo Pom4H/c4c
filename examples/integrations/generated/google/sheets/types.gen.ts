@@ -4543,7 +4543,7 @@ export type SheetsSpreadsheetsGetResponses = {
 export type SheetsSpreadsheetsGetResponse =
   SheetsSpreadsheetsGetResponses[keyof SheetsSpreadsheetsGetResponses]
 
-export type SheetsSpreadsheetsDeveloperMetadataGetData = {
+export type SheetsSpreadsheec4celoperMetadataGetData = {
   body?: never
   path: {
     /**
@@ -4604,17 +4604,17 @@ export type SheetsSpreadsheetsDeveloperMetadataGetData = {
   url: '/v4/spreadsheets/{spreadsheetId}/developerMetadata/{metadataId}'
 }
 
-export type SheetsSpreadsheetsDeveloperMetadataGetResponses = {
+export type SheetsSpreadsheec4celoperMetadataGetResponses = {
   /**
    * Successful response
    */
   200: DeveloperMetadata
 }
 
-export type SheetsSpreadsheetsDeveloperMetadataGetResponse =
-  SheetsSpreadsheetsDeveloperMetadataGetResponses[keyof SheetsSpreadsheetsDeveloperMetadataGetResponses]
+export type SheetsSpreadsheec4celoperMetadataGetResponse =
+  SheetsSpreadsheec4celoperMetadataGetResponses[keyof SheetsSpreadsheec4celoperMetadataGetResponses]
 
-export type SheetsSpreadsheetsDeveloperMetadataSearchData = {
+export type SheetsSpreadsheec4celoperMetadataSearchData = {
   body?: SearchDeveloperMetadataRequest
   path: {
     /**
@@ -4671,15 +4671,15 @@ export type SheetsSpreadsheetsDeveloperMetadataSearchData = {
   url: '/v4/spreadsheets/{spreadsheetId}/developerMetadata:search'
 }
 
-export type SheetsSpreadsheetsDeveloperMetadataSearchResponses = {
+export type SheetsSpreadsheec4celoperMetadataSearchResponses = {
   /**
    * Successful response
    */
   200: SearchDeveloperMetadataResponse
 }
 
-export type SheetsSpreadsheetsDeveloperMetadataSearchResponse =
-  SheetsSpreadsheetsDeveloperMetadataSearchResponses[keyof SheetsSpreadsheetsDeveloperMetadataSearchResponses]
+export type SheetsSpreadsheec4celoperMetadataSearchResponse =
+  SheetsSpreadsheec4celoperMetadataSearchResponses[keyof SheetsSpreadsheec4celoperMetadataSearchResponses]
 
 export type SheetsSpreadsheetsSheetsCopyToData = {
   body?: CopySheetToAnotherSpreadsheetRequest

@@ -1,4 +1,4 @@
-# tsdev Implementation Plan
+# c4c Implementation Plan
 
 Roadmap for introducing the Hono transport layer, richer procedure metadata, streaming workflow APIs, unified CLI tooling, and generated clients.
 
@@ -12,7 +12,7 @@ Roadmap for introducing the Hono transport layer, richer procedure metadata, str
 - Introduce shared middleware (CORS, health, context injection, logging) to be reused in every deployment mode.
 
 ## 2. Workflow Streaming API
-- Add execution event hooks/emitter inside `@tsdev/workflow` to surface node start/completion, errors, and final status.
+- Add execution event hooks/emitter inside `@c4c/workflow` to surface node start/completion, errors, and final status.
 - Expose SSE endpoint (e.g. `GET /workflow/executions/:id/stream`) using `streamSSE` that subscribes to execution events and streams JSON payloads (`workflow-start`, `node-start`, `node-complete`, `node-error`, `workflow-complete`, `heartbeat`).
 - Ensure long-running streams flush after every event and close cleanly once execution finishes or errors.
 - Update workflow HTTP routes to return `executionId` so clients can immediately connect to the SSE stream.
@@ -42,8 +42,8 @@ Roadmap for introducing the Hono transport layer, richer procedure metadata, str
 - Ensure new functionality plugs into ports instead of coupling to transports directly (e.g. metadata filters, auth policies, event streaming).
 - Update docs to reflect the hexagonal architecture narrative and keep adapters transport-agnostic.
 
-## 4. Unified CLI (`tsdev serve …`)
-- Introduce a small CLI package/bin exposing `tsdev serve <mode>` with modes: `rpc`, `rest`, `workflow`, `ui`, `all`.
+## 4. Unified CLI (`c4c serve …`)
+- Introduce a small CLI package/bin exposing `c4c serve <mode>` with modes: `rpc`, `rest`, `workflow`, `ui`, `all`.
 - Each mode composes the relevant Hono routers (or launches the UI dev server), sharing configuration for port/host and registry loading.
 - Provide configuration via flags/env (`--port`, `--host`, `--config-file`) and emit startup diagnostics (available routes, SSE endpoints, etc.).
 - Support monolithic (`all`) mode in a single process and optional microservice mode via multiple CLI invocations.
@@ -54,12 +54,12 @@ Roadmap for introducing the Hono transport layer, richer procedure metadata, str
 - Optionally proxy the UI through the main Hono app for simplified deployment.
 
 ## 6. Typed Client Generation
-- Extend `@tsdev/generators` to emit a TypeScript client (REST and/or RPC) using metadata-filtered contracts.
+- Extend `@c4c/generators` to emit a TypeScript client (REST and/or RPC) using metadata-filtered contracts.
 - Generate:
   - Typed function wrappers (`createUser(input)`).
   - Zod schemas or inferred types for inputs/outputs.
   - Fetch implementation with pluggable transport (node/fetch).
-- Provide CLI command (`tsdev generate client --out ./src/generated`) and document the workflow.
+- Provide CLI command (`c4c generate client --out ./src/generated`) and document the workflow.
 - Align OpenAPI output with exposed procedures only, ensuring frontend clients match published endpoints.
 
 ## 7. Documentation & Validation
@@ -73,7 +73,7 @@ Roadmap for introducing the Hono transport layer, richer procedure metadata, str
 - Provide migration guide for existing users moving from the Node HTTP server to Hono.
 
 ## Open Questions / Decisions
-- Confirm desired default ports and whether `tsdev serve all` should hot-reload during development.
+- Confirm desired default ports and whether `c4c serve all` should hot-reload during development.
 - Decide on configuration source of truth (JSON/YAML manifest vs programmatic setup).
 - Determine if SSE events require persistence/history for late subscribers.
 - Clarify packaging strategy for the generated client (npm package vs per-project codegen).

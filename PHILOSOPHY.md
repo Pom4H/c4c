@@ -502,7 +502,7 @@ Procedures work across any transport:
 POST /rpc/users.create
 
 // CLI
-tsdev users.create --name Alice --email alice@example.com
+c4c users.create --name Alice --email alice@example.com
 
 // Workflow
 { type: "procedure", procedureName: "users.create" }

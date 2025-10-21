@@ -639,9 +639,9 @@ const clientCode = generateRpcClientModule(registry);
 **Use the generated client:**
 
 ```typescript
-import { createTsdevClient } from "./generated/client";
+import { createc4cClient } from "./generated/client";
 
-const client = createTsdevClient({
+const client = createc4cClient({
   baseUrl: "http://localhost:3000",
   authToken: "your-jwt-token", // Auto-added to protected procedures
 });
