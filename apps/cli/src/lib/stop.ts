@@ -1,3 +1,4 @@
+import { promises as fs } from "node:fs";
 import { formatHandlersLabel } from "./formatting.js";
 import { isProcessAlive, waitForProcessExit } from "./process.js";
 import { discoverActiveSession, removeDevSessionArtifacts } from "./session.js";
@@ -18,42 +19,15 @@ export async function stopDevServer(projectRoot: string): Promise<void> {
 		return;
 	}
 
-	const url = new URL(`/rpc/${encodeURIComponent("dev.control.stop")}`, `http://127.0.0.1:${metadata.port}`).toString();
-	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), 5000);
-
-	let stopRequestAccepted = false;
-	let fallbackReason: string | null = null;
+	// Write stop signal file
 	try {
-		const response = await fetch(url, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ reason: "cli-stop" }),
-			signal: controller.signal,
-		});
-		if (response.ok) {
-			stopRequestAccepted = true;
-		} else if (response.status === 404) {
-			fallbackReason = "Procedure not found (older dev server). Falling back to signal-based shutdown.";
-		} else {
-			fallbackReason = `Stop request responded with status ${response.status}`;
-		}
+		await fs.writeFile(sessionPaths.stopSignalFile, JSON.stringify({
+			requestedAt: new Date().toISOString(),
+			reason: "cli-stop",
+		}), "utf8");
+		console.log(`[c4c] Stop signal sent to dev server (pid ${metadata.pid}).`);
 	} catch (error) {
-		if (controller.signal.aborted) {
-			throw new Error("Timed out while contacting the dev server.");
-		}
-		fallbackReason = error instanceof Error ? error.message : String(error);
-	} finally {
-		clearTimeout(timeout);
-	}
-
-	if (fallbackReason) {
-		console.warn(`[c4c] ${fallbackReason}`);
-	}
-
-	if (stopRequestAccepted) {
-		console.log(`[c4c] Stop request sent to dev server (pid ${metadata.pid}).`);
-	} else {
+		console.warn(`[c4c] Failed to write stop signal file: ${error instanceof Error ? error.message : String(error)}`);
 		console.log(`[c4c] Sending SIGTERM to dev server (pid ${metadata.pid}).`);
 		try {
 			process.kill(metadata.pid, "SIGTERM");
@@ -63,6 +37,7 @@ export async function stopDevServer(projectRoot: string): Promise<void> {
 			);
 		}
 	}
+
 	const exited = await waitForProcessExit(metadata.pid, 7000);
 	if (exited) {
 		await removeDevSessionArtifacts(sessionPaths);

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { Command } from "commander";
 import process from "node:process";
 import { serveCommand } from "./commands/serve.js";
-import { devCommand, devLogsCommand, devStopCommand } from "./commands/dev.js";
+import { devCommand, devLogsCommand, devStopCommand, devStatusCommand } from "./commands/dev.js";
 import { generateClientCommand } from "./commands/generate.js";
 
 const pkg = JSON.parse(
@@ -50,7 +50,6 @@ const devCommandDef = program
 	.option("--docs", "Force enable docs endpoints")
 	.option("--disable-docs", "Disable docs endpoints")
 	.option("--quiet", "Reduce startup logging")
-	.option("--agent", "Mark this CLI invocation as running on behalf of an agent")
 	.action(async (modeArg: string, options) => {
 		try {
 			await devCommand(modeArg, options);
@@ -78,10 +77,27 @@ devCommandDef
 	});
 
 devCommandDef
+	.command("status")
+	.description("Check the status of the running c4c dev server")
+	.option("--root <path>", "Project root containing handlers/", process.cwd())
+	.option("--json", "Output status in JSON format")
+	.action(async (options) => {
+		try {
+			await devStatusCommand(options);
+		} catch (error) {
+			console.error(
+				`[c4c] ${error instanceof Error ? error.message : String(error)}`
+			);
+			process.exit(1);
+		}
+	});
+
+devCommandDef
 	.command("logs")
 	.description("Print stdout logs from the running c4c dev server")
 	.option("--root <path>", "Project root containing handlers/", process.cwd())
 	.option("--tail <number>", "Number of log lines from the end of the file to display")
+	.option("--json", "Output logs in JSON format")
 	.action(async (options) => {
 		try {
 			await devLogsCommand(options);

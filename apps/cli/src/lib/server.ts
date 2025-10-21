@@ -1,10 +1,10 @@
 import { promises as fs } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { resolve, join } from "node:path";
+import { resolve } from "node:path";
 import { collectRegistry, collectRegistryDetailed, type Registry, type RegistryModuleIndex } from "@c4c/core";
 import { createHttpServer, type HttpAppOptions } from "@c4c/adapters";
-import { DEFAULTS, DEV_CONTROLS_LABEL } from "./constants.js";
-import { formatHandlersLabel, logProcedureChange } from "./formatting.js";
+import { DEFAULTS } from "./constants.js";
+import { formatHandlersLabel } from "./formatting.js";
 import { createLogWriter, interceptConsole } from "./logging.js";
 import {
 	ensureDevSessionAvailability,
@@ -12,9 +12,8 @@ import {
 	removeDevSessionArtifacts,
 	writeDevSessionMetadata,
 } from "./session.js";
-import type { DevSessionMetadata, DevUserType, ServeMode } from "./types.js";
+import type { DevSessionMetadata, ServeMode } from "./types.js";
 import { watchHandlers } from "./watcher.js";
-import { createDevControlProcedures, type DevControlProcedureDescriptor } from "../internal/handlers/dev-control.js";
 
 export interface ServeOptions {
 	port?: number;
@@ -26,7 +25,6 @@ export interface ServeOptions {
 	enableWorkflow?: boolean;
 	apiBaseUrl?: string;
 	projectRoot?: string;
-	userType?: DevUserType;
 }
 
 export async function serve(mode: ServeMode, options: ServeOptions = {}) {
@@ -37,7 +35,6 @@ export async function serve(mode: ServeMode, options: ServeOptions = {}) {
 
 export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 	const { handlersPath, httpOptions, projectRoot } = resolveServeConfiguration(mode, options);
-	const userType: DevUserType = options.userType ?? "human";
 	const sessionPaths = getDevSessionPaths(projectRoot);
 	await ensureDevSessionAvailability(sessionPaths);
 
@@ -64,7 +61,6 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 		mode,
 		projectRoot,
 		handlersPath,
-		userType,
 		logFile: sessionPaths.logFile,
 		startedAt: new Date().toISOString(),
 		status: "running",
@@ -140,24 +136,6 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 		}
 	};
 
-	const controlProcedures: DevControlProcedureDescriptor[] = createDevControlProcedures({
-		requestStop: (reason) => {
-		if (reason) {
-			console.log(`[c4c] Stop requested: ${reason}`);
-		} else {
-			console.log("[c4c] Stop requested");
-		}
-		triggerShutdown("rpc");
-		},
-		logFile: sessionPaths.logFile,
-		sourcePath: join(handlersPath, DEV_CONTROLS_LABEL),
-	});
-
-	for (const control of controlProcedures) {
-		registry.set(control.name, control.procedure);
-		logProcedureChange("Registered", control.name, control.procedure, handlersPath, control.sourcePath);
-	}
-
 	server = createHttpServer(registry, port, httpOptions);
 
 	for (const signal of signals) {
@@ -170,11 +148,19 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 
 	const handlersLabel = formatHandlersLabel(handlersPath);
 	console.log(`[c4c] Watching handlers in ${handlersLabel}`);
-	if (userType === "agent") {
-		console.log(`[c4c] pnpm "c4c dev stop" to stop the dev server`);
-	} else {
-		console.log(`[c4c] Press Ctrl+C to stop the dev server`);
-	}
+	console.log(`[c4c] Run "c4c dev stop" or press Ctrl+C to stop the dev server`);
+
+	// Check for stop signal file periodically
+	const stopCheckInterval = setInterval(async () => {
+		try {
+			await fs.access(sessionPaths.stopSignalFile);
+			console.log("[c4c] Stop signal received via file");
+			triggerShutdown("stop-signal", { exit: true });
+			clearInterval(stopCheckInterval);
+		} catch {
+			// File doesn't exist, continue
+		}
+	}, 500);
 
 	const watchTask = watchHandlers(
 		handlersPath,
@@ -187,6 +173,7 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 	try {
 		await watchTask;
 	} finally {
+		clearInterval(stopCheckInterval);
 		await performCleanup();
 	}
 }

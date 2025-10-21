@@ -1,6 +1,6 @@
 import { resolve, relative } from "node:path";
 import { dev as runDev, type ServeOptions } from "../lib/server.js";
-import type { DevUserType, ServeMode } from "../lib/types.js";
+import type { ServeMode } from "../lib/types.js";
 import { determineHandlersPath, determineWorkflowsPath } from "../internal/utils/project-paths.js";
 import { stopDevServer } from "../lib/stop.js";
 import { readDevLogs } from "../lib/logs.js";
@@ -13,7 +13,6 @@ interface DevCommandOptions {
 	docs?: boolean;
 	disableDocs?: boolean;
 	quiet?: boolean;
-	agent?: boolean;
 }
 
 export async function devCommand(modeArg: string, options: DevCommandOptions): Promise<void> {
@@ -31,14 +30,12 @@ export async function devCommand(modeArg: string, options: DevCommandOptions): P
 
 	const enableDocs = options.docs ? true : options.disableDocs ? false : undefined;
 
-	const userType: DevUserType = options.agent ? "agent" : "human";
 	const serveOptions: ServeOptions = {
 		port: options.port,
 		handlersPath,
 		workflowsPath,
 		enableDocs,
 		projectRoot: rootDir,
-		userType,
 	};
 
 	await runDev(modeArg, serveOptions);
@@ -60,6 +57,7 @@ export async function devStopCommand(options: DevStopOptions): Promise<void> {
 interface DevLogsOptions {
 	root?: string;
 	tail?: number;
+	json?: boolean;
 }
 
 export async function devLogsCommand(options: DevLogsOptions): Promise<void> {
@@ -72,15 +70,27 @@ export async function devLogsCommand(options: DevLogsOptions): Promise<void> {
 	})();
 	const result = await readDevLogs({ projectRoot: rootDir, tail: tailValue });
 	if (!result) {
-		console.log(`[c4c] No running dev server found (searched from ${rootLabel}).`);
+		if (options.json) {
+			console.log(JSON.stringify({ running: false, lines: [] }, null, 2));
+		} else {
+			console.log(`[c4c] No running dev server found (searched from ${rootLabel}).`);
+		}
 		return;
 	}
-	if (result.lines.length === 0) {
-		console.log("[c4c] No new log entries.");
-		return;
-	}
-	for (const line of result.lines) {
-		console.log(line);
+	if (options.json) {
+		console.log(JSON.stringify({ 
+			running: true, 
+			lines: result.lines,
+			nextOffset: result.nextOffset 
+		}, null, 2));
+	} else {
+		if (result.lines.length === 0) {
+			console.log("[c4c] No new log entries.");
+			return;
+		}
+		for (const line of result.lines) {
+			console.log(line);
+		}
 	}
 }
 
@@ -90,4 +100,44 @@ function parsePositiveInteger(value: unknown, label: string): number {
 		throw new Error(`Invalid ${label} '${value}'`);
 	}
 	return parsed;
+}
+
+interface DevStatusOptions {
+	root?: string;
+	json?: boolean;
+}
+
+export async function devStatusCommand(options: DevStatusOptions): Promise<void> {
+	const { discoverActiveSession } = await import("../lib/session.js");
+	const rootDir = resolve(options.root ?? process.cwd());
+	const resolved = await discoverActiveSession(rootDir);
+	
+	if (!resolved) {
+		if (options.json) {
+			console.log(JSON.stringify({ running: false }, null, 2));
+		} else {
+			console.log("[c4c] No running dev server found.");
+		}
+		return;
+	}
+
+	const { metadata } = resolved;
+	
+	if (options.json) {
+		console.log(JSON.stringify({
+			running: true,
+			pid: metadata.pid,
+			port: metadata.port,
+			mode: metadata.mode,
+			status: metadata.status,
+			startedAt: metadata.startedAt,
+		}, null, 2));
+	} else {
+		console.log(`[c4c] Dev server is running`);
+		console.log(`  PID: ${metadata.pid}`);
+		console.log(`  Port: ${metadata.port}`);
+		console.log(`  Mode: ${metadata.mode}`);
+		console.log(`  Status: ${metadata.status}`);
+		console.log(`  Started: ${metadata.startedAt}`);
+	}
 }
