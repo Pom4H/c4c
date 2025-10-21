@@ -5,6 +5,12 @@ import process from "node:process";
 import { serveCommand } from "./commands/serve.js";
 import { devCommand, devLogsCommand, devStopCommand, devStatusCommand } from "./commands/dev.js";
 import { generateClientCommand } from "./commands/generate.js";
+import { execProcedureCommand, execWorkflowCommand } from "./commands/exec.js";
+import { 
+	getAllCompletions, 
+	generateBashCompletion, 
+	generateZshCompletion 
+} from "./lib/completion.js";
 
 const pkg = JSON.parse(
 	readFileSync(new URL("../package.json", import.meta.url), "utf8")
@@ -118,6 +124,66 @@ generate
 				`[c4c] ${error instanceof Error ? error.message : String(error)}`
 			);
 			process.exit(1);
+		}
+	});
+
+program
+	.command("exec <name>")
+	.description("Execute a procedure or workflow (use workflow/name for workflows)")
+	.option("--root <path>", "Project root containing procedures/", process.cwd())
+	.option("-i, --input <json>", "Input data as JSON string")
+	.option("-f, --input-file <file>", "Input data from JSON file")
+	.option("--json", "Output only JSON result (no logging)")
+	.action(async (name: string, options) => {
+		try {
+			// Check if it's a workflow (starts with workflow/ or procedure/)
+			if (name.startsWith("workflow/")) {
+				const workflowPath = name.replace("workflow/", "");
+				await execWorkflowCommand({ ...options, file: workflowPath });
+			} else if (name.startsWith("procedure/")) {
+				const procedureName = name.replace("procedure/", "");
+				await execProcedureCommand(procedureName, options);
+			} else {
+				// Default to procedure
+				await execProcedureCommand(name, options);
+			}
+		} catch (error) {
+			console.error(
+				`[c4c] ${error instanceof Error ? error.message : String(error)}`
+			);
+			process.exit(1);
+		}
+	});
+
+const completion = program
+	.command("completion")
+	.description("Generate shell completion scripts");
+
+completion
+	.command("bash")
+	.description("Generate bash completion script")
+	.action(() => {
+		console.log(generateBashCompletion());
+	});
+
+completion
+	.command("zsh")
+	.description("Generate zsh completion script")
+	.action(() => {
+		console.log(generateZshCompletion());
+	});
+
+completion
+	.command("list")
+	.description("List all available procedures and workflows (for completion)")
+	.option("--root <path>", "Project root", process.cwd())
+	.action(async (options) => {
+		try {
+			const completions = await getAllCompletions({ root: options.root });
+			console.log(completions.join("\n"));
+		} catch (error) {
+			// Silently fail for completion
+			process.exit(0);
 		}
 	});
 

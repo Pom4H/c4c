@@ -1,4 +1,4 @@
-import type { ExecutionContext, Handler, Procedure } from "./types.js";
+import type { ExecutionContext, Handler, Procedure, Registry } from "./types.js";
 
 /**
  * Execute a procedure with input validation and output validation
@@ -18,6 +18,24 @@ export async function executeProcedure<TInput, TOutput>(
 	const validatedOutput = procedure.contract.output.parse(result);
 
 	return validatedOutput;
+}
+
+/**
+ * Execute a procedure from registry by name
+ */
+export async function execute(
+	registry: Registry,
+	procedureName: string,
+	input: unknown,
+	context?: ExecutionContext
+): Promise<unknown> {
+	const procedure = registry.get(procedureName);
+	if (!procedure) {
+		throw new Error(`Procedure '${procedureName}' not found in registry`);
+	}
+
+	const ctx = context ?? createExecutionContext();
+	return executeProcedure(procedure, input, ctx);
 }
 
 /**

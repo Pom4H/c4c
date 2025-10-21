@@ -209,6 +209,34 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  examples/modules:
+    dependencies:
+      '@c4c/adapters':
+        specifier: workspace:*
+        version: link:../../packages/adapters
+      '@c4c/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@c4c/generators':
+        specifier: workspace:*
+        version: link:../../packages/generators
+      '@c4c/policies':
+        specifier: workspace:*
+        version: link:../../packages/policies
+      zod:
+        specifier: ^4.1.12
+        version: 4.1.12
+    devDependencies:
+      '@types/node':
+        specifier: ^24.7.2
+        version: 24.7.2
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/adapters:
     dependencies:
       '@c4c/core':
