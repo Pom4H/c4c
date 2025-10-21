@@ -1,6 +1,6 @@
 import { resolve, relative } from "node:path";
 import { generateClient as runGenerateClient, type GenerateClientOptions } from "../lib/generate.js";
-import { determineHandlersPath, resolveOutputPath } from "../internal/utils/project-paths.js";
+import { determineHandlersPath, resolveOutputPath } from "../lib/project-paths.js";
 
 interface GenerateClientCommandOptions {
 	root?: string;

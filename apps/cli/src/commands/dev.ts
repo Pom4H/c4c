@@ -1,6 +1,6 @@
 import { resolve, relative } from "node:path";
 import { dev as runDev, type ServeOptions } from "../lib/server.js";
-import { determineHandlersPath, determineWorkflowsPath } from "../internal/utils/project-paths.js";
+import { determineHandlersPath, determineWorkflowsPath } from "../lib/project-paths.js";
 import { stopDevServer } from "../lib/stop.js";
 import { readDevLogs } from "../lib/logs.js";
 import { getDevStatus } from "../lib/status.js";

@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { serve as runServe, type ServeOptions } from "../lib/server.js";
 import type { ServeMode } from "../lib/types.js";
-import { determineHandlersPath, determineWorkflowsPath } from "../internal/utils/project-paths.js";
+import { determineHandlersPath, determineWorkflowsPath } from "../lib/project-paths.js";
 
 interface ServeCommandOptions {
 	port?: number;
