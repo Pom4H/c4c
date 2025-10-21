@@ -6,16 +6,15 @@ import { readDevLogs } from "../lib/logs.js";
 import { getDevStatus } from "../lib/status.js";
 
 interface DevCommandOptions {
-	port?: number;
-	root?: string;
-	handlers?: string;
-	workflows?: string;
-	docs?: boolean;
+    port?: number;
+    root?: string;
+    workflows?: string;
+    docs?: boolean;
 }
 
 export async function devCommand(options: DevCommandOptions): Promise<void> {
 	const rootDir = resolve(options.root ?? process.cwd());
-	const handlersPath = determineHandlersPath(rootDir, options.handlers);
+    const handlersPath = determineHandlersPath(rootDir);
 	const workflowsPath = determineWorkflowsPath(rootDir, options.workflows);
 
     const enableDocs = options.docs ? true : undefined;

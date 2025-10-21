@@ -5,17 +5,16 @@ import type { ServeMode } from "../lib/types.js";
 import { determineHandlersPath, determineWorkflowsPath } from "../lib/project-paths.js";
 
 interface ServeCommandOptions {
-	port?: number;
-	root?: string;
-	handlers?: string;
-	workflows?: string;
-	docs?: boolean;
-	apiBase?: string;
+    port?: number;
+    root?: string;
+    workflows?: string;
+    docs?: boolean;
+    apiBase?: string;
 }
 
 export async function serveCommand(modeArg: string, options: ServeCommandOptions): Promise<void> {
 	const rootDir = resolve(options.root ?? process.cwd());
-	const handlersPath = determineHandlersPath(rootDir, options.handlers);
+    const handlersPath = determineHandlersPath(rootDir);
 	const workflowsPath = determineWorkflowsPath(rootDir, options.workflows);
 
     const enableDocs = options.docs ? true : undefined;

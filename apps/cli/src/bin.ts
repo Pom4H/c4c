@@ -22,7 +22,6 @@ program
 	.argument("[mode]", "Mode to run (all|rest|workflow|rpc|ui)", "all")
 	.option("-p, --port <number>", "Port to listen on", parsePort)
 	.option("--root <path>", "Project root containing handlers/ and workflows", process.cwd())
-	.option("--handlers <path>", "Custom handlers directory (overrides root)")
 	.option("--workflows <path>", "Custom workflows directory (overrides root)")
     .option("--docs", "Force enable docs endpoints")
 	.option("--api-base <url>", "Workflow API base URL used in UI mode", process.env.C4C_API_BASE)
@@ -42,7 +41,6 @@ const devCommandDef = program
     .description("Start the c4c HTTP server with watch mode")
     .option("-p, --port <number>", "Port to listen on", parsePort)
 	.option("--root <path>", "Project root containing handlers/", process.cwd())
-	.option("--handlers <path>", "Custom handlers directory (overrides root)")
 	.option("--workflows <path>", "Custom workflows directory (overrides root)")
     .option("--docs", "Force enable docs endpoints")
     .action(async (options) => {
@@ -112,7 +110,6 @@ generate
 	.command("client")
 	.description("Generate a typed client from contracts")
 	.option("--root <path>", "Project root containing handlers/", process.cwd())
-	.option("--handlers <path>", "Custom handlers directory (overrides root)")
 	.option("--out <file>", "Output file for the generated client", "c4c-client.ts")
 	.option("--base-url <url>", "Base URL embedded in generated client")
 	.action(async (options) => {
