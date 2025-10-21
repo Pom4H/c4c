@@ -75,7 +75,6 @@ devCommandDef
 	.command("logs")
 	.description("Print stdout logs from the running c4c dev server")
 	.option("--root <path>", "Project root containing handlers/", process.cwd())
-    .option("--json", "Output structured JSON logs")
 	.option("--tail <number>", "Number of log lines from the end of the file to display")
 	.action(async (options) => {
 		try {

@@ -19,12 +19,16 @@ export function determineHandlersPath(root: string, explicit?: string): string {
 }
 
 export function determineWorkflowsPath(root: string, explicit?: string): string {
-	const candidates = [
-		explicit,
-		process.env.C4C_WORKFLOWS_DIR,
-		join(root, "workflows"),
-	];
-	return pickPath(root, candidates, join(root, "workflows"));
+    const candidates = [
+        explicit,
+        process.env.C4C_WORKFLOWS_DIR,
+        join(root, "workflows"),
+    ];
+    // Pick workflows dir if present; otherwise, fall back to handlers dir.
+    const picked = pickPath(root, candidates, join(root, "workflows"));
+    if (existsSync(picked)) return picked;
+    // Fall back to handlers directory to unify structure when workflows/ is absent
+    return determineHandlersPath(root);
 }
 
 export function resolveOutputPath(path: string): string {

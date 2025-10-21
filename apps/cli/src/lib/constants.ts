@@ -4,7 +4,7 @@ import type { ServeMode } from "./types.js";
 export const DEV_DIR_NAME = ".c4c";
 export const DEV_SESSION_SUBDIR = "dev";
 export const DEV_SESSION_FILE_NAME = "session.json";
-export const DEV_LOG_FILE_NAME = "dev.log";
+export const DEV_LOG_FILE_NAME = "dev.jsonl";
 export const DEV_LOG_STATE_FILE_NAME = "log-state.json";
 export const DEV_LOG_TAIL_LIMIT = 500;
 export const SESSION_DISCOVERY_MAX_DEPTH = 3;

@@ -42,7 +42,6 @@ export async function devStopCommand(options: DevStopOptions): Promise<void> {
 
 interface DevLogsOptions {
     root?: string;
-    json?: boolean;
     tail?: number;
 }
 
@@ -59,30 +58,13 @@ export async function devLogsCommand(options: DevLogsOptions): Promise<void> {
 		console.log(`[c4c] No running dev server found (searched from ${rootLabel}).`);
 		return;
 	}
-    if (options.json) {
-        const entries = result.lines.map(parseStructuredLogLine).filter(Boolean) as Array<{
-            timestamp: string;
-            level: string;
-            message: string;
-        }>;
-        console.log(
-            JSON.stringify(
-                {
-                    entries,
-                    nextOffset: result.nextOffset,
-                },
-                null,
-                2
-            )
-        );
-    } else {
-        if (result.lines.length === 0) {
-            console.log("[c4c] No new log entries.");
-            return;
-        }
-        for (const line of result.lines) {
-            console.log(line);
-        }
+    if (result.lines.length === 0) {
+        console.log("[c4c] No new log entries.");
+        return;
+    }
+    // Logs are already JSONL; just print lines as-is.
+    for (const line of result.lines) {
+        console.log(line);
     }
 }
 
@@ -113,10 +95,4 @@ function parsePositiveInteger(value: unknown, label: string): number {
 	return parsed;
 }
 
-function parseStructuredLogLine(line: string): { timestamp: string; level: string; message: string } | null {
-    // Format: [ISO_TIMESTAMP] [LEVEL] message
-    const match = /^\[(?<ts>[^\]]+)\]\s+\[(?<lvl>[^\]]+)\]\s*(?<msg>[\s\S]*)$/.exec(line);
-    if (!match || !match.groups) return null;
-    const { ts, lvl, msg } = match.groups as { ts: string; lvl: string; msg: string };
-    return { timestamp: ts, level: lvl, message: msg };
-}
+// No parsing helpers needed; dev logs are JSONL.
