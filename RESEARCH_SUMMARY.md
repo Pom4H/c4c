@@ -134,12 +134,12 @@ c4c dev logs --json --level error --tail 10
 - ✅ Фильтрация из коробки
 - ✅ Статистика
 
-#### 3. `c4c dev --ensure --agent`
+#### 3. `c4c dev --ensure --json`
 
 **Решает:** Проблему #4
 
 ```bash
-c4c dev --ensure --agent
+c4c dev --ensure --json
 ```
 
 **Вывод (уже запущен):**
