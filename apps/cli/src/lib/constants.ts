@@ -27,7 +27,7 @@ export const SESSION_DISCOVERY_IGNORE_DIRS = new Set([
 	".pnpm",
 ]);
 
-export const DEFAULT_WORKFLOWS_PATH = process.env.C4C_WORKFLOWS_DIR ?? "workflows";
+export const DEFAULT_WORKFLOWS_PATH = "workflows";
 
 export const DEFAULTS: Record<ServeMode, Required<Omit<HttpAppOptions, "port">>> = {
 	all: {

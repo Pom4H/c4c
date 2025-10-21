@@ -22,7 +22,6 @@ program
 	.argument("[mode]", "Mode to run (all|rest|workflow|rpc|ui)", "all")
 	.option("-p, --port <number>", "Port to listen on", parsePort)
 	.option("--root <path>", "Project root containing handlers/ and workflows", process.cwd())
-	.option("--workflows <path>", "Custom workflows directory (overrides root)")
     .option("--docs", "Force enable docs endpoints")
 	.option("--api-base <url>", "Workflow API base URL used in UI mode", process.env.C4C_API_BASE)
 	.action(async (modeArg: string, options) => {
@@ -41,7 +40,6 @@ const devCommandDef = program
     .description("Start the c4c HTTP server with watch mode")
     .option("-p, --port <number>", "Port to listen on", parsePort)
 	.option("--root <path>", "Project root containing handlers/", process.cwd())
-	.option("--workflows <path>", "Custom workflows directory (overrides root)")
     .option("--docs", "Force enable docs endpoints")
     .action(async (options) => {
 		try {
