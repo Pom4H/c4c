@@ -11,7 +11,6 @@ interface DevCommandOptions {
 	handlers?: string;
 	workflows?: string;
 	docs?: boolean;
-	disableDocs?: boolean;
 	quiet?: boolean;
 }
 
@@ -24,7 +23,7 @@ export async function devCommand(options: DevCommandOptions): Promise<void> {
 		process.env.C4C_QUIET = "1";
 	}
 
-    const enableDocs = options.docs ? true : options.disableDocs ? false : undefined;
+    const enableDocs = options.docs ? true : undefined;
 
 	const serveOptions: ServeOptions = {
 		port: options.port,

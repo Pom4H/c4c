@@ -24,9 +24,8 @@ program
 	.option("--root <path>", "Project root containing handlers/ and workflows", process.cwd())
 	.option("--handlers <path>", "Custom handlers directory (overrides root)")
 	.option("--workflows <path>", "Custom workflows directory (overrides root)")
-	.option("--docs", "Force enable docs endpoints")
-	.option("--disable-docs", "Disable docs endpoints")
-	.option("--quiet", "Reduce startup logging")
+    .option("--docs", "Force enable docs endpoints")
+    .option("--quiet", "Reduce startup logging")
 	.option("--api-base <url>", "Workflow API base URL used in UI mode", process.env.C4C_API_BASE)
 	.action(async (modeArg: string, options) => {
 		try {
@@ -46,8 +45,7 @@ const devCommandDef = program
 	.option("--root <path>", "Project root containing handlers/", process.cwd())
 	.option("--handlers <path>", "Custom handlers directory (overrides root)")
 	.option("--workflows <path>", "Custom workflows directory (overrides root)")
-	.option("--docs", "Force enable docs endpoints")
-	.option("--disable-docs", "Disable docs endpoints")
+    .option("--docs", "Force enable docs endpoints")
     .option("--quiet", "Reduce startup logging")
     .action(async (options) => {
 		try {

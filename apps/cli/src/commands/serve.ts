@@ -10,7 +10,6 @@ interface ServeCommandOptions {
 	handlers?: string;
 	workflows?: string;
 	docs?: boolean;
-	disableDocs?: boolean;
 	quiet?: boolean;
 	apiBase?: string;
 }
@@ -24,7 +23,7 @@ export async function serveCommand(modeArg: string, options: ServeCommandOptions
 		process.env.C4C_QUIET = "1";
 	}
 
-	const enableDocs = options.docs ? true : options.disableDocs ? false : undefined;
+    const enableDocs = options.docs ? true : undefined;
 
 	const serveOptions: ServeOptions = {
 		port: options.port,
