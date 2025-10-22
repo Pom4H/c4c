@@ -143,7 +143,7 @@ export default function ExecutionDetailPage() {
 		eventSource.addEventListener("node.completed", (event) => {
 			try {
 				const data = JSON.parse(event.data);
-				console.log("[SSE] node.completed:", data);
+				console.log("[SSE] node.completed:", data.nodeId, "output:", data.output);
 				setExecution(prev => {
 					if (!prev) return prev;
 					
@@ -169,7 +169,7 @@ export default function ExecutionDetailPage() {
 					};
 				});
 			} catch (error) {
-				console.error("Failed to process SSE event:", error);
+				console.error("Failed to process SSE node.completed event:", error);
 			}
 		});
 		
@@ -215,9 +215,15 @@ export default function ExecutionDetailPage() {
 			}
 		});
 		
-		eventSource.onerror = () => {
-			console.warn("SSE connection error");
+		eventSource.onerror = (error) => {
+			console.error("SSE connection error:", error);
+			console.log("EventSource readyState:", eventSource.readyState);
+			console.log("EventSource url:", eventSource.url);
 			// Don't close - will auto-reconnect
+		};
+		
+		eventSource.onopen = () => {
+			console.log("[SSE] Connection opened");
 		};
 		
 		return () => {
