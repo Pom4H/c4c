@@ -5,7 +5,7 @@
  * and routes them to appropriate workflows or event handlers
  */
 
-import type { Hono } from "hono";
+import { Hono } from "hono";
 import type { Context } from "hono";
 import type { Registry } from "@c4c/core";
 
@@ -236,14 +236,13 @@ export function createWebhookRouter(
 		enableLogging = true,
 	} = options;
 
-	const { Hono } = require("hono");
 	const app = new Hono();
 
 	/**
 	 * Generic webhook endpoint: POST /webhooks/:provider
 	 * Receives webhook events from any provider
 	 */
-	app.post("/:provider", async (c) => {
+	app.post("/:provider", async (c: Context) => {
 		const provider = c.req.param("provider");
 
 		if (enableLogging) {
@@ -271,7 +270,7 @@ export function createWebhookRouter(
 
 		// Extract headers
 		const headers: Record<string, string> = {};
-		c.req.raw.headers.forEach((value, key) => {
+		c.req.raw.headers.forEach((value: string, key: string) => {
 			headers[key] = value;
 		});
 
@@ -317,7 +316,7 @@ export function createWebhookRouter(
 	/**
 	 * Subscription management endpoint: POST /webhooks/:provider/subscribe
 	 */
-	app.post("/:provider/subscribe", async (c) => {
+	app.post("/:provider/subscribe", async (c: Context) => {
 		const provider = c.req.param("provider");
 		const body = await c.req.json();
 
@@ -351,7 +350,7 @@ export function createWebhookRouter(
 	/**
 	 * Unsubscribe endpoint: DELETE /webhooks/:provider/subscribe/:subscriptionId
 	 */
-	app.delete("/:provider/subscribe/:subscriptionId", async (c) => {
+	app.delete("/:provider/subscribe/:subscriptionId", async (c: Context) => {
 		const subscriptionId = c.req.param("subscriptionId");
 		
 		webhookRegistry.unregisterSubscription(subscriptionId);
@@ -366,7 +365,7 @@ export function createWebhookRouter(
 	/**
 	 * List subscriptions: GET /webhooks/:provider/subscriptions
 	 */
-	app.get("/:provider/subscriptions", async (c) => {
+	app.get("/:provider/subscriptions", async (c: Context) => {
 		const provider = c.req.param("provider");
 		const subscriptions = webhookRegistry.getSubscriptionsByProvider(provider);
 		
@@ -406,7 +405,3 @@ function extractEventType(
 	}
 }
 
-/**
- * Export types and utilities
- */
-export type { WebhookEvent, WebhookHandler, WebhookSubscription };

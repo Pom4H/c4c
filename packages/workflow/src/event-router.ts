@@ -4,8 +4,21 @@
  * Manages the mapping between trigger events and paused workflow executions
  */
 
-import type { WebhookEvent } from "@c4c/adapters/webhook";
 import type { WorkflowDefinition, WorkflowExecutionResult } from "./types.js";
+
+/**
+ * Webhook event structure (from adapters)
+ */
+export interface WebhookEvent {
+	id: string;
+	provider: string;
+	triggerId?: string;
+	subscriptionId?: string;
+	eventType?: string;
+	payload: unknown;
+	headers: Record<string, string>;
+	timestamp: Date;
+}
 
 /**
  * Paused workflow execution waiting for an event
