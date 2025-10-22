@@ -176,7 +176,7 @@ export default function ExecutionDetailPage() {
 		eventSource.addEventListener("workflow.completed", (event) => {
 			try {
 				const data = JSON.parse(event.data);
-				console.log("[SSE] workflow.completed:", data);
+				console.log("[SSE] workflow.completed received:", data);
 				setExecution(prev => {
 					if (!prev) return prev;
 					return {
@@ -190,7 +190,7 @@ export default function ExecutionDetailPage() {
 				console.log("[SSE] Closing EventSource after workflow.completed");
 				eventSource.close();
 			} catch (error) {
-				console.error("Failed to process SSE event:", error);
+				console.error("Failed to process workflow.completed event:", error);
 			}
 		});
 		
@@ -219,7 +219,24 @@ export default function ExecutionDetailPage() {
 			console.error("SSE connection error:", error);
 			console.log("EventSource readyState:", eventSource.readyState);
 			console.log("EventSource url:", eventSource.url);
-			// Don't close - will auto-reconnect
+			
+			// Если соединение закрыто (не переподключается), проверяем финальный статус
+			if (eventSource.readyState === EventSource.CLOSED) {
+				console.log("[SSE] Connection closed, fetching final execution state...");
+				setTimeout(async () => {
+					try {
+						const response = await fetch(`/api/workflow/executions/${executionId}`);
+						const finalExecution = await response.json();
+						console.log("[SSE] Final execution state:", finalExecution);
+						
+						if (finalExecution.status === "completed" || finalExecution.status === "failed") {
+							setExecution(finalExecution);
+						}
+					} catch (err) {
+						console.error("Failed to fetch final execution state:", err);
+					}
+				}, 1000);
+			}
 		};
 		
 		eventSource.onopen = () => {

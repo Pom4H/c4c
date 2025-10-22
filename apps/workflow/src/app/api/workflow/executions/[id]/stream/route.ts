@@ -13,18 +13,33 @@ export async function GET(
 ) {
 	const { id } = await params;
 
+	console.log(`[Proxy] Connecting to SSE stream for execution ${id}`);
+
 	try {
 		// Proxy SSE stream from backend server
-		const response = await fetch(`${config.apiBase}/workflow/executions/${id}/stream`, {
+		const backendUrl = `${config.apiBase}/workflow/executions/${id}/stream`;
+		console.log(`[Proxy] Backend URL: ${backendUrl}`);
+		
+		const response = await fetch(backendUrl, {
 			signal: request.signal,
 		});
 
+		console.log(`[Proxy] Backend response status: ${response.status}`);
+
 		if (!response.ok) {
+			console.error(`[Proxy] Backend returned error status: ${response.status}`);
 			return new Response(JSON.stringify({ error: "Failed to connect to stream" }), {
 				status: response.status,
 				headers: { "Content-Type": "application/json" },
 			});
 		}
+
+		console.log(`[Proxy] Starting to forward SSE stream for ${id}`);
+
+		// Listen for client disconnect
+		request.signal.addEventListener('abort', () => {
+			console.log(`[Proxy] Client disconnected from stream ${id}`);
+		});
 
 		// Forward the SSE stream
 		return new Response(response.body, {
@@ -35,7 +50,7 @@ export async function GET(
 			},
 		});
 	} catch (error) {
-		console.error("Failed to proxy SSE stream:", error);
+		console.error(`[Proxy] Error proxying SSE stream for ${id}:`, error);
 		return new Response(JSON.stringify({ error: "Failed to connect to stream" }), {
 			status: 500,
 			headers: { "Content-Type": "application/json" },
