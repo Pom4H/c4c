@@ -143,8 +143,15 @@ export default function ExecutionDetailPage() {
 				const data = JSON.parse(event.data);
 				setExecution(prev => {
 					if (!prev) return prev;
+					
+					// Добавить ноду в nodesExecuted если её там ещё нет
+					const nodesExecuted = prev.nodesExecuted.includes(data.nodeId)
+						? prev.nodesExecuted
+						: [...prev.nodesExecuted, data.nodeId];
+					
 					return {
 						...prev,
+						nodesExecuted,
 						nodeDetails: {
 							...prev.nodeDetails,
 							[data.nodeId]: {
@@ -170,6 +177,7 @@ export default function ExecutionDetailPage() {
 						status: "completed",
 						endTime: new Date().toISOString(),
 						executionTime: data.executionTime,
+						nodesExecuted: data.nodesExecuted || prev.nodesExecuted,
 					};
 				});
 				eventSource.close();

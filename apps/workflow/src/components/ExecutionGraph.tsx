@@ -5,7 +5,7 @@
  * Как в n8n - цветные ноды показывают статус выполнения
  */
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useEffect } from "react";
 import {
 	ReactFlow,
 	Background,
@@ -139,6 +139,7 @@ export default function ExecutionGraph({ workflow, execution, onNodeClick }: Exe
 		const edges: Edge[] = [];
 		
 		workflow.nodes.forEach((node) => {
+			// Обработка обычных next переходов
 			if (node.next) {
 				const nextNodes = Array.isArray(node.next) ? node.next : [node.next];
 				nextNodes.forEach((nextId) => {
@@ -163,13 +164,49 @@ export default function ExecutionGraph({ workflow, execution, onNodeClick }: Exe
 					});
 				});
 			}
+			
+			// Обработка параллельных нод - создаем ребра к branches
+			if (node.type === "parallel" && (node as any).config?.branches) {
+				const branches = (node as any).config.branches as string[];
+				branches.forEach((branchId) => {
+					const sourceExecuted = execution.nodesExecuted.includes(node.id);
+					const targetExecuted = execution.nodesExecuted.includes(branchId);
+					const wasTraversed = sourceExecuted && targetExecuted;
+					
+					edges.push({
+						id: `${node.id}-branch-${branchId}`,
+						source: node.id,
+						target: branchId,
+						type: "smoothstep",
+						animated: wasTraversed,
+						style: {
+							stroke: wasTraversed ? "#10b981" : "#d1d5db",
+							strokeWidth: wasTraversed ? 2 : 1,
+							strokeDasharray: "5,5", // Пунктирная линия для параллельных веток
+						},
+						markerEnd: {
+							type: MarkerType.ArrowClosed,
+							color: wasTraversed ? "#10b981" : "#d1d5db",
+						},
+					});
+				});
+			}
 		});
 		
 		return edges;
 	}, [workflow, execution]);
 
-	const [nodes, , onNodesChange] = useNodesState(initialNodes);
-	const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+	const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+	// Обновлять nodes и edges когда execution меняется
+	useEffect(() => {
+		setNodes(initialNodes);
+	}, [initialNodes, setNodes]);
+
+	useEffect(() => {
+		setEdges(initialEdges);
+	}, [initialEdges, setEdges]);
 
 	const handleNodeClick = useCallback(
 		(_event: React.MouseEvent, node: Node) => {
