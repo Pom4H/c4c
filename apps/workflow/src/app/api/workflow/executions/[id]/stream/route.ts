@@ -1,9 +1,9 @@
 /**
  * API Route: GET /api/workflow/executions/[id]/stream
- * SSE stream для live updates execution
+ * Проксирует SSE stream на backend server
  */
 
-import { subscribeToExecution } from "@c4c/workflow";
+import { config } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
@@ -12,50 +12,33 @@ export async function GET(
 	{ params }: { params: Promise<{ id: string }> }
 ) {
 	const { id } = await params;
-	const executionId = id;
 
-	// Create SSE stream
-	const encoder = new TextEncoder();
-	
-	const stream = new ReadableStream({
-		start(controller) {
-			// Subscribe to workflow events
-			const unsubscribe = subscribeToExecution(executionId, (event) => {
-				try {
-					const data = `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
-					controller.enqueue(encoder.encode(data));
-				} catch (error) {
-					console.error("Failed to send SSE event:", error);
-				}
+	try {
+		// Proxy SSE stream from backend server
+		const response = await fetch(`${config.apiBase}/workflow/executions/${id}/stream`, {
+			signal: request.signal,
+		});
+
+		if (!response.ok) {
+			return new Response(JSON.stringify({ error: "Failed to connect to stream" }), {
+				status: response.status,
+				headers: { "Content-Type": "application/json" },
 			});
+		}
 
-			// Keep connection alive
-			const keepAlive = setInterval(() => {
-				try {
-					controller.enqueue(encoder.encode(": keepalive\n\n"));
-				} catch {
-					clearInterval(keepAlive);
-				}
-			}, 15000);
-
-			// Cleanup on close
-			request.signal.addEventListener("abort", () => {
-				clearInterval(keepAlive);
-				unsubscribe();
-				try {
-					controller.close();
-				} catch {
-					// Already closed
-				}
-			});
-		},
-	});
-
-	return new Response(stream, {
-		headers: {
-			"Content-Type": "text/event-stream",
-			"Cache-Control": "no-cache, no-transform",
-			Connection: "keep-alive",
-		},
-	});
+		// Forward the SSE stream
+		return new Response(response.body, {
+			headers: {
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-cache, no-transform",
+				Connection: "keep-alive",
+			},
+		});
+	} catch (error) {
+		console.error("Failed to proxy SSE stream:", error);
+		return new Response(JSON.stringify({ error: "Failed to connect to stream" }), {
+			status: 500,
+			headers: { "Content-Type": "application/json" },
+		});
+	}
 }

@@ -89,6 +89,43 @@ export function createWorkflowRouter(registry: Registry, options: WorkflowRouter
 		return c.json({ definition }, 200);
 	});
 
+	router.get("/workflow/executions", async (c) => {
+		try {
+			const { getExecutionStore } = await import("@c4c/workflow");
+			const store = getExecutionStore();
+			const executions = store.getAllExecutionsJSON();
+			const stats = store.getStats();
+
+			return c.json({
+				executions,
+				stats,
+			}, 200);
+		} catch (error) {
+			return c.json({ error: "Failed to get executions" }, 500);
+		}
+	});
+
+	router.get("/workflow/executions/:executionId", async (c) => {
+		const executionId = c.req.param("executionId");
+		if (!executionId) {
+			return c.json({ error: "executionId is required" }, 400);
+		}
+
+		try {
+			const { getExecutionStore } = await import("@c4c/workflow");
+			const store = getExecutionStore();
+			const execution = store.getExecutionJSON(executionId);
+
+			if (!execution) {
+				return c.json({ error: `Execution '${executionId}' not found` }, 404);
+			}
+
+			return c.json({ execution }, 200);
+		} catch (error) {
+			return c.json({ error: "Failed to get execution" }, 500);
+		}
+	});
+
 	router.post("/workflow/execute", async (c) => {
 		try {
 			const body = await c.req.json<{
