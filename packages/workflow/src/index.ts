@@ -43,3 +43,15 @@ export type { StepContext, ConditionContext } from "./builder.js";
 
 // Re-export selected core types for app/example convenience
 export type { Registry, Procedure } from "@c4c/core";
+
+// Event Router for webhook events
+export {
+	EventRouter,
+	createEventRouter,
+} from "./event-router.js";
+export type {
+	PausedExecution,
+	EventFilter,
+	ResumeHandler,
+	RouteResult,
+} from "./event-router.js";

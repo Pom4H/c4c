@@ -5,6 +5,7 @@ import { generateOpenAPIJSON } from "@c4c/generators";
 import { createRestRouter, listRESTRoutes } from "./rest.js";
 import { createWorkflowRouter } from "./workflow-http.js";
 import { createRpcRouter } from "./rpc.js";
+import { createWebhookRouter, WebhookRegistry } from "./webhook.js";
 
 export interface HttpAppOptions {
 	port?: number;
@@ -12,7 +13,9 @@ export interface HttpAppOptions {
 	enableRpc?: boolean;
 	enableRest?: boolean;
 	enableWorkflow?: boolean;
+	enableWebhooks?: boolean;
 	workflowsPath?: string;
+	webhookRegistry?: WebhookRegistry;
 }
 
 /**
@@ -38,7 +41,9 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 		enableRpc = true,
 		enableRest = true,
 		enableWorkflow = true,
+		enableWebhooks = true,
 		workflowsPath = process.env.c4c_WORKFLOWS_DIR ?? "workflows",
+		webhookRegistry = new WebhookRegistry(),
 	} = options;
 
 	const app = new Hono();
@@ -117,6 +122,10 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 		app.route("/", createWorkflowRouter(registry, { workflowsPath }));
 	}
 
+	if (enableWebhooks) {
+		app.route("/webhooks", createWebhookRouter(registry, webhookRegistry));
+	}
+
 	if (enableRest) {
 		app.route("/", createRestRouter(registry));
 	}
@@ -141,6 +150,7 @@ function logStartup(registry: Registry, options: HttpAppOptions) {
 		enableRpc = true,
 		enableRest = true,
 		enableWorkflow = true,
+		enableWebhooks = true,
 		workflowsPath = process.env.c4c_WORKFLOWS_DIR ?? "workflows",
 	} = options;
 
@@ -171,6 +181,13 @@ function logStartup(registry: Registry, options: HttpAppOptions) {
 	}
 	if (enableRest) {
 		console.log(`   REST: http://localhost:${port}/:resource (conventional)`);
+	}
+	if (enableWebhooks) {
+		console.log(`\n📡 Webhooks:`);
+		console.log(`   Receive:      POST http://localhost:${port}/webhooks/:provider`);
+		console.log(`   Subscribe:    POST http://localhost:${port}/webhooks/:provider/subscribe`);
+		console.log(`   Unsubscribe:  DELETE http://localhost:${port}/webhooks/:provider/subscribe/:id`);
+		console.log(`   List:         GET http://localhost:${port}/webhooks/:provider/subscriptions`);
 	}
 	console.log(``);
 
