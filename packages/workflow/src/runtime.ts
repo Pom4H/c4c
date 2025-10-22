@@ -647,6 +647,9 @@ async function executeNode(
 					case "sequential":
 						nextNodeId = await executeSequentialNode(node, context);
 						break;
+					case "trigger":
+						nextNodeId = await executeTriggerNode(node, context);
+						break;
 					default:
 						throw new Error(`Unknown node type: ${node.type}`);
 				}
@@ -891,6 +894,30 @@ async function executeSequentialNode(
 	context: WorkflowContext
 ): Promise<string | undefined> {
 	// Sequential is just returning next node
+	return typeof node.next === "string" ? node.next : node.next?.[0];
+}
+
+/**
+ * Execute trigger node
+ * Trigger nodes are entry points - they just pass through to the next node
+ * The actual trigger event data should be in context.variables
+ */
+async function executeTriggerNode(
+	node: WorkflowNode,
+	context: WorkflowContext
+): Promise<string | undefined> {
+	// Trigger node is just a marker - the event data is already in context.variables
+	// Just log that we started from a trigger
+	console.log(`[Workflow] 🎯 Triggered by: ${node.procedureName || "unknown trigger"}`);
+	
+	// Store trigger information in outputs for reference
+	context.nodeOutputs.set(node.id, {
+		triggerId: node.procedureName,
+		timestamp: new Date(),
+		event: context.variables.webhook || context.variables.trigger || {},
+	});
+	
+	// Move to next node
 	return typeof node.next === "string" ? node.next : node.next?.[0];
 }
 

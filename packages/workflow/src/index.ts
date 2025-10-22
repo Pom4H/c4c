@@ -16,6 +16,7 @@ export type {
   ParallelConfig,
   SubWorkflowConfig,
   WorkflowResumeState,
+  TriggerConfig,
 } from "./types.js";
 
 export { executeWorkflow, validateWorkflow, resumeWorkflow, PauseSignal } from "./runtime.js";
@@ -44,7 +45,7 @@ export type { StepContext, ConditionContext } from "./builder.js";
 // Re-export selected core types for app/example convenience
 export type { Registry, Procedure } from "@c4c/core";
 
-// Event Router for webhook events
+// Event Router for webhook events (legacy pause/resume approach)
 export {
 	EventRouter,
 	createEventRouter,
@@ -55,3 +56,14 @@ export type {
 	ResumeHandler,
 	RouteResult,
 } from "./event-router.js";
+
+// Trigger Workflow Manager (simplified trigger approach)
+export {
+	TriggerWorkflowManager,
+	createTriggerWorkflowManager,
+} from "./trigger-manager.js";
+export type {
+	TriggerSubscription,
+	DeployTriggerWorkflowOptions,
+	WebhookEvent,
+} from "./trigger-manager.js";

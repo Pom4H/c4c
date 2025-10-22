@@ -11,8 +11,8 @@ import type { z } from "zod";
  */
 export interface WorkflowNode {
 	id: string;
-	type: "procedure" | "condition" | "parallel" | "sequential";
-	procedureName?: string; // Reference to registered procedure
+	type: "procedure" | "condition" | "parallel" | "sequential" | "trigger";
+	procedureName?: string; // Reference to registered procedure (for trigger nodes, this is the trigger procedure)
 	config?: Record<string, unknown>;
 	next?: string | string[]; // Next node(s) to execute
 	onError?: string; // Error handler node
@@ -30,6 +30,24 @@ export interface WorkflowDefinition {
 	startNode: string;
 	variables?: Record<string, unknown>; // Workflow-level variables
 	metadata?: Record<string, unknown>;
+	/** If true, this workflow is triggered by external events and should not be run directly */
+	isTriggered?: boolean;
+	/** Trigger configuration for event-driven workflows */
+	trigger?: TriggerConfig;
+}
+
+/**
+ * Trigger configuration for event-driven workflows
+ */
+export interface TriggerConfig {
+	/** Provider (e.g., "googleDrive", "slack") */
+	provider: string;
+	/** Trigger procedure name that creates the webhook subscription */
+	triggerProcedure: string;
+	/** Event type filter */
+	eventType?: string;
+	/** Additional subscription configuration */
+	subscriptionConfig?: Record<string, unknown>;
 }
 
 /**
