@@ -121,10 +121,14 @@ export async function executeWorkflow(
 
 				const nextNodeId = await executeNode(node, workflowContext, registry, workflow);
 
+				// Get output for this node (IMPORTANT: use node.id, not currentNodeId!)
+				const nodeOutput = workflowContext.nodeOutputs.get(node.id);
+				console.log(`[Workflow] Node ${node.id} output:`, nodeOutput);
+
 				// Update node status in store
-				executionStore.updateNodeStatus(executionId, currentNodeId, "completed", {
+				executionStore.updateNodeStatus(executionId, node.id, "completed", {
 					endTime: new Date(),
-					output: workflowContext.nodeOutputs.get(currentNodeId),
+					output: nodeOutput,
 				});
 
 				publish({
@@ -135,7 +139,7 @@ export async function executeWorkflow(
 					nodeIndex,
 					nextNodeId,
 					timestamp: Date.now(),
-					output: workflowContext.nodeOutputs.get(currentNodeId),
+					output: nodeOutput,
 				});
 
 					currentNodeId = nextNodeId;
@@ -171,6 +175,7 @@ export async function executeWorkflow(
 				// Save execution result to store
 				executionStore.completeExecution(executionId, workflowResult);
 
+				console.log(`[Workflow] Publishing workflow.completed event for ${executionId}`);
 				publish({
 					type: "workflow.completed",
 					workflowId: workflow.id,
@@ -178,6 +183,7 @@ export async function executeWorkflow(
 					executionTime,
 					nodesExecuted,
 				});
+				console.log(`[Workflow] workflow.completed event published for ${executionId}`);
 
 				return workflowResult;
 			} catch (error) {
