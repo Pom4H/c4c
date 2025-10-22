@@ -1,10 +1,10 @@
 /**
  * API Route: GET /api/workflow/executions/[id]
- * Возвращает детали конкретного execution
+ * Проксирует запрос на backend server
  */
 
 import { NextResponse } from "next/server";
-import { getExecutionStore } from "@c4c/workflow";
+import { config } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
@@ -14,17 +14,20 @@ export async function GET(
 ) {
 	try {
 		const { id } = await params;
-		const store = getExecutionStore();
-		const execution = store.getExecutionJSON(id);
 
-		if (!execution) {
-			return NextResponse.json(
-				{ error: "Execution not found" },
-				{ status: 404 }
-			);
+		// Proxy request to backend server
+		const response = await fetch(`${config.apiBase}/workflow/executions/${id}`, {
+			cache: "no-store",
+		});
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			return NextResponse.json(data, { status: response.status });
 		}
 
-		return NextResponse.json(execution);
+		// Backend returns { execution }, we want to return just the execution
+		return NextResponse.json(data.execution || data);
 	} catch (error) {
 		console.error("Failed to get execution:", error);
 		return NextResponse.json(

@@ -29,7 +29,7 @@ export { bindCollector, forceFlush, clearActiveCollector } from "./otel.js";
 
 // Realtime events for SSE/WebSocket integrations
 export type { WorkflowEvent, SerializedWorkflowExecutionResult } from "./events.js";
-export { subscribeToExecution } from "./events.js";
+export { subscribeToExecution, subscribeToAllExecutions } from "./events.js";
 
 // Workflow library utilities
 export {

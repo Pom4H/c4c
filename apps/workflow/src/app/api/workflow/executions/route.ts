@@ -1,23 +1,27 @@
 /**
  * API Route: GET /api/workflow/executions
- * Возвращает список всех executions
+ * Проксирует запрос на backend server
  */
 
 import { NextResponse } from "next/server";
-import { getExecutionStore } from "@c4c/workflow";
+import { config } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
 	try {
-		const store = getExecutionStore();
-		const executions = store.getAllExecutionsJSON();
-		const stats = store.getStats();
-
-		return NextResponse.json({
-			executions,
-			stats,
+		// Proxy request to backend server
+		const response = await fetch(`${config.apiBase}/workflow/executions`, {
+			cache: "no-store",
 		});
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			return NextResponse.json(data, { status: response.status });
+		}
+
+		return NextResponse.json(data);
 	} catch (error) {
 		console.error("Failed to get executions:", error);
 		return NextResponse.json(

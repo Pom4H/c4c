@@ -1,20 +1,16 @@
 /**
- * API Route: GET /api/workflow/executions/[id]/stream
- * Проксирует SSE stream на backend server
+ * API Route: GET /api/workflow/executions-stream
+ * Проксирует SSE stream для updates всех executions
  */
 
 import { config } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
-	request: Request,
-	{ params }: { params: Promise<{ id: string }> }
-) {
-	const { id } = await params;
-
+export async function GET(request: Request) {
 	try {
-		const response = await fetch(`${config.apiBase}/workflow/executions/${id}/stream`, {
+		// Proxy SSE stream from backend server
+		const response = await fetch(`${config.apiBase}/workflow/executions-stream`, {
 			signal: request.signal,
 		});
 
@@ -25,6 +21,7 @@ export async function GET(
 			});
 		}
 
+		// Forward the SSE stream
 		return new Response(response.body, {
 			headers: {
 				"Content-Type": "text/event-stream",

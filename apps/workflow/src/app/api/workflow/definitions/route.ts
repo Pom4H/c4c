@@ -1,29 +1,32 @@
 /**
  * API Route: GET /api/workflow/definitions
- * Возвращает список доступных workflow definitions
+ * Проксирует запрос на backend server
  */
 
 import { NextResponse } from "next/server";
-
-// Mock workflows for now - в production загружать из БД или файлов
-const workflows = [
-	{
-		id: "google-drive-monitor",
-		name: "Google Drive Monitor",
-		nodeCount: 4,
-	},
-	{
-		id: "slack-bot",
-		name: "Slack Bot",
-		nodeCount: 5,
-	},
-	{
-		id: "complex-trigger-workflow",
-		name: "Complex Trigger Workflow",
-		nodeCount: 7,
-	},
-];
+import { config } from "@/lib/config";
 
 export async function GET() {
-	return NextResponse.json(workflows);
+	try {
+		// Proxy request to backend server
+		const response = await fetch(`${config.apiBase}/workflow/definitions`, {
+			cache: "no-store",
+		});
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			return NextResponse.json(data, { status: response.status });
+		}
+
+		// Transform data to match expected format
+		const workflows = data.workflows || [];
+		return NextResponse.json(workflows);
+	} catch (error) {
+		console.error("Failed to get workflow definitions:", error);
+		return NextResponse.json(
+			{ error: "Failed to get workflow definitions" },
+			{ status: 500 }
+		);
+	}
 }

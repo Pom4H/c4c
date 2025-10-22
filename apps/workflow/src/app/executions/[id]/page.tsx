@@ -127,6 +127,7 @@ export default function ExecutionDetailPage() {
 							...prev.nodeDetails,
 							[data.nodeId]: {
 								...prev.nodeDetails[data.nodeId],
+								nodeId: data.nodeId,
 								status: "running",
 								startTime: new Date().toISOString(),
 							},
@@ -134,7 +135,7 @@ export default function ExecutionDetailPage() {
 					};
 				});
 			} catch (error) {
-				console.error("Failed to process SSE event:", error);
+				console.error("Failed to process node.started event:", error);
 			}
 		});
 		
@@ -143,20 +144,29 @@ export default function ExecutionDetailPage() {
 				const data = JSON.parse(event.data);
 				setExecution(prev => {
 					if (!prev) return prev;
+					
+					const nodesExecuted = prev.nodesExecuted.includes(data.nodeId)
+						? prev.nodesExecuted
+						: [...prev.nodesExecuted, data.nodeId];
+					
 					return {
 						...prev,
+						nodesExecuted,
 						nodeDetails: {
 							...prev.nodeDetails,
 							[data.nodeId]: {
 								...prev.nodeDetails[data.nodeId],
+								nodeId: data.nodeId,
 								status: "completed",
+								startTime: prev.nodeDetails[data.nodeId]?.startTime,
 								endTime: new Date().toISOString(),
+								output: data.output,
 							},
 						},
 					};
 				});
 			} catch (error) {
-				console.error("Failed to process SSE event:", error);
+				console.error("Failed to process node.completed event:", error);
 			}
 		});
 		
@@ -170,11 +180,12 @@ export default function ExecutionDetailPage() {
 						status: "completed",
 						endTime: new Date().toISOString(),
 						executionTime: data.executionTime,
+						nodesExecuted: data.nodesExecuted || prev.nodesExecuted,
 					};
 				});
 				eventSource.close();
 			} catch (error) {
-				console.error("Failed to process SSE event:", error);
+				console.error("Failed to process workflow.completed event:", error);
 			}
 		});
 		
@@ -193,13 +204,12 @@ export default function ExecutionDetailPage() {
 				});
 				eventSource.close();
 			} catch (error) {
-				console.error("Failed to process SSE event:", error);
+				console.error("Failed to process workflow.failed event:", error);
 			}
 		});
 		
 		eventSource.onerror = () => {
-			console.warn("SSE connection error");
-			// Don't close - will auto-reconnect
+			// SSE will auto-reconnect
 		};
 		
 		return () => {
