@@ -232,6 +232,64 @@ export function createWorkflowRouter(registry: Registry, options: WorkflowRouter
 		});
 	});
 
+	router.get("/workflow/executions-stream", async (c) => {
+		return streamSSE(c, async (stream) => {
+			let open = true;
+
+			// Get initial data
+			const { getExecutionStore } = await import("@c4c/workflow");
+			const store = getExecutionStore();
+
+			// Send initial state
+			await stream.writeSSE({
+				event: "executions.initial",
+				data: JSON.stringify({
+					executions: store.getAllExecutionsJSON(),
+					stats: store.getStats(),
+					timestamp: Date.now(),
+				}),
+			});
+
+			// Subscribe to all workflow events
+			const { subscribeToAllExecutions } = await import("@c4c/workflow");
+			const unsubscribe = subscribeToAllExecutions((event) => {
+				if (!open) return;
+
+				// Send event
+				void stream.writeSSE({
+					event: event.type,
+					data: JSON.stringify(event),
+					id: String(Date.now()),
+				});
+
+				// Send updated stats after each event
+				void stream.writeSSE({
+					event: "executions.update",
+					data: JSON.stringify({
+						executions: store.getAllExecutionsJSON(),
+						stats: store.getStats(),
+						timestamp: Date.now(),
+					}),
+				});
+			});
+
+			stream.onAbort(() => {
+				open = false;
+				unsubscribe();
+			});
+
+			// Keep-alive
+			while (open) {
+				await stream.sleep(15000);
+				if (!open) break;
+				await stream.writeSSE({
+					event: "heartbeat",
+					data: JSON.stringify({ timestamp: Date.now() }),
+				});
+			}
+		});
+	});
+
 	return router;
 }
 

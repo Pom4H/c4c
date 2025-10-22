@@ -55,9 +55,37 @@ export default function ExecutionsPage() {
 	useEffect(() => {
 		loadExecutions();
 		loadWorkflows();
-		// Refresh every 2 seconds
-		const interval = setInterval(loadExecutions, 2000);
-		return () => clearInterval(interval);
+		
+		// Setup SSE for real-time updates instead of polling
+		const eventSource = new EventSource("/api/workflow/executions-stream");
+		
+		eventSource.addEventListener("executions.initial", (event) => {
+			try {
+				const data = JSON.parse(event.data);
+				setExecutions(data.executions || []);
+				setStats(data.stats || { total: 0, completed: 0, failed: 0, running: 0 });
+			} catch (error) {
+				console.error("Failed to process SSE initial event:", error);
+			}
+		});
+		
+		eventSource.addEventListener("executions.update", (event) => {
+			try {
+				const data = JSON.parse(event.data);
+				setExecutions(data.executions || []);
+				setStats(data.stats || { total: 0, completed: 0, failed: 0, running: 0 });
+			} catch (error) {
+				console.error("Failed to process SSE update event:", error);
+			}
+		});
+		
+		eventSource.onerror = () => {
+			console.warn("SSE connection error, will auto-reconnect");
+		};
+		
+		return () => {
+			eventSource.close();
+		};
 	}, []);
 
 	const loadWorkflows = async () => {
