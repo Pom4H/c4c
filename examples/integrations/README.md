@@ -1,10 +1,10 @@
 # Integrations Example
 
-This package demonstrates how to turn OpenAPI-generated clients into c4c contracts and procedures.
+This package demonstrates how to turn OpenAPI-generated clients into c4c procedures following modular conventions.
 
-## Generating Contracts & Procedures
+## Generating Integration Procedures
 
-The `generate` script scans `examples/integrations/generated/**` and emits procedure files into `examples/integrations/src/**`.
+The `generate` script scans `examples/integrations/generated/**` and emits procedure files into `examples/integrations/procedures/integrations/**`.
 
 ```bash
 pnpm --filter integrations generate
@@ -26,7 +26,7 @@ Set the right env var before executing a procedure or attach the token to the ex
 
 ## Running the Runtime
 
-The runtime script loads `.env` automatically, discovers all generated procedures via `src/procedures/generated.ts`, and exposes them through the HTTP adapter.
+The runtime script loads `.env` automatically, discovers all generated procedures via `procedures/generated.ts`, and exposes them through the HTTP adapter.
 
 ```bash
 pnpm --filter integrations dev

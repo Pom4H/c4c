@@ -2,7 +2,7 @@
   "name": "integrations",
   "type": "module",
   "scripts": {
-    "generate": "node ./scripts/generate-contracts.mjs",
+    "generate": "node ./scripts/generate-integrations.mjs",
     "dev": "tsx src/apps/http.ts"
   },
   "dependencies": {
