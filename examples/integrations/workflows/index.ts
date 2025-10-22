@@ -14,6 +14,8 @@ import {
 	dataProcessingWorkflow,
 	parallelWorkflow,
 	loggingWorkflow,
+	longRunningWorkflow,
+	veryLongWorkflow,
 } from "./demo-workflow.js";
 
 export {
@@ -24,6 +26,8 @@ export {
 	dataProcessingWorkflow,
 	parallelWorkflow,
 	loggingWorkflow,
+	longRunningWorkflow,
+	veryLongWorkflow,
 };
 
 export const workflows = [
@@ -31,6 +35,8 @@ export const workflows = [
 	dataProcessingWorkflow,
 	parallelWorkflow,
 	loggingWorkflow,
+	longRunningWorkflow,
+	veryLongWorkflow,
 	googleDriveMonitor,
 	slackBot,
 	complexTriggerWorkflow,

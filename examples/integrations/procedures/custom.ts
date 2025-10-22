@@ -422,3 +422,104 @@ export const customExecuteSlackCommand: Procedure<
 		};
 	},
 };
+
+// Delay procedure - для создания длительных workflows
+const delayInput = z.object({
+	seconds: z.number().min(0).max(300),
+	message: z.string().optional(),
+});
+
+const delayOutput = z.object({
+	delayed: z.boolean(),
+	seconds: z.number(),
+	startTime: z.string(),
+	endTime: z.string(),
+});
+
+export const customDelay: Procedure<z.infer<typeof delayInput>, z.infer<typeof delayOutput>> = {
+	contract: {
+		name: "custom.delay",
+		description: "Delays execution for specified seconds (for demo purposes)",
+		input: delayInput,
+		output: delayOutput,
+		metadata: {
+			exposure: "internal",
+			roles: ["workflow-node"],
+			category: "custom",
+			tags: ["timing", "demo"],
+		},
+	},
+	handler: async ({ seconds, message }) => {
+		const startTime = new Date().toISOString();
+		console.log(`[delay] ${message || `Waiting ${seconds} seconds...`}`);
+		
+		// Delay
+		await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+		
+		const endTime = new Date().toISOString();
+		console.log(`[delay] Completed after ${seconds} seconds`);
+		
+		return {
+			delayed: true,
+			seconds,
+			startTime,
+			endTime,
+		};
+	},
+};
+
+// Heavy computation procedure - имитация тяжелых вычислений
+const heavyComputationInput = z.object({
+	iterations: z.number().min(1).max(1000000),
+	label: z.string().optional(),
+});
+
+const heavyComputationOutput = z.object({
+	completed: z.boolean(),
+	iterations: z.number(),
+	result: z.number(),
+	duration: z.number(),
+});
+
+export const customHeavyComputation: Procedure<
+	z.infer<typeof heavyComputationInput>,
+	z.infer<typeof heavyComputationOutput>
+> = {
+	contract: {
+		name: "custom.heavyComputation",
+		description: "Performs heavy computation (for demo purposes)",
+		input: heavyComputationInput,
+		output: heavyComputationOutput,
+		metadata: {
+			exposure: "internal",
+			roles: ["workflow-node"],
+			category: "custom",
+			tags: ["computation", "demo"],
+		},
+	},
+	handler: async ({ iterations, label }) => {
+		const startTime = Date.now();
+		console.log(`[heavyComputation] ${label || "Computing"} with ${iterations} iterations...`);
+		
+		// Simulate heavy computation
+		let result = 0;
+		for (let i = 0; i < iterations; i++) {
+			result += Math.sqrt(i) * Math.sin(i);
+			
+			// Log progress every 100k iterations
+			if (i > 0 && i % 100000 === 0) {
+				console.log(`[heavyComputation] Progress: ${i}/${iterations}`);
+			}
+		}
+		
+		const duration = Date.now() - startTime;
+		console.log(`[heavyComputation] Completed in ${duration}ms`);
+		
+		return {
+			completed: true,
+			iterations,
+			result,
+			duration,
+		};
+	},
+};
