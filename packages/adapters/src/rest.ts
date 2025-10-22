@@ -18,7 +18,7 @@ interface RestMapping {
 }
 
 /**
- * REST API adapter for tsdev
+ * REST API adapter for c4c
  * Converts procedures to RESTful routes using conventions:
  * - resource.create -> POST /resource
  * - resource.list -> GET /resource

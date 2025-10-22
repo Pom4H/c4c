@@ -16,9 +16,10 @@ export type {
   ParallelConfig,
   SubWorkflowConfig,
   WorkflowResumeState,
+  TriggerConfig,
 } from "./types.js";
 
-export { executeWorkflow, validateWorkflow, resumeWorkflow, PauseSignal } from "./runtime.js";
+export { executeWorkflow, validateWorkflow } from "./runtime.js";
 
 export { createSubworkflowProcedure } from "./subworkflow.js";
 
@@ -28,7 +29,7 @@ export { bindCollector, forceFlush, clearActiveCollector } from "./otel.js";
 
 // Realtime events for SSE/WebSocket integrations
 export type { WorkflowEvent, SerializedWorkflowExecutionResult } from "./events.js";
-export { subscribeToExecution } from "./events.js";
+export { subscribeToExecution, subscribeToAllExecutions } from "./events.js";
 
 // Workflow library utilities
 export {
@@ -43,3 +44,25 @@ export type { StepContext, ConditionContext } from "./builder.js";
 
 // Re-export selected core types for app/example convenience
 export type { Registry, Procedure } from "@c4c/core";
+
+// Trigger Workflow Manager (simplified trigger approach)
+export {
+	TriggerWorkflowManager,
+	createTriggerWorkflowManager,
+} from "./trigger-manager.js";
+export type {
+	TriggerSubscription,
+	DeployTriggerWorkflowOptions,
+	WebhookEvent,
+} from "./trigger-manager.js";
+
+// Execution Store for monitoring and UI
+export {
+	ExecutionStore,
+	getExecutionStore,
+	setExecutionStore,
+} from "./execution-store.js";
+export type {
+	ExecutionRecord,
+	NodeExecutionDetail,
+} from "./execution-store.js";

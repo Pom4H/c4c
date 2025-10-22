@@ -4,7 +4,7 @@
  * OpenTelemetry Trace Viewer Component
  */
 
-import type { TraceSpan } from "@tsdev/workflow";
+import type { TraceSpan } from "@c4c/workflow";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";

@@ -6,10 +6,10 @@ import type {
   SheetsSpreadsheetsCreateResponses,
   SheetsSpreadsheetsGetData,
   SheetsSpreadsheetsGetResponses,
-  SheetsSpreadsheetsDeveloperMetadataGetData,
-  SheetsSpreadsheetsDeveloperMetadataGetResponses,
-  SheetsSpreadsheetsDeveloperMetadataSearchData,
-  SheetsSpreadsheetsDeveloperMetadataSearchResponses,
+  SheetsSpreadsheec4celoperMetadataGetData,
+  SheetsSpreadsheec4celoperMetadataGetResponses,
+  SheetsSpreadsheec4celoperMetadataSearchData,
+  SheetsSpreadsheec4celoperMetadataSearchResponses,
   SheetsSpreadsheetsSheetsCopyToData,
   SheetsSpreadsheetsSheetsCopyToResponses,
   SheetsSpreadsheetsValuesGetData,
@@ -109,11 +109,11 @@ export const sheetsSpreadsheetsGet = <ThrowOnError extends boolean = false>(
 /**
  * Returns the developer metadata with the specified ID. The caller must specify the spreadsheet ID and the developer metadata's unique metadataId.
  */
-export const sheetsSpreadsheetsDeveloperMetadataGet = <ThrowOnError extends boolean = false>(
-  options: Options<SheetsSpreadsheetsDeveloperMetadataGetData, ThrowOnError>
+export const sheetsSpreadsheec4celoperMetadataGet = <ThrowOnError extends boolean = false>(
+  options: Options<SheetsSpreadsheec4celoperMetadataGetData, ThrowOnError>
 ) => {
   return (options.client ?? client).get<
-    SheetsSpreadsheetsDeveloperMetadataGetResponses,
+    SheetsSpreadsheec4celoperMetadataGetResponses,
     unknown,
     ThrowOnError
   >({
@@ -135,11 +135,11 @@ export const sheetsSpreadsheetsDeveloperMetadataGet = <ThrowOnError extends bool
 /**
  * Returns all developer metadata matching the specified DataFilter. If the provided DataFilter represents a DeveloperMetadataLookup object, this will return all DeveloperMetadata entries selected by it. If the DataFilter represents a location in a spreadsheet, this will return all developer metadata associated with locations intersecting that region.
  */
-export const sheetsSpreadsheetsDeveloperMetadataSearch = <ThrowOnError extends boolean = false>(
-  options: Options<SheetsSpreadsheetsDeveloperMetadataSearchData, ThrowOnError>
+export const sheetsSpreadsheec4celoperMetadataSearch = <ThrowOnError extends boolean = false>(
+  options: Options<SheetsSpreadsheec4celoperMetadataSearchData, ThrowOnError>
 ) => {
   return (options.client ?? client).post<
-    SheetsSpreadsheetsDeveloperMetadataSearchResponses,
+    SheetsSpreadsheec4celoperMetadataSearchResponses,
     unknown,
     ThrowOnError
   >({

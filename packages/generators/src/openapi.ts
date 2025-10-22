@@ -31,9 +31,9 @@ export function generateOpenAPISpec(
 	} = {}
 ): OpenAPISpec {
 	const {
-		title = "tsdev API",
+		title = "c4c API",
 		version = "1.0.0",
-		description = "API generated from tsdev contracts",
+		description = "API generated from c4c contracts",
 		servers = [{ url: "http://localhost:3000", description: "Development server" }],
 	} = options;
 

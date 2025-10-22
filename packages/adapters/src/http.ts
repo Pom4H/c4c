@@ -5,6 +5,7 @@ import { generateOpenAPIJSON } from "@c4c/generators";
 import { createRestRouter, listRESTRoutes } from "./rest.js";
 import { createWorkflowRouter } from "./workflow-http.js";
 import { createRpcRouter } from "./rpc.js";
+import { createWebhookRouter, WebhookRegistry } from "./webhook.js";
 
 export interface HttpAppOptions {
 	port?: number;
@@ -12,11 +13,13 @@ export interface HttpAppOptions {
 	enableRpc?: boolean;
 	enableRest?: boolean;
 	enableWorkflow?: boolean;
+	enableWebhooks?: boolean;
 	workflowsPath?: string;
+	webhookRegistry?: WebhookRegistry;
 }
 
 /**
- * HTTP adapter for tsdev
+ * HTTP adapter for c4c
  * Builds a Hono application and starts a Node server
  */
 export function createHttpServer(registry: Registry, port = 3000, options: HttpAppOptions = {}) {
@@ -38,7 +41,9 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 		enableRpc = true,
 		enableRest = true,
 		enableWorkflow = true,
-		workflowsPath = process.env.TSDEV_WORKFLOWS_DIR ?? "workflows",
+		enableWebhooks = true,
+		workflowsPath = process.env.c4c_WORKFLOWS_DIR ?? "workflows",
+		webhookRegistry = new WebhookRegistry(),
 	} = options;
 
 	const app = new Hono();
@@ -69,9 +74,9 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 	if (enableDocs) {
 		app.get("/openapi.json", (c) => {
 			const spec = generateOpenAPIJSON(registry, {
-				title: "tsdev API",
+				title: "c4c API",
 				version: "1.0.0",
-				description: "Auto-generated API from tsdev contracts",
+				description: "Auto-generated API from c4c contracts",
 				servers: [{ url: `http://localhost:${port}`, description: "Development server" }],
 			});
 
@@ -83,7 +88,7 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 <!DOCTYPE html>
 <html>
 <head>
-	<title>tsdev API Documentation</title>
+	<title>c4c API Documentation</title>
 	<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
 </head>
 <body>
@@ -117,6 +122,10 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 		app.route("/", createWorkflowRouter(registry, { workflowsPath }));
 	}
 
+	if (enableWebhooks) {
+		app.route("/webhooks", createWebhookRouter(registry, webhookRegistry));
+	}
+
 	if (enableRest) {
 		app.route("/", createRestRouter(registry));
 	}
@@ -131,7 +140,7 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 }
 
 function logStartup(registry: Registry, options: HttpAppOptions) {
-	if (process.env.TSDEV_QUIET === "1") {
+	if (process.env.c4c_QUIET === "1") {
 		return;
 	}
 
@@ -141,7 +150,8 @@ function logStartup(registry: Registry, options: HttpAppOptions) {
 		enableRpc = true,
 		enableRest = true,
 		enableWorkflow = true,
-		workflowsPath = process.env.TSDEV_WORKFLOWS_DIR ?? "workflows",
+		enableWebhooks = true,
+		workflowsPath = process.env.c4c_WORKFLOWS_DIR ?? "workflows",
 	} = options;
 
 	console.log(`🚀 HTTP server listening on http://localhost:${port}`);
@@ -171,6 +181,13 @@ function logStartup(registry: Registry, options: HttpAppOptions) {
 	}
 	if (enableRest) {
 		console.log(`   REST: http://localhost:${port}/:resource (conventional)`);
+	}
+	if (enableWebhooks) {
+		console.log(`\n📡 Webhooks:`);
+		console.log(`   Receive:      POST http://localhost:${port}/webhooks/:provider`);
+		console.log(`   Subscribe:    POST http://localhost:${port}/webhooks/:provider/subscribe`);
+		console.log(`   Unsubscribe:  DELETE http://localhost:${port}/webhooks/:provider/subscribe/:id`);
+		console.log(`   List:         GET http://localhost:${port}/webhooks/:provider/subscriptions`);
 	}
 	console.log(``);
 

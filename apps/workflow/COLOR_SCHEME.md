@@ -2,7 +2,7 @@
 
 **Visual semantics for workflow node types.**
 
-In tsdev workflows, node types have semantic meaning:
+In c4c workflows, node types have semantic meaning:
 - **Procedure** = executes business logic
 - **Condition** = branching logic
 - **Parallel** = concurrent execution

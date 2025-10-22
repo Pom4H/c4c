@@ -1,0 +1,55 @@
+export type ServeMode = "all" | "rest" | "workflow" | "rpc";
+
+export type DevSessionStatus = "running" | "stopping";
+export type DevOverallStatus = DevSessionStatus | "none";
+
+export interface DevSessionMetadata {
+	id: string;
+	pid: number;
+	port: number;
+	mode: ServeMode;
+	projectRoot: string;
+	proceduresPath: string;
+	logFile: string;
+	startedAt: string;
+	status: DevSessionStatus;
+}
+
+export interface DevSessionPaths {
+	directory: string;
+	sessionFile: string;
+	logFile: string;
+	logStateFile: string;
+}
+
+export interface DevLogState {
+	lastReadBytes: number;
+	updatedAt: string;
+}
+
+export interface DevLogReadResult {
+	lines: string[];
+	nextOffset: number;
+}
+
+export interface DevStatusReport {
+    status: DevOverallStatus;
+    pid?: number;
+    port?: number;
+    mode?: ServeMode;
+    projectRoot?: string;
+    proceduresPath?: string;
+    startedAt?: string;
+}
+
+export interface DiscoveredSession {
+	paths: DevSessionPaths;
+	metadata: DevSessionMetadata;
+}
+
+export type ConsoleMethod = "log" | "info" | "warn" | "error";
+
+export interface LogWriter {
+	write(method: ConsoleMethod, args: unknown[]): void;
+	flush(): Promise<void>;
+}

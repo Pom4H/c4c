@@ -1,0 +1,25 @@
+{
+  "name": "modules-example",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Example demonstrating modular procedures and client generation",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx ../../apps/cli/src/bin.ts serve --root .",
+    "generate:client": "tsx ../../apps/cli/src/bin.ts generate client --root . --out ./generated/client.ts",
+    "test:client": "tsx scripts/test-client.ts"
+  },
+  "dependencies": {
+    "@c4c/core": "workspace:*",
+    "@c4c/adapters": "workspace:*",
+    "@c4c/policies": "workspace:*",
+    "@c4c/generators": "workspace:*",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@c4c/cli": "workspace:*",
+    "@types/node": "^24.7.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

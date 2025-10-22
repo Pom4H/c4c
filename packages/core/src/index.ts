@@ -15,7 +15,9 @@ export type {
 	ContractMetadata,
 	ProcedureExposure,
 	ProcedureRole,
+	ProcedureType,
 	AuthRequirements,
+	TriggerMetadata,
 } from "./types.js";
 
 export {
@@ -26,7 +28,34 @@ export {
 } from "./metadata.js";
 
 // Registry
-export { collectRegistry, getProcedure, listProcedures, describeRegistry } from "./registry.js";
+export {
+	collectRegistry,
+	collectRegistryDetailed,
+	describeRegistry,
+	formatProcedureBadges,
+	formatProcedureMetadata,
+	getProcedure,
+	isSupportedHandlerFile,
+	listProcedures,
+	loadProceduresFromModule,
+} from "./registry.js";
+
+export type { RegistryLoadResult, RegistryModuleIndex } from "./registry.js";
 
 // Executor
-export { executeProcedure, createExecutionContext, applyPolicies } from "./executor.js";
+export { executeProcedure, execute, createExecutionContext, applyPolicies } from "./executor.js";
+
+// Triggers
+export {
+	isTrigger,
+	isTriggerStopOperation,
+	getTriggerMetadata,
+	findTriggers,
+	findStopProcedure,
+	groupTriggersByProvider,
+	validateTrigger,
+	describeTrigger,
+	TriggerSubscriptionManager,
+} from "./triggers.js";
+
+export type { TriggerSubscription } from "./triggers.js";

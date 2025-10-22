@@ -2,8 +2,8 @@ import { createExecutionContext, executeProcedure } from "@c4c/core";
 import type { Registry } from "@c4c/core";
 
 /**
- * CLI adapter for tsdev
- * Demonstrates transport-agnostic principle - same handlers work via CLI
+ * CLI adapter for c4c
+ * Demonstrates transport-agnostic principle - same procedures work via CLI
  */
 export async function runCli(registry: Registry, args: string[] = process.argv.slice(2)) {
     const [procedureName, ...inputArgs] = args;

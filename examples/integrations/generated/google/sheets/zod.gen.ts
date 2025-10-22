@@ -3010,7 +3010,7 @@ export const zSheetsSpreadsheetsGetData = z.object({
  */
 export const zSheetsSpreadsheetsGetResponse = zSpreadsheet
 
-export const zSheetsSpreadsheetsDeveloperMetadataGetData = z.object({
+export const zSheetsSpreadsheec4celoperMetadataGetData = z.object({
   body: z.optional(z.never()),
   path: z.object({
     spreadsheetId: z.string(),
@@ -3036,9 +3036,9 @@ export const zSheetsSpreadsheetsDeveloperMetadataGetData = z.object({
 /**
  * Successful response
  */
-export const zSheetsSpreadsheetsDeveloperMetadataGetResponse = zDeveloperMetadata
+export const zSheetsSpreadsheec4celoperMetadataGetResponse = zDeveloperMetadata
 
-export const zSheetsSpreadsheetsDeveloperMetadataSearchData = z.object({
+export const zSheetsSpreadsheec4celoperMetadataSearchData = z.object({
   body: z.optional(zSearchDeveloperMetadataRequest),
   path: z.object({
     spreadsheetId: z.string()
@@ -3063,7 +3063,7 @@ export const zSheetsSpreadsheetsDeveloperMetadataSearchData = z.object({
 /**
  * Successful response
  */
-export const zSheetsSpreadsheetsDeveloperMetadataSearchResponse = zSearchDeveloperMetadataResponse
+export const zSheetsSpreadsheec4celoperMetadataSearchResponse = zSearchDeveloperMetadataResponse
 
 export const zSheetsSpreadsheetsSheetsCopyToData = z.object({
   body: z.optional(zCopySheetToAnotherSpreadsheetRequest),

@@ -210,7 +210,7 @@ c4c serve ui --root . --port 3100 --api-base http://localhost:3000
 c4c generate client --root ./examples/integrations --out ./src/generated/client.ts
 
 # Generate OpenAPI specification
-c4c generate openapi --root ./src/handlers --out ./openapi.json
+c4c generate openapi --root ./src/procedures --out ./openapi.json
 ```
 
 **Create procedures:**
@@ -224,7 +224,7 @@ export const createUserContract = {
   output: z.object({ id: z.string(), name: z.string(), email: z.string() })
 };
 
-// handlers/users.ts
+// procedures/users.ts
 export const createUser: Procedure = {
   contract: createUserContract,
   handler: async (input) => {
@@ -238,7 +238,7 @@ export const createUser: Procedure = {
 
 ```typescript
 // apps/http.ts
-const registry = await collectRegistry("./handlers");
+const registry = await collectRegistry("./procedures");
 createHttpServer(registry, 3000);
 ```
 
@@ -268,7 +268,7 @@ POST /workflow/validate      # Validate workflow definition
 your-project/
 ├── src/
 │   ├── contracts/           # Procedure contracts
-│   ├── handlers/            # Procedure implementations
+│   ├── procedures/         # Procedure implementations
 │   └── apps/
 │
 ├── workflows/               # Workflow definitions (git)
@@ -577,7 +577,7 @@ workflows/order-processing.ts
              ▼
 ┌─────────────────────────────────────────────────────┐
 │                Business Logic                        │
-│  handlers/                                          │
+│  procedures/                                        │
 │  ├── users.ts    - User procedures                  │
 │  ├── emails.ts   - Email procedures                 │
 │  └── payments.ts - Payment procedures               │
@@ -639,9 +639,9 @@ const clientCode = generateRpcClientModule(registry);
 **Use the generated client:**
 
 ```typescript
-import { createTsdevClient } from "./generated/client";
+import { createc4cClient } from "./generated/client";
 
-const client = createTsdevClient({
+const client = createc4cClient({
   baseUrl: "http://localhost:3000",
   authToken: "your-jwt-token", // Auto-added to protected procedures
 });

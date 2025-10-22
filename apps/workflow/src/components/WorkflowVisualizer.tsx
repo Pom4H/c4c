@@ -17,7 +17,7 @@ import {
   Panel,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { WorkflowDefinition, TraceSpan } from "@tsdev/workflow";
+import type { WorkflowDefinition, TraceSpan } from "@c4c/workflow";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 

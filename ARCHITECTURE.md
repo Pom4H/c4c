@@ -53,7 +53,7 @@ This document explains the internals of c4c with focus on:
                  ▼
 ┌──────────────────────────────────────────────────────────┐
 │                  Business Logic                          │
-│  handlers/ - Procedure implementations                   │
+│  procedures/ - Procedure implementations                 │
 │  • Pure functions: input → output                        │
 │  • No transport coupling                                 │
 │  • Fully testable                                        │
@@ -121,7 +121,7 @@ interface Procedure<TInput = unknown, TOutput = unknown> {
 }
 ```
 
-**This is what you export from handlers/:**
+**This is what you export from procedures/:**
 
 ```typescript
 export const createUser: Procedure = {
@@ -143,7 +143,7 @@ type Registry = Map<string, Procedure>;
 **Created via auto-discovery:**
 
 ```typescript
-const registry = await collectRegistry("./handlers");
+const registry = await collectRegistry("./procedures");
 // Key: contract.name (e.g., "users.create")
 // Value: Procedure object
 ```
@@ -185,47 +185,56 @@ const withRetry: Policy = (handler) => {
 **How it works:**
 
 ```typescript
-export async function collectRegistry(handlersPath = "src/handlers"): Promise<Registry> {
+export async function collectRegistryDetailed(proceduresPath = "src/procedures") {
   const registry: Registry = new Map();
+  const moduleIndex = new Map<string, Set<string>>();
+  const proceduresRoot = resolve(proceduresPath);
+  const procedureFiles = await findProcedureFiles(proceduresRoot);
 
-  // 1. Find all TypeScript files
-  const handlerFiles = globSync(`${handlersPath}/**/*.ts`, {
-    absolute: true,
-    ignore: ["**/*.test.ts", "**/*.spec.ts"],
-  });
+  for (const file of procedureFiles) {
+    const procedures = await loadProceduresFromModule(file, {
+      versionHint: Date.now().toString(36),
+    });
+    const names = new Set<string>();
 
-  for (const file of handlerFiles) {
-    // 2. Dynamic import
-    const module = await import(file);
-
-    // 3. Check each export
-    for (const [exportName, exportValue] of Object.entries(module)) {
-      if (isProcedure(exportValue)) {
-        const procedureName = exportValue.contract.name || exportName;
-        registry.set(procedureName, exportValue as Procedure);
-      }
+    for (const [name, procedure] of procedures) {
+      registry.set(name, procedure);
+      names.add(name);
+      logProcedureEvent("Registered", name, procedure, proceduresRoot, file);
     }
+
+    moduleIndex.set(file, names);
   }
 
-  return registry;
-}
-
-function isProcedure(value: unknown): value is Procedure {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "contract" in value &&
-    "handler" in value &&
-    typeof (value as any).handler === "function"
-  );
+  return { registry, moduleIndex };
 }
 ```
 
 **Key points:**
-- Uses `globSync` to find files
-- Dynamic `import()` for each file
-- Runtime type checking to identify Procedures
-- No decorators, no manual registration
+- Streams directories with `readdir` instead of materialising a glob results array.
+- Dynamically imports modules with a cache-busting `?v=` query so edits invalidate Node's ESM cache.
+- Keeps a `moduleIndex` map that records which procedures came from which file.
+- Normalises logging through `logProcedureEvent`, so both initial boot and hot reloads share the same concise format.
+
+**What this unlocks in dev mode:**
+- File watcher can surgically add/update/remove procedures by consulting `moduleIndex`.
+- Logs stay readable: `+` (registered), `~` (updated), `-` (removed), with dimmed `@relative/path` suffixes.
+- Agent sessions can resume from the last log byte offset because the CLI persists log state under `.c4c/dev`.
+
+### Dev Server Logging
+
+The CLI writes runtime information to `.c4c/dev/dev.log` and exposes it through `pnpm c4c dev logs`. Registry events use the compact formatter introduced above:
+
+```
+[Registry] + data.secureAction [external] [auth] roles=workflow-node,api-endpoint | cat=demo | tags=data,auth | auth=Bearer roles:moderator @examples/integrations/procedures/data.ts
+```
+
+- `+ / ~ / -` convey add/update/remove.
+- Badges come from procedure metadata (`[external]`, `[auth]`, etc.).
+- Metadata is compressed (`cat`, `tags`, `auth`) so lines fit within standard terminal widths.
+- Path suffixes are dimmed to reduce visual noise; `@internal` marks generated control procedures (stop/log RPC endpoints).
+
+Because the CLI tracks offsets in `.c4c/dev/log-state.json`, repeated `pnpm c4c dev logs` calls only return new lines—ideal for agent tooling or tailing in scripts.
 
 ### 2. Execution Flow (executeProcedure)
 
@@ -490,13 +499,13 @@ function parseValue(value: string): unknown {
 **Usage:**
 
 ```bash
-tsdev users.create --name Alice --email alice@example.com
+c4c users.create --name Alice --email alice@example.com
 # Parsed as: { name: "Alice", email: "alice@example.com" }
 
-tsdev math.add --a 5 --b 3
+c4c math.add --a 5 --b 3
 # Parsed as: { a: 5, b: 3 }
 
-tsdev users.create --json '{"name":"Alice","email":"alice@example.com"}'
+c4c users.create --json '{"name":"Alice","email":"alice@example.com"}'
 # Parsed as: { name: "Alice", email: "alice@example.com" }
 ```
 
@@ -1361,7 +1370,7 @@ nodeSpan.setAttributes({
 export function generateOpenAPISpec(registry: Registry): OpenAPISpec {
   const spec: OpenAPISpec = {
     openapi: "3.0.0",
-    info: { title: "tsdev API", version: "1.0.0" },
+    info: { title: "c4c API", version: "1.0.0" },
     paths: {},
   };
   
@@ -1648,7 +1657,7 @@ interface ContractMetadata {
 **Generated client includes:**
 
 ```typescript
-export interface TsdevClientOptions {
+export interface c4cClientOptions {
   baseUrl?: string;
   fetch?: typeof fetch;
   headers?: Record<string, string>;
@@ -1673,7 +1682,7 @@ const PROCEDURE_METADATA = {
   // ...
 } as const;
 
-export function createTsdevClient(options: TsdevClientOptions = {}) {
+export function createc4cClient(options: c4cClientOptions = {}) {
   const invoke = async (name, input) => {
     const metadata = PROCEDURE_METADATA[name] ?? { requiresAuth: false };
     const headers = { ...resolved.headers };
@@ -1709,13 +1718,13 @@ export function createTsdevClient(options: TsdevClientOptions = {}) {
 
 ```typescript
 // Static token
-const client = createTsdevClient({
+const client = createc4cClient({
   baseUrl: "http://localhost:3000",
   authToken: "jwt-token-here",
 });
 
 // Dynamic token (refreshes automatically)
-const client = createTsdevClient({
+const client = createc4cClient({
   baseUrl: "http://localhost:3000",
   getAuthToken: async () => {
     const token = localStorage.getItem("token");
@@ -1815,7 +1824,7 @@ export function withLogging(procedureName: string): Policy {
 ```typescript
 import { trace } from "@opentelemetry/api";
 
-const tracer = trace.getTracer("tsdev.procedures");
+const tracer = trace.getTracer("c4c.procedures");
 
 export function withSpan(procedureName: string): Policy {
   return (handler) => {
@@ -1935,7 +1944,7 @@ cd packages/adapters && pnpm build
 **Happens once at startup:**
 
 ```typescript
-const registry = await collectRegistry("./handlers");
+const registry = await collectRegistry("./procedures");
 ```
 
 **Cost:**
@@ -2062,7 +2071,7 @@ switch (node.type) {
 
 ```typescript
 import { createExecutionContext } from '@c4c/core';
-import { createUser } from './handlers/users';
+import { createUser } from './procedures/users';
 
 test('createUser creates a user', async () => {
   const input = { name: "Alice", email: "alice@example.com" };
@@ -2085,7 +2094,7 @@ import { collectRegistry } from '@c4c/core';
 import { createHttpServer } from '@c4c/adapters';
 
 test('HTTP server executes procedures', async () => {
-  const registry = await collectRegistry("./handlers");
+  const registry = await collectRegistry("./procedures");
   const server = createHttpServer(registry, 3001);
   
   const response = await fetch("http://localhost:3001/rpc/users.create", {
@@ -2110,7 +2119,7 @@ import { executeWorkflow } from '@c4c/workflow';
 
 test('workflow executes all nodes', async () => {
   const workflow = { /* ... */ };
-  const registry = await collectRegistry("./handlers");
+  const registry = await collectRegistry("./procedures");
   
   const result = await executeWorkflow(workflow, registry);
   
@@ -2133,9 +2142,9 @@ generateSDK(registry, {
 });
 
 // Usage
-import { TsdevClient } from "./sdk/client";
+import { c4cClient } from "./sdk/client";
 
-const client = new TsdevClient("http://localhost:3000");
+const client = new c4cClient("http://localhost:3000");
 const user = await client.users.create({ name: "Alice", email: "alice@example.com" });
 ```
 
@@ -2282,7 +2291,7 @@ Comment: "We need manager approval for refunds > $100"
 
 ## Conclusion
 
-tsdev architecture enables a new way of building software:
+c4c architecture enables a new way of building software:
 
 ### For AI Agents
 
