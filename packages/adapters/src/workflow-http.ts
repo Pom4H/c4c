@@ -196,8 +196,6 @@ export function createWorkflowRouter(registry: Registry, options: WorkflowRouter
 			};
 
 			const unsubscribe = subscribeToExecution(executionId, (event) => {
-				console.log(`[SSE Backend] Sending event: ${event.type} for ${executionId}`);
-				
 				void stream.writeSSE({
 					event: event.type,
 					data: JSON.stringify(event),
@@ -209,18 +207,15 @@ export function createWorkflowRouter(registry: Registry, options: WorkflowRouter
 					event.type === "workflow.failed" ||
 					event.type === "workflow.paused"
 				) {
-					console.log(`[SSE Backend] Closing stream for ${executionId} due to ${event.type}`);
 					cleanup();
 					stream.close();
 				}
 			});
 
 			stream.onAbort(() => {
-				console.log(`[SSE Backend] Stream aborted for ${executionId}`);
 				cleanup();
 			});
 
-			console.log(`[SSE Backend] Stream connected for ${executionId}`);
 			await stream.writeSSE({
 				event: "workflow.stream.connected",
 				data: JSON.stringify({ executionId, timestamp: Date.now() }),

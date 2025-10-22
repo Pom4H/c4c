@@ -119,7 +119,6 @@ export default function ExecutionDetailPage() {
 		eventSource.addEventListener("node.started", (event) => {
 			try {
 				const data = JSON.parse(event.data);
-				console.log("[SSE] node.started:", data.nodeId);
 				setExecution(prev => {
 					if (!prev) return prev;
 					return {
@@ -136,18 +135,16 @@ export default function ExecutionDetailPage() {
 					};
 				});
 			} catch (error) {
-				console.error("Failed to process SSE event:", error);
+				console.error("Failed to process node.started event:", error);
 			}
 		});
 		
 		eventSource.addEventListener("node.completed", (event) => {
 			try {
 				const data = JSON.parse(event.data);
-				console.log("[SSE] node.completed:", data.nodeId, "output:", data.output);
 				setExecution(prev => {
 					if (!prev) return prev;
 					
-					// Добавить ноду в nodesExecuted если её там ещё нет
 					const nodesExecuted = prev.nodesExecuted.includes(data.nodeId)
 						? prev.nodesExecuted
 						: [...prev.nodesExecuted, data.nodeId];
@@ -163,20 +160,19 @@ export default function ExecutionDetailPage() {
 								status: "completed",
 								startTime: prev.nodeDetails[data.nodeId]?.startTime,
 								endTime: new Date().toISOString(),
-								output: data.output, // ← Добавляем output из события!
+								output: data.output,
 							},
 						},
 					};
 				});
 			} catch (error) {
-				console.error("Failed to process SSE node.completed event:", error);
+				console.error("Failed to process node.completed event:", error);
 			}
 		});
 		
 		eventSource.addEventListener("workflow.completed", (event) => {
 			try {
 				const data = JSON.parse(event.data);
-				console.log("[SSE] workflow.completed received:", data);
 				setExecution(prev => {
 					if (!prev) return prev;
 					return {
@@ -187,7 +183,6 @@ export default function ExecutionDetailPage() {
 						nodesExecuted: data.nodesExecuted || prev.nodesExecuted,
 					};
 				});
-				console.log("[SSE] Closing EventSource after workflow.completed");
 				eventSource.close();
 			} catch (error) {
 				console.error("Failed to process workflow.completed event:", error);
@@ -197,7 +192,6 @@ export default function ExecutionDetailPage() {
 		eventSource.addEventListener("workflow.failed", (event) => {
 			try {
 				const data = JSON.parse(event.data);
-				console.log("[SSE] workflow.failed:", data);
 				setExecution(prev => {
 					if (!prev) return prev;
 					return {
@@ -208,39 +202,14 @@ export default function ExecutionDetailPage() {
 						error: data.error,
 					};
 				});
-				console.log("[SSE] Closing EventSource after workflow.failed");
 				eventSource.close();
 			} catch (error) {
-				console.error("Failed to process SSE event:", error);
+				console.error("Failed to process workflow.failed event:", error);
 			}
 		});
 		
-		eventSource.onerror = (error) => {
-			console.error("SSE connection error:", error);
-			console.log("EventSource readyState:", eventSource.readyState);
-			console.log("EventSource url:", eventSource.url);
-			
-			// Если соединение закрыто (не переподключается), проверяем финальный статус
-			if (eventSource.readyState === EventSource.CLOSED) {
-				console.log("[SSE] Connection closed, fetching final execution state...");
-				setTimeout(async () => {
-					try {
-						const response = await fetch(`/api/workflow/executions/${executionId}`);
-						const finalExecution = await response.json();
-						console.log("[SSE] Final execution state:", finalExecution);
-						
-						if (finalExecution.status === "completed" || finalExecution.status === "failed") {
-							setExecution(finalExecution);
-						}
-					} catch (err) {
-						console.error("Failed to fetch final execution state:", err);
-					}
-				}, 1000);
-			}
-		};
-		
-		eventSource.onopen = () => {
-			console.log("[SSE] Connection opened");
+		eventSource.onerror = () => {
+			// SSE will auto-reconnect
 		};
 		
 		return () => {
