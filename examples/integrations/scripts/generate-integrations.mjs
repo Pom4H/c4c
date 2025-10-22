@@ -96,6 +96,7 @@ async function processTarget(target) {
 		.concat("_TOKEN");
 	const metadataTokenKey = `${providerId}Token`;
 
+	// First pass: resolve all operations with their schemas
 	const resolvedOperations = operations
 		.map((operation) => {
 			const pascalName = capitalize(operation.name);
@@ -114,6 +115,31 @@ async function processTarget(target) {
 			};
 		})
 		.filter(Boolean);
+
+	// Second pass: link triggers with their stop operations
+	for (const operation of resolvedOperations) {
+		if (operation.isTrigger && !operation.isStopOperation) {
+			// Try to find associated stop operation
+			const possibleStopNames = [
+				`${provider}ChannelsStop`,
+				`${provider}${serviceParts.map(capitalize).join("")}Stop`,
+				`${operation.name.replace(/watch/i, "stop")}`,
+				`${operation.name}Stop`,
+			];
+
+			const stopOperation = resolvedOperations.find(
+				(op) =>
+					op.isStopOperation &&
+					possibleStopNames.some((name) =>
+						op.name.toLowerCase().includes(name.toLowerCase())
+					)
+			);
+
+			if (stopOperation) {
+				operation.stopProcedure = `${providerId}.${toDotCase(stopOperation.name)}`;
+			}
+		}
+	}
 
 	if (resolvedOperations.length === 0) {
 		console.warn(`Skipping ${relative}: no matching Zod schemas found for SDK exports.`);
@@ -158,13 +184,73 @@ function extractOperations(source, fileName) {
 				if (ts.isIdentifier(declaration.name)) {
 					const name = declaration.name.text;
 					const description = readJsDoc(node, sourceFile);
-					operations.push({ name, description });
+					const triggerInfo = detectTrigger(name, description);
+					operations.push({ name, description, ...triggerInfo });
 				}
 			}
 		}
 	});
 
 	return operations;
+}
+
+/**
+ * Detects if an operation is a trigger based on naming and description patterns
+ */
+function detectTrigger(name, description) {
+	const nameLower = name.toLowerCase();
+	const descLower = (description || "").toLowerCase();
+
+	// Keywords that indicate a trigger
+	const triggerKeywords = {
+		watch: "watch",
+		subscribe: "subscription",
+		webhook: "webhook",
+		listen: "subscription",
+		poll: "poll",
+		stream: "stream",
+		notify: "subscription",
+		event: "subscription",
+	};
+
+	// Keywords that indicate a stop/unsubscribe operation
+	const stopKeywords = ["stop", "unsubscribe", "cancel", "close"];
+
+	// Check if this is a stop/cleanup operation
+	const isStopOperation = stopKeywords.some(
+		(keyword) => nameLower.includes(keyword)
+	);
+
+	// Check if this is a trigger operation
+	for (const [keyword, type] of Object.entries(triggerKeywords)) {
+		if (nameLower.includes(keyword) || descLower.includes(keyword)) {
+			return {
+				isTrigger: true,
+				isStopOperation,
+				triggerType: type,
+			};
+		}
+	}
+
+	// Additional check: operations that "subscribe" in description
+	if (
+		descLower.includes("subscribe") ||
+		descLower.includes("watch for") ||
+		descLower.includes("listens to") ||
+		descLower.includes("notification")
+	) {
+		return {
+			isTrigger: true,
+			isStopOperation,
+			triggerType: "subscription",
+		};
+	}
+
+	return {
+		isTrigger: false,
+		isStopOperation,
+		triggerType: null,
+	};
 }
 
 function extractZodExports(source) {
@@ -272,6 +358,39 @@ function renderFile({
 				? escapeString(operation.description)
 				: escapeString(operation.name);
 
+			// Build metadata object
+			const metadataLines = [
+				`    exposure: "internal",`,
+			];
+
+			// Add roles - triggers get special "trigger" role
+			if (operation.isTrigger && !operation.isStopOperation) {
+				metadataLines.push(`    roles: ["workflow-node", "trigger"],`);
+				metadataLines.push(`    type: "trigger",`);
+			} else {
+				metadataLines.push(`    roles: ["workflow-node"],`);
+			}
+
+			metadataLines.push(`    provider: ${escapeString(providerId)},`);
+			metadataLines.push(`    operation: ${escapeString(operation.name)},`);
+			metadataLines.push(`    tags: ${tagsArray},`);
+
+			// Add trigger metadata if this is a trigger
+			if (operation.isTrigger && !operation.isStopOperation) {
+				const triggerMetadata = [
+					`    trigger: {`,
+					`      type: ${escapeString(operation.triggerType)},`,
+				];
+
+				if (operation.stopProcedure) {
+					triggerMetadata.push(`      stopProcedure: ${escapeString(operation.stopProcedure)},`);
+					triggerMetadata.push(`      requiresChannelManagement: true,`);
+				}
+
+				triggerMetadata.push(`    },`);
+				metadataLines.push(triggerMetadata.join("\n"));
+			}
+
 			const contract = [
 				`export const ${contractName}: Contract = {`,
 				`  name: ${escapeString(
@@ -281,11 +400,7 @@ function renderFile({
 				`  input: zod.${operation.dataKey},`,
 				`  output: zod.${operation.responseKey},`,
 				`  metadata: {`,
-				`    exposure: "internal",`,
-				`    roles: ["workflow-node"],`,
-				`    provider: ${escapeString(providerId)},`,
-				`    operation: ${escapeString(operation.name)},`,
-				`    tags: ${tagsArray},`,
+				metadataLines.join("\n"),
 				`  },`,
 				`};`,
 			].join("\n");

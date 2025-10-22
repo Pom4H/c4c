@@ -139,10 +139,14 @@ export const GoogleDriveDriveChangesWatchContract: Contract = {
   output: zod.zDriveChangesWatchResponse,
   metadata: {
     exposure: "internal",
-    roles: ["workflow-node"],
+    roles: ["workflow-node", "trigger"],
+    type: "trigger",
     provider: "googleDrive",
     operation: "driveChangesWatch",
     tags: ["google", "drive"],
+    trigger: {
+      type: "watch",
+    },
   },
 };
 
@@ -1399,10 +1403,14 @@ export const GoogleDriveDriveFilesWatchContract: Contract = {
   output: zod.zDriveFilesWatchResponse,
   metadata: {
     exposure: "internal",
-    roles: ["workflow-node"],
+    roles: ["workflow-node", "trigger"],
+    type: "trigger",
     provider: "googleDrive",
     operation: "driveFilesWatch",
     tags: ["google", "drive"],
+    trigger: {
+      type: "watch",
+    },
   },
 };
 

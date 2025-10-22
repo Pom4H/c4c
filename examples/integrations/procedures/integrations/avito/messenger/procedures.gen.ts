@@ -265,10 +265,14 @@ export const AvitoMessengerGetSubscriptionsContract: Contract = {
   output: zod.zGetSubscriptionsResponse,
   metadata: {
     exposure: "internal",
-    roles: ["workflow-node"],
+    roles: ["workflow-node", "trigger"],
+    type: "trigger",
     provider: "avitoMessenger",
     operation: "getSubscriptions",
     tags: ["avito", "messenger"],
+    trigger: {
+      type: "webhook",
+    },
   },
 };
 
@@ -433,10 +437,14 @@ export const AvitoMessengerGetMessagesV3Contract: Contract = {
   output: zod.zGetMessagesV3Response,
   metadata: {
     exposure: "internal",
-    roles: ["workflow-node"],
+    roles: ["workflow-node", "trigger"],
+    type: "trigger",
     provider: "avitoMessenger",
     operation: "getMessagesV3",
     tags: ["avito", "messenger"],
+    trigger: {
+      type: "webhook",
+    },
   },
 };
 
@@ -475,10 +483,14 @@ export const AvitoMessengerPostWebhookV3Contract: Contract = {
   output: zod.zPostWebhookV3Response,
   metadata: {
     exposure: "internal",
-    roles: ["workflow-node"],
+    roles: ["workflow-node", "trigger"],
+    type: "trigger",
     provider: "avitoMessenger",
     operation: "postWebhookV3",
     tags: ["avito", "messenger"],
+    trigger: {
+      type: "webhook",
+    },
   },
 };
 

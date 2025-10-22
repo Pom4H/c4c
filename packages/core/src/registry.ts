@@ -10,6 +10,7 @@ const ROLE_COLOR: Record<ProcedureRole, string> = {
 	"workflow-node": "\u001B[36m", // cyan
 	"api-endpoint": "\u001B[35m", // magenta
 	"sdk-client": "\u001B[33m", // yellow
+	"trigger": "\u001B[32m", // green
 };
 
 const COLOR_ENABLED = () => Boolean(process.stdout?.isTTY && !process.env.NO_COLOR);

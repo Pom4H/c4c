@@ -29,12 +29,13 @@ export const SESSION_DISCOVERY_IGNORE_DIRS = new Set([
 
 export const DEFAULT_WORKFLOWS_PATH = "workflows";
 
-export const DEFAULTS: Record<ServeMode, Required<Omit<HttpAppOptions, "port">>> = {
+export const DEFAULTS: Record<ServeMode, Required<Omit<HttpAppOptions, "port" | "webhookRegistry">>> = {
 	all: {
 		enableDocs: true,
 		enableRest: true,
 		enableRpc: true,
 		enableWorkflow: true,
+		enableWebhooks: true,
 		workflowsPath: DEFAULT_WORKFLOWS_PATH,
 	},
 	rest: {
@@ -42,6 +43,7 @@ export const DEFAULTS: Record<ServeMode, Required<Omit<HttpAppOptions, "port">>>
 		enableRest: true,
 		enableRpc: false,
 		enableWorkflow: false,
+		enableWebhooks: false,
 		workflowsPath: DEFAULT_WORKFLOWS_PATH,
 	},
 	workflow: {
@@ -49,6 +51,7 @@ export const DEFAULTS: Record<ServeMode, Required<Omit<HttpAppOptions, "port">>>
 		enableRest: false,
 		enableRpc: false,
 		enableWorkflow: true,
+		enableWebhooks: true,
 		workflowsPath: DEFAULT_WORKFLOWS_PATH,
 	},
 	rpc: {
@@ -56,6 +59,7 @@ export const DEFAULTS: Record<ServeMode, Required<Omit<HttpAppOptions, "port">>>
 		enableRest: false,
 		enableRpc: true,
 		enableWorkflow: false,
+		enableWebhooks: false,
 		workflowsPath: DEFAULT_WORKFLOWS_PATH,
 	},
 };

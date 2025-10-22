@@ -307,10 +307,14 @@ export const AvitoItemsApplyVasContract: Contract = {
   output: zod.zApplyVasResponse,
   metadata: {
     exposure: "internal",
-    roles: ["workflow-node"],
+    roles: ["workflow-node", "trigger"],
+    type: "trigger",
     provider: "avitoItems",
     operation: "applyVas",
     tags: ["avito", "items"],
+    trigger: {
+      type: "subscription",
+    },
   },
 };
 
