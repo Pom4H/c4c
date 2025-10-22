@@ -8,6 +8,7 @@
  */
 
 import type { Registry } from "@c4c/core";
+import { createExecutionContext } from "@c4c/core";
 import { executeWorkflow } from "./runtime.js";
 import type { WorkflowDefinition, WorkflowExecutionResult } from "./types.js";
 
@@ -98,18 +99,19 @@ export class TriggerWorkflowManager {
 		console.log(`[TriggerManager] Creating subscription via ${workflow.trigger.triggerProcedure}`);
 		const subscriptionResult = await triggerProcedure.handler(
 			subscriptionConfig,
-			{
+			createExecutionContext({
 				transport: "trigger-manager",
 				registry: this.registry,
-			}
+			})
 		);
 
 		// Extract subscription info from result
-		const subscriptionId = (subscriptionResult as { id?: string }).id || 
+		const resultObj = subscriptionResult as Record<string, unknown>;
+		const subscriptionId = (resultObj.id as string | undefined) || 
 			`sub_${workflow.id}_${Date.now()}`;
-		const channelId = (subscriptionResult as { channelId?: string }).channelId;
-		const resourceId = (subscriptionResult as { resourceId?: string }).resourceId;
-		const expiration = (subscriptionResult as { expiration?: string }).expiration;
+		const channelId = resultObj.channelId as string | undefined;
+		const resourceId = resultObj.resourceId as string | undefined;
+		const expiration = resultObj.expiration as string | undefined;
 
 		// Create subscription record
 		const subscription: TriggerSubscription = {
@@ -121,7 +123,7 @@ export class TriggerWorkflowManager {
 			resourceId,
 			createdAt: new Date(),
 			expiresAt: expiration ? new Date(expiration) : undefined,
-			metadata: subscriptionResult,
+			metadata: resultObj as Record<string, unknown>,
 		};
 
 		// Store subscription
@@ -185,10 +187,10 @@ export class TriggerWorkflowManager {
 									resourceId: subscription.resourceId,
 								},
 							},
-							{
+							createExecutionContext({
 								transport: "trigger-manager",
 								registry: this.registry,
-							}
+							})
 						);
 						console.log(`[TriggerManager] ✅ Cleaned up subscription via ${stopProcedureName}`);
 					} catch (error) {

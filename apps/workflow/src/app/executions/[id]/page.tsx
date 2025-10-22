@@ -51,12 +51,19 @@ interface ExecutionDetail {
 	spans?: Array<{
 		spanId: string;
 		traceId: string;
+		parentSpanId?: string;
 		name: string;
+		kind: string;
 		startTime: number;
 		endTime: number;
 		duration: number;
-		status: { code: string };
+		status: { code: "OK" | "ERROR" | "UNSET"; message?: string };
 		attributes: Record<string, string | number | boolean>;
+		events?: Array<{
+			name: string;
+			timestamp: number;
+			attributes?: Record<string, unknown>;
+		}>;
 	}>;
 }
 
@@ -84,6 +91,26 @@ export default function ExecutionDetailPage() {
 	const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
 	useEffect(() => {
+		const loadExecution = async () => {
+			try {
+				// Load execution details
+				const execResponse = await fetch(`/api/workflow/executions/${executionId}`);
+				const execData = await execResponse.json();
+				setExecution(execData);
+				
+				// Load workflow definition
+				if (execData.workflowId) {
+					const wfResponse = await fetch(`/api/workflow/definitions/${execData.workflowId}`);
+					const wfData = await wfResponse.json();
+					setWorkflow(wfData);
+				}
+			} catch (error) {
+				console.error("Failed to load execution:", error);
+			} finally {
+				setIsLoading(false);
+			}
+		};
+		
 		loadExecution();
 		
 		// Setup SSE for live updates
@@ -179,26 +206,6 @@ export default function ExecutionDetailPage() {
 			eventSource.close();
 		};
 	}, [executionId]);
-
-	const loadExecution = async () => {
-		try {
-			// Load execution details
-			const execResponse = await fetch(`/api/workflow/executions/${executionId}`);
-			const execData = await execResponse.json();
-			setExecution(execData);
-			
-			// Load workflow definition
-			if (execData.workflowId) {
-				const wfResponse = await fetch(`/api/workflow/definitions/${execData.workflowId}`);
-				const wfData = await wfResponse.json();
-				setWorkflow(wfData);
-			}
-		} catch (error) {
-			console.error("Failed to load execution:", error);
-		} finally {
-			setIsLoading(false);
-		}
-	};
 
 	const getStatusIcon = (status: ExecutionDetail["status"]) => {
 		switch (status) {
@@ -399,11 +406,13 @@ export default function ExecutionDetailPage() {
 											</div>
 										)}
 
-										{selectedNode.output && (
+										{selectedNode.output !== undefined && (
 											<div>
 												<p className="text-sm font-semibold text-muted-foreground mb-2">Output</p>
 												<pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-64">
-													{JSON.stringify(selectedNode.output, null, 2)}
+													{typeof selectedNode.output === "string" 
+														? selectedNode.output 
+														: JSON.stringify(selectedNode.output, null, 2)}
 												</pre>
 											</div>
 										)}

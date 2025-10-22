@@ -105,18 +105,7 @@ export async function executeWorkflow(
 					timestamp: Date.now(),
 				});
 
-				// Track node start
-				executionStore.updateNodeStatus(executionId, currentNodeId, "running", {
-					startTime: new Date(),
-				});
-
 				const nextNodeId = await executeNode(node, workflowContext, registry, workflow);
-
-				// Track node completion
-				executionStore.updateNodeStatus(executionId, currentNodeId, "completed", {
-					endTime: new Date(),
-					output: workflowContext.nodeOutputs.get(currentNodeId),
-				});
 
 				publish({
 					type: "node.completed",

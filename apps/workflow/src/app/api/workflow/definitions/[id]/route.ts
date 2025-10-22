@@ -4,6 +4,7 @@
  */
 
 import { NextResponse } from "next/server";
+import type { WorkflowDefinition } from "@c4c/workflow";
 import {
 	googleDriveMonitor,
 	slackBot,
@@ -11,17 +12,18 @@ import {
 } from "@/../../examples/integrations/workflows/trigger-example";
 
 // Mock workflows - в production загружать из БД
-const workflowsMap: Record<string, any> = {
-	"google-drive-monitor": googleDriveMonitor,
-	"slack-bot": slackBot,
-	"complex-trigger-workflow": complexTriggerWorkflow,
+const workflowsMap: Record<string, WorkflowDefinition> = {
+	"google-drive-monitor": googleDriveMonitor as WorkflowDefinition,
+	"slack-bot": slackBot as WorkflowDefinition,
+	"complex-trigger-workflow": complexTriggerWorkflow as WorkflowDefinition,
 };
 
 export async function GET(
 	request: Request,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
-	const workflow = workflowsMap[params.id];
+	const { id } = await params;
+	const workflow = workflowsMap[id];
 
 	if (!workflow) {
 		return NextResponse.json(

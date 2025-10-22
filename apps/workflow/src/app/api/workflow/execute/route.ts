@@ -4,7 +4,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { executeWorkflow } from "@c4c/workflow";
+import { executeWorkflow, type WorkflowDefinition } from "@c4c/workflow";
 import { collectRegistry } from "@c4c/core";
 import {
 	googleDriveMonitor,
@@ -12,10 +12,10 @@ import {
 	complexTriggerWorkflow,
 } from "@/../../examples/integrations/workflows/trigger-example";
 
-const workflowsMap: Record<string, any> = {
-	"google-drive-monitor": googleDriveMonitor,
-	"slack-bot": slackBot,
-	"complex-trigger-workflow": complexTriggerWorkflow,
+const workflowsMap: Record<string, WorkflowDefinition> = {
+	"google-drive-monitor": googleDriveMonitor as WorkflowDefinition,
+	"slack-bot": slackBot as WorkflowDefinition,
+	"complex-trigger-workflow": complexTriggerWorkflow as WorkflowDefinition,
 };
 
 export async function POST(request: Request) {

@@ -6,16 +6,17 @@
  */
 
 import { useCallback, useMemo } from "react";
-import ReactFlow, {
+import {
+	ReactFlow,
 	Background,
 	Controls,
-	Node,
-	Edge,
+	type Node,
+	type Edge,
 	MarkerType,
 	useNodesState,
 	useEdgesState,
-} from "reactflow";
-import "reactflow/dist/style.css";
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 
 interface NodeDetail {
 	nodeId: string;
@@ -167,8 +168,8 @@ export default function ExecutionGraph({ workflow, execution, onNodeClick }: Exe
 		return edges;
 	}, [workflow, execution]);
 
-	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-	const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+	const [nodes, , onNodesChange] = useNodesState(initialNodes);
+	const [edges, , onEdgesChange] = useEdgesState(initialEdges);
 
 	const handleNodeClick = useCallback(
 		(_event: React.MouseEvent, node: Node) => {
