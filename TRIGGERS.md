@@ -158,60 +158,75 @@ manager.unregister("sub_123");
 
 ## Использование в Workflows
 
-### Пример: Мониторинг изменений Google Drive
+### Новый упрощенный подход
+
+**Триггер - это просто точка входа.** Когда приходит событие, workflow запускается от триггера и выполняется до конца.
 
 ```typescript
-export const watchDriveChanges = {
+import type { WorkflowDefinition } from "@c4c/workflow";
+
+export const watchDriveChanges: WorkflowDefinition = {
   id: "watch-drive-changes",
   name: "Monitor Google Drive Changes",
-  startNode: "get-token",
+  version: "1.0.0",
+  
+  // Указываем что это trigger-based workflow
+  isTriggered: true,
+  
+  // Конфигурация триггера
+  trigger: {
+    provider: "googleDrive",
+    triggerProcedure: "googleDrive.drive.changes.watch",
+    eventType: "change",
+  },
+  
+  // Workflow начинается с trigger ноды
+  startNode: "on-change",
   
   nodes: [
     {
-      id: "get-token",
-      type: "procedure",
-      procedureName: "googleDrive.drive.changes.get.start.page.token",
-      next: "subscribe",
-    },
-    {
-      id: "subscribe",
-      type: "procedure",
-      procedureName: "googleDrive.drive.changes.watch", // ← Триггер
-      config: {
-        pageToken: "{{ outputs.get-token.startPageToken }}",
-        requestBody: {
-          id: "{{ workflowId }}",
-          type: "web_hook",
-          address: "{{ webhookUrl }}",
-        },
-      },
-      next: "wait-for-events",
-      onError: "cleanup",
-    },
-    {
-      id: "wait-for-events",
-      type: "procedure",
-      procedureName: "workflow.pause",
-      config: { resumeOn: "webhook-received" },
+      id: "on-change",
+      type: "trigger", // ← Trigger node - точка входа
+      procedureName: "googleDrive.drive.changes.watch",
       next: "process-change",
     },
     {
       id: "process-change",
       type: "procedure",
       procedureName: "custom.handleFileChange",
-      next: "wait-for-events", // Loop back
-    },
-    {
-      id: "cleanup",
-      type: "procedure",
-      procedureName: "googleDrive.drive.channels.stop", // ← Stop триггера
       config: {
-        channelId: "{{ outputs.subscribe.id }}",
+        // Данные события доступны через trigger.*
+        fileId: "{{ trigger.payload.fileId }}",
+        fileName: "{{ trigger.payload.file.name }}",
       },
     },
   ],
 };
 ```
+
+### Деплой workflow
+
+```typescript
+import { createTriggerWorkflowManager } from "@c4c/workflow";
+import { WebhookRegistry } from "@c4c/adapters";
+
+const webhookRegistry = new WebhookRegistry();
+const triggerManager = createTriggerWorkflowManager(registry, webhookRegistry);
+
+// Автоматически создаст webhook subscription и начнет слушать события
+const subscription = await triggerManager.deploy(watchDriveChanges, {
+  webhookUrl: "https://your-server.com/webhooks/googleDrive",
+});
+
+console.log("✅ Workflow deployed:", subscription.subscriptionId);
+
+// Для остановки (автоматически вызовет cleanup):
+// await triggerManager.stop("watch-drive-changes");
+```
+
+### Старый подход (не рекомендуется)
+
+Старый подход с pause/resume сохранен для обратной совместимости, но не рекомендуется для новых проектов. См. [TRIGGER_INTEGRATION_GUIDE.md](./TRIGGER_INTEGRATION_GUIDE.md) для деталей нового упрощенного подхода.
 
 ## API Reference
 

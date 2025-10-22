@@ -1,244 +1,312 @@
 /**
- * Example: Using triggers in workflows
+ * Example: Using triggers in workflows (SIMPLIFIED APPROACH)
  * 
- * Demonstrates how to work with trigger-based procedures like
- * Google Drive's file watch functionality
+ * Триггер - это просто точка входа в workflow.
+ * Когда приходит событие, workflow запускается и выполняется до конца.
  */
 
-import {
-	isTrigger,
-	findTriggers,
-	getTriggerMetadata,
-	describeTrigger,
-	groupTriggersByProvider,
-	type Registry,
-} from "@c4c/core";
+import type { WorkflowDefinition } from "@c4c/workflow";
 
 /**
- * Example: Find all triggers in a registry
- */
-export function discoverTriggers(registry: Registry) {
-	const triggers = findTriggers(registry);
-	
-	console.log(`\n=== Found ${triggers.size} triggers ===\n`);
-	
-	for (const [name, procedure] of triggers) {
-		const metadata = getTriggerMetadata(procedure);
-		console.log(`📡 ${name}`);
-		console.log(`   Type: ${metadata?.type}`);
-		console.log(`   Description: ${procedure.contract.description}`);
-		
-		if (metadata?.stopProcedure) {
-			console.log(`   Stop procedure: ${metadata.stopProcedure}`);
-		}
-		
-		if (metadata?.requiresChannelManagement) {
-			console.log(`   ⚠️  Requires channel management`);
-		}
-		
-		console.log();
-	}
-}
-
-/**
- * Example: Group triggers by provider
- */
-export function groupTriggers(registry: Registry) {
-	const grouped = groupTriggersByProvider(registry);
-	
-	console.log(`\n=== Triggers by Provider ===\n`);
-	
-	for (const [provider, triggers] of grouped) {
-		console.log(`📦 ${provider}:`);
-		for (const [name, procedure] of triggers) {
-			console.log(`   - ${name}: ${describeTrigger(procedure)}`);
-		}
-		console.log();
-	}
-}
-
-/**
- * Example workflow using a trigger
+ * Example 1: Google Drive file monitoring
  * 
- * This workflow:
- * 1. Subscribes to Google Drive file changes
- * 2. Processes each change event
- * 3. Stops watching when done
+ * Мониторит изменения в Google Drive и обрабатывает их
  */
-export const watchGoogleDriveChanges = {
-	id: "watch-drive-changes",
-	name: "Watch Google Drive Changes",
-	description: "Monitor a Google Drive for file changes",
+export const googleDriveMonitor: WorkflowDefinition = {
+	id: "google-drive-monitor",
+	name: "Google Drive File Monitor",
+	description: "Monitors Google Drive for file changes and processes them",
 	version: "1.0.0",
 	
-	startNode: "get-start-token",
+	// Указываем что это trigger-based workflow
+	isTriggered: true,
+	
+	// Конфигурация триггера
+	trigger: {
+		provider: "googleDrive",
+		triggerProcedure: "googleDrive.drive.changes.watch",
+		eventType: "change", // Фильтровать только "change" события
+	},
+	
+	startNode: "on-file-change",
 	
 	nodes: [
+		// Trigger node - точка входа
 		{
-			id: "get-start-token",
-			type: "procedure" as const,
-			procedureName: "googleDrive.drive.changes.get.start.page.token",
-			config: {},
-			next: "subscribe-to-changes",
-		},
-		{
-			id: "subscribe-to-changes",
-			type: "procedure" as const,
+			id: "on-file-change",
+			type: "trigger",
 			procedureName: "googleDrive.drive.changes.watch",
-			config: {
-				// pageToken from previous step
-				pageToken: "{{ outputs['get-start-token'].startPageToken }}",
-				// Channel configuration
-				requestBody: {
-					id: "{{ workflowId }}-{{ executionId }}",
-					type: "web_hook",
-					address: "{{ webhookUrl }}",
-				},
-			},
-			next: "wait-for-events",
-			// Store channel info for cleanup
-			onError: "cleanup-subscription",
+			next: "log-event",
 		},
+		
+		// Логировать событие
 		{
-			id: "wait-for-events",
-			type: "procedure" as const,
-			procedureName: "workflow.pause",
+			id: "log-event",
+			type: "procedure",
+			procedureName: "custom.logEvent",
 			config: {
-				reason: "waiting-for-webhook-events",
-				resumeOn: "webhook-received",
+				message: "File changed: {{ trigger.payload.file.name }}",
+				event: "{{ trigger }}",
 			},
-			next: "process-change",
+			next: "check-file-type",
 		},
+		
+		// Проверить тип файла
 		{
-			id: "process-change",
-			type: "procedure" as const,
-			procedureName: "custom.processFileChange",
+			id: "check-file-type",
+			type: "condition",
 			config: {
-				changeData: "{{ webhook.payload }}",
+				expression: "trigger.payload.file.mimeType === 'application/pdf'",
+				trueBranch: "process-pdf",
+				falseBranch: "skip",
 			},
-			next: "wait-for-events", // Loop back to wait for more events
 		},
+		
+		// Обработать PDF
 		{
-			id: "cleanup-subscription",
-			type: "procedure" as const,
-			// Note: This would work if driveChannelsStop was generated
-			// procedureName: "googleDrive.drive.channels.stop",
-			procedureName: "custom.cleanupChannel",
+			id: "process-pdf",
+			type: "procedure",
+			procedureName: "custom.processPDF",
 			config: {
-				channelId: "{{ outputs['subscribe-to-changes'].id }}",
-				resourceId: "{{ outputs['subscribe-to-changes'].resourceId }}",
+				fileId: "{{ trigger.payload.fileId }}",
+				fileName: "{{ trigger.payload.file.name }}",
+			},
+			next: "notify",
+		},
+		
+		// Пропустить не-PDF файлы
+		{
+			id: "skip",
+			type: "procedure",
+			procedureName: "custom.log",
+			config: {
+				message: "Skipped non-PDF file",
+			},
+		},
+		
+		// Отправить уведомление
+		{
+			id: "notify",
+			type: "procedure",
+			procedureName: "custom.sendNotification",
+			config: {
+				message: "Processed PDF: {{ trigger.payload.file.name }}",
 			},
 		},
 	],
 };
 
 /**
- * Example: Create a generic trigger subscription workflow
+ * Example 2: Slack bot
+ * 
+ * Реагирует на сообщения в Slack
  */
-export function createTriggerWorkflow(
-	triggerId: string,
-	processorId: string,
-	options: {
-		webhookUrl: string;
-		filters?: Record<string, unknown>;
-	}
-) {
-	return {
-		id: `trigger-${triggerId}`,
-		name: `Trigger: ${triggerId}`,
-		version: "1.0.0",
-		startNode: "subscribe",
-		
-		nodes: [
-			{
-				id: "subscribe",
-				type: "procedure" as const,
-				procedureName: triggerId,
-				config: {
-					webhookUrl: options.webhookUrl,
-					...options.filters,
-				},
-				next: "wait",
-				onError: "cleanup",
+export const slackBot: WorkflowDefinition = {
+	id: "slack-bot",
+	name: "Slack Bot",
+	description: "Responds to Slack messages",
+	version: "1.0.0",
+	
+	isTriggered: true,
+	
+	trigger: {
+		provider: "slack",
+		triggerProcedure: "slack.events.subscribe",
+		eventType: "message",
+	},
+	
+	startNode: "on-message",
+	
+	nodes: [
+		{
+			id: "on-message",
+			type: "trigger",
+			procedureName: "slack.events.subscribe",
+			next: "parse-command",
+		},
+		{
+			id: "parse-command",
+			type: "procedure",
+			procedureName: "custom.parseSlackCommand",
+			config: {
+				text: "{{ trigger.payload.event.text }}",
+				user: "{{ trigger.payload.event.user }}",
+				channel: "{{ trigger.payload.event.channel }}",
 			},
-			{
-				id: "wait",
-				type: "procedure" as const,
-				procedureName: "workflow.pause",
-				config: {
-					resumeOn: "webhook-event",
-				},
-				next: "process",
+			next: "check-command",
+		},
+		{
+			id: "check-command",
+			type: "condition",
+			config: {
+				expression: "outputs['parse-command'].isCommand === true",
+				trueBranch: "execute-command",
+				falseBranch: "ignore",
 			},
-			{
-				id: "process",
-				type: "procedure" as const,
-				procedureName: processorId,
-				config: {
-					eventData: "{{ webhook.payload }}",
-				},
-				next: "wait", // Loop
+		},
+		{
+			id: "execute-command",
+			type: "procedure",
+			procedureName: "custom.executeSlackCommand",
+		},
+		{
+			id: "ignore",
+			type: "procedure",
+			procedureName: "custom.log",
+			config: {
+				message: "Not a command, ignoring",
 			},
-			{
-				id: "cleanup",
-				type: "procedure" as const,
-				procedureName: "custom.cleanup",
-				config: {
-					subscriptionId: "{{ outputs.subscribe.id }}",
-				},
+		},
+	],
+};
+
+/**
+ * Example 3: Multi-step processing with error handling
+ * 
+ * Более сложный workflow с обработкой ошибок
+ */
+export const complexTriggerWorkflow: WorkflowDefinition = {
+	id: "complex-trigger-workflow",
+	name: "Complex Trigger Workflow",
+	version: "1.0.0",
+	
+	isTriggered: true,
+	
+	trigger: {
+		provider: "googleDrive",
+		triggerProcedure: "googleDrive.drive.changes.watch",
+		subscriptionConfig: {
+			// Можно передать дополнительную конфигурацию
+			pageToken: "start-token",
+		},
+	},
+	
+	startNode: "trigger",
+	
+	nodes: [
+		{
+			id: "trigger",
+			type: "trigger",
+			procedureName: "googleDrive.drive.changes.watch",
+			next: "validate",
+		},
+		{
+			id: "validate",
+			type: "procedure",
+			procedureName: "custom.validateEvent",
+			config: {
+				event: "{{ trigger }}",
 			},
-		],
-	};
+			next: "parallel-processing",
+			onError: "handle-error", // Обработать ошибку
+		},
+		{
+			id: "parallel-processing",
+			type: "parallel",
+			config: {
+				branches: ["download-file", "update-database"],
+				waitForAll: true,
+			},
+			next: "finalize",
+		},
+		{
+			id: "download-file",
+			type: "procedure",
+			procedureName: "custom.downloadFile",
+			config: {
+				fileId: "{{ trigger.payload.fileId }}",
+			},
+		},
+		{
+			id: "update-database",
+			type: "procedure",
+			procedureName: "custom.updateDatabase",
+			config: {
+				fileId: "{{ trigger.payload.fileId }}",
+				metadata: "{{ trigger.payload.file }}",
+			},
+		},
+		{
+			id: "finalize",
+			type: "procedure",
+			procedureName: "custom.finalize",
+			config: {
+				message: "Processing complete",
+			},
+		},
+		{
+			id: "handle-error",
+			type: "procedure",
+			procedureName: "custom.handleError",
+			config: {
+				error: "{{ error }}",
+				event: "{{ trigger }}",
+			},
+		},
+	],
+};
+
+/**
+ * Usage example:
+ */
+export async function deployTriggerWorkflow() {
+	// Эта функция показывает как использовать новый подход
+	
+	const { collectRegistry } = await import("@c4c/core");
+	const { createTriggerWorkflowManager } = await import("@c4c/workflow");
+	const { WebhookRegistry, createHttpServer } = await import("@c4c/adapters");
+	
+	// 1. Подготовка
+	const registry = await collectRegistry("./procedures");
+	const webhookRegistry = new WebhookRegistry();
+	const triggerManager = createTriggerWorkflowManager(registry, webhookRegistry);
+	
+	// 2. Запуск HTTP сервера для webhook'ов
+	const server = createHttpServer(registry, 3000, {
+		enableWebhooks: true,
+		webhookRegistry,
+	});
+	
+	console.log("🚀 Server running on port 3000");
+	console.log("📡 Webhook endpoint: http://localhost:3000/webhooks/googleDrive");
+	
+	// 3. Деплой workflow - автоматически создаст subscription
+	const subscription = await triggerManager.deploy(googleDriveMonitor, {
+		webhookUrl: "http://localhost:3000/webhooks/googleDrive",
+	});
+	
+	console.log("✅ Workflow deployed:", {
+		workflowId: subscription.workflowId,
+		subscriptionId: subscription.subscriptionId,
+		provider: subscription.provider,
+	});
+	
+	// Workflow теперь слушает события!
+	// Когда событие придет:
+	// 1. HTTP сервер примет webhook POST
+	// 2. TriggerWorkflowManager запустит workflow
+	// 3. Workflow выполнится от trigger ноды до конца
+	// 4. Workflow завершится
+	
+	// Для остановки:
+	// await triggerManager.stop("google-drive-monitor");
+	
+	// Или остановить все:
+	// await triggerManager.stopAll();
 }
 
 /**
- * Example: Utility to check if a procedure can be used as a trigger
+ * Comparison with old approach:
+ * 
+ * OLD (complex):
+ * - Create subscription node
+ * - Create pause node
+ * - Manage EventRouter manually
+ * - Register resume handlers
+ * - Loop back to pause
+ * 
+ * NEW (simple):
+ * - Just define trigger node
+ * - Deploy with triggerManager.deploy()
+ * - Everything else is automatic
  */
-export function validateTriggerProcedure(registry: Registry, procedureName: string): {
-	valid: boolean;
-	issues: string[];
-	recommendations: string[];
-} {
-	const procedure = registry.get(procedureName);
-	const issues: string[] = [];
-	const recommendations: string[] = [];
-	
-	if (!procedure) {
-		return {
-			valid: false,
-			issues: [`Procedure ${procedureName} not found in registry`],
-			recommendations: [],
-		};
-	}
-	
-	if (!isTrigger(procedure)) {
-		return {
-			valid: false,
-			issues: [`Procedure ${procedureName} is not marked as a trigger`],
-			recommendations: [
-				"Only procedures with type: 'trigger' can be used as workflow triggers",
-				"Use findTriggers(registry) to discover available triggers",
-			],
-		};
-	}
-	
-	const metadata = getTriggerMetadata(procedure);
-	
-	if (metadata?.requiresChannelManagement && !metadata?.stopProcedure) {
-		issues.push("Trigger requires channel management but no stop procedure is configured");
-		recommendations.push(
-			"Add cleanup logic to your workflow to prevent resource leaks"
-		);
-	}
-	
-	if (metadata?.type === "poll" && !metadata?.pollingInterval) {
-		issues.push("Poll-type trigger missing pollingInterval configuration");
-		recommendations.push("Configure pollingInterval in trigger metadata");
-	}
-	
-	return {
-		valid: issues.length === 0,
-		issues,
-		recommendations,
-	};
-}

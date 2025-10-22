@@ -14,7 +14,6 @@ import { generateOpenAPISpec } from "@c4c/generators";
 import {
 	executeWorkflow,
 	validateWorkflow,
-	resumeWorkflow,
 	subscribeToExecution,
 	loadWorkflowLibrary,
 	loadWorkflowDefinitionById,
@@ -128,32 +127,11 @@ export function createWorkflowRouter(registry: Registry, options: WorkflowRouter
 		}
 	});
 
+	// Resume endpoint removed - use TriggerWorkflowManager for event-driven workflows
 	router.post("/workflow/resume", async (c) => {
-		try {
-			const { workflow, workflowId, resumeState, variablesDelta } = await c.req.json<{
-				workflow?: WorkflowDefinition;
-				workflowId?: string;
-				resumeState: WorkflowResumeState;
-				variablesDelta?: Record<string, unknown>;
-			}>();
-
-			const definition =
-				workflow ??
-				(workflowId ? await loadWorkflowDefinitionById(workflowsPath, workflowId) : undefined);
-
-			if (!definition) {
-				return c.json({ error: `Workflow '${workflowId ?? "unknown"}' not found` }, 404);
-			}
-
-			if (resumeState.workflowId !== definition.id) {
-				return c.json({ error: "resumeState.workflowId does not match workflow.id" }, 400);
-			}
-
-			const result = await resumeWorkflow(definition, registry, resumeState, variablesDelta ?? {});
-			return c.json(result, 200);
-		} catch (error) {
-			return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
-		}
+		return c.json({ 
+			error: "Resume endpoint removed. Use TriggerWorkflowManager for event-driven workflows." 
+		}, 410); // 410 Gone
 	});
 
 	router.post("/workflow/validate", async (c) => {
