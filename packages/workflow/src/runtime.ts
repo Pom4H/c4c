@@ -23,16 +23,7 @@ import { SpanCollector, bindCollector, forceFlush, clearActiveCollector } from "
 
 const tracer = trace.getTracer("c4c.workflow");
 
-/**
- * Signal to pause workflow execution gracefully.
- * Throw this from a procedure to pause and persist state for later resume.
- */
-export class PauseSignal extends Error {
-  constructor(readonly reason: string, readonly data?: unknown) {
-    super(reason);
-    this.name = "PauseSignal";
-  }
-}
+// PauseSignal removed - use TriggerWorkflowManager for event-driven workflows
 
 /**
  * Execute a workflow with full OpenTelemetry tracing
@@ -105,26 +96,37 @@ export async function executeWorkflow(
 						"workflow.nodes_executed": nodesExecuted.length,
 					});
 
-					publish({
-						type: "node.started",
-						workflowId: workflow.id,
-						executionId,
-						nodeId: currentNodeId,
-						nodeIndex,
-						timestamp: Date.now(),
-					});
+				publish({
+					type: "node.started",
+					workflowId: workflow.id,
+					executionId,
+					nodeId: currentNodeId,
+					nodeIndex,
+					timestamp: Date.now(),
+				});
 
-					const nextNodeId = await executeNode(node, workflowContext, registry, workflow);
+				// Track node start
+				executionStore.updateNodeStatus(executionId, currentNodeId, "running", {
+					startTime: new Date(),
+				});
 
-					publish({
-						type: "node.completed",
-						workflowId: workflow.id,
-						executionId,
-						nodeId: node.id,
-						nodeIndex,
-						nextNodeId,
-						timestamp: Date.now(),
-					});
+				const nextNodeId = await executeNode(node, workflowContext, registry, workflow);
+
+				// Track node completion
+				executionStore.updateNodeStatus(executionId, currentNodeId, "completed", {
+					endTime: new Date(),
+					output: workflowContext.nodeOutputs.get(currentNodeId),
+				});
+
+				publish({
+					type: "node.completed",
+					workflowId: workflow.id,
+					executionId,
+					nodeId: node.id,
+					nodeIndex,
+					nextNodeId,
+					timestamp: Date.now(),
+				});
 
 					currentNodeId = nextNodeId;
 					nodeIndex++;
@@ -166,55 +168,6 @@ export async function executeWorkflow(
 
 				return workflowResult;
 			} catch (error) {
-				if (error instanceof PauseSignal) {
-					const executionTime = Date.now() - startTime;
-					const outputs: Record<string, unknown> = {};
-					for (const [nodeId, output] of workflowContext.nodeOutputs.entries()) {
-						outputs[nodeId] = output;
-					}
-
-					workflowSpan.setAttributes({
-						"workflow.status": "paused",
-						"workflow.nodes_executed_total": nodesExecuted.length,
-						"workflow.execution_time_ms": executionTime,
-						"workflow.pause.reason": error.reason,
-					});
-					workflowSpan.setStatus({ code: SpanStatusCode.UNSET });
-
-					console.log(
-						`[Workflow] ⏸️ Paused: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes) — ${error.reason}`
-					);
-
-					const resumeState: WorkflowResumeState = {
-						workflowId: workflow.id,
-						executionId,
-						currentNode: workflowContext.currentNode || workflow.startNode,
-						variables: { ...workflowContext.variables },
-						nodeOutputs: Object.fromEntries(workflowContext.nodeOutputs.entries()),
-						nodesExecuted: [...nodesExecuted],
-					};
-
-					publish({
-						type: "workflow.paused",
-						workflowId: workflow.id,
-						executionId,
-						executionTime,
-						nodesExecuted,
-						resumeState,
-					});
-
-					const workflowResult: WorkflowExecutionResult = {
-						executionId,
-						status: "paused",
-						outputs,
-						executionTime,
-						nodesExecuted,
-						resumeState,
-					};
-
-					return workflowResult;
-				}
-
 				const executionTime = Date.now() - startTime;
 				const normalizedError = normalizeError(error);
 
@@ -282,253 +235,7 @@ export async function executeWorkflow(
 	return result;
 }
 
-/**
- * Resume a previously paused workflow from a serialized state
- */
-export async function resumeWorkflow(
-	workflow: WorkflowDefinition,
-	registry: Registry,
-	resumeState: WorkflowResumeState,
-	variablesDelta: Record<string, unknown> = {},
-	options?: { collector?: SpanCollector }
-): Promise<WorkflowExecutionResult> {
-	const startTime = Date.now();
-	const collector = options?.collector ?? new SpanCollector();
-	let collectorBound = false;
-
-	try {
-		await bindCollector(collector);
-		collectorBound = true;
-	} catch (error) {
-		console.warn("[Workflow] Failed to initialize OpenTelemetry collector for resume:", error);
-	}
-
-	publish({
-		type: "workflow.resumed",
-		workflowId: workflow.id,
-		executionId: resumeState.executionId,
-		timestamp: startTime,
-	});
-
-	const result = await tracer.startActiveSpan(
-		`workflow.resume`,
-		{
-			attributes: {
-				"workflow.id": workflow.id,
-				"workflow.name": workflow.name,
-				"workflow.version": workflow.version,
-				"workflow.execution_id": resumeState.executionId,
-				"workflow.start_node": resumeState.currentNode,
-				"workflow.node_count": workflow.nodes.length,
-			},
-		},
-		async (workflowSpan: Span) => {
-			const workflowContext: WorkflowContext = {
-				workflowId: workflow.id,
-				executionId: resumeState.executionId,
-				variables: { ...workflow.variables, ...resumeState.variables, ...variablesDelta },
-				nodeOutputs: new Map(Object.entries(resumeState.nodeOutputs || {})),
-				startTime: new Date(),
-				currentNode: resumeState.currentNode,
-			};
-
-			const nodesExecuted: string[] = [...(resumeState.nodesExecuted || [])];
-
-			try {
-				let currentNodeId: string | undefined = resumeState.currentNode;
-				let nodeIndex = nodesExecuted.length;
-
-				while (currentNodeId) {
-					const node = workflow.nodes.find((n) => n.id === currentNodeId);
-					if (!node) {
-						throw new Error(`Node ${currentNodeId} not found in workflow`);
-					}
-
-					workflowContext.currentNode = currentNodeId;
-					nodesExecuted.push(currentNodeId);
-
-					workflowSpan.setAttributes({
-						"workflow.current_node": currentNodeId,
-						"workflow.current_node_index": nodeIndex,
-						"workflow.nodes_executed": nodesExecuted.length,
-					});
-
-					publish({
-						type: "node.started",
-						workflowId: workflow.id,
-						executionId: resumeState.executionId,
-						nodeId: currentNodeId,
-						nodeIndex,
-						timestamp: Date.now(),
-					});
-
-					const nextNodeId = await executeNode(node, workflowContext, registry, workflow);
-
-					publish({
-						type: "node.completed",
-						workflowId: workflow.id,
-						executionId: resumeState.executionId,
-						nodeId: node.id,
-						nodeIndex,
-						nextNodeId,
-						timestamp: Date.now(),
-					});
-
-					currentNodeId = nextNodeId;
-					nodeIndex++;
-				}
-
-				const outputs: Record<string, unknown> = {};
-				for (const [nodeId, output] of workflowContext.nodeOutputs.entries()) {
-					outputs[nodeId] = output;
-				}
-
-				const executionTime = Date.now() - startTime;
-
-				workflowSpan.setAttributes({
-					"workflow.status": "completed",
-					"workflow.nodes_executed_total": nodesExecuted.length,
-					"workflow.execution_time_ms": executionTime,
-				});
-				workflowSpan.setStatus({ code: SpanStatusCode.OK });
-
-				console.log(
-					`[Workflow] ▶️ Resumed and completed: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`
-				);
-
-				const workflowResult: WorkflowExecutionResult = {
-					executionId: resumeState.executionId,
-					status: "completed",
-					outputs,
-					executionTime,
-					nodesExecuted,
-				};
-
-				publish({
-					type: "workflow.completed",
-					workflowId: workflow.id,
-					executionId: resumeState.executionId,
-					executionTime,
-					nodesExecuted,
-				});
-
-				return workflowResult;
-			} catch (error) {
-				if (error instanceof PauseSignal) {
-					const executionTime = Date.now() - startTime;
-					const outputs: Record<string, unknown> = {};
-					for (const [nodeId, output] of workflowContext.nodeOutputs.entries()) {
-						outputs[nodeId] = output;
-					}
-
-					workflowSpan.setAttributes({
-						"workflow.status": "paused",
-						"workflow.nodes_executed_total": nodesExecuted.length,
-						"workflow.execution_time_ms": executionTime,
-						"workflow.pause.reason": error.reason,
-					});
-					workflowSpan.setStatus({ code: SpanStatusCode.UNSET });
-
-					const newResumeState: WorkflowResumeState = {
-						workflowId: workflow.id,
-						executionId: resumeState.executionId,
-						currentNode: workflowContext.currentNode || resumeState.currentNode,
-						variables: { ...workflowContext.variables },
-						nodeOutputs: Object.fromEntries(workflowContext.nodeOutputs.entries()),
-						nodesExecuted: [...nodesExecuted],
-					};
-
-					console.log(
-						`[Workflow] ⏸️ Paused after resume: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes) — ${error.reason}`
-					);
-
-					publish({
-						type: "workflow.paused",
-						workflowId: workflow.id,
-						executionId: resumeState.executionId,
-						executionTime,
-						nodesExecuted,
-						resumeState: newResumeState,
-					});
-
-					const pausedResult: WorkflowExecutionResult = {
-						executionId: resumeState.executionId,
-						status: "paused",
-						outputs,
-						executionTime,
-						nodesExecuted,
-						resumeState: newResumeState,
-					};
-
-					return pausedResult;
-				}
-
-				const executionTime = Date.now() - startTime;
-				const normalizedError = normalizeError(error);
-
-				workflowSpan.setAttributes({
-					"workflow.status": "failed",
-					"workflow.nodes_executed_total": nodesExecuted.length,
-					"workflow.execution_time_ms": executionTime,
-					"workflow.error": normalizedError.message,
-				});
-				workflowSpan.recordException(normalizedError);
-				workflowSpan.setStatus({
-					code: SpanStatusCode.ERROR,
-					message: normalizedError.message,
-				});
-
-				console.error(
-					`[Workflow] ❌ Failed after resume: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`,
-					normalizedError
-				);
-
-				publish({
-					type: "workflow.failed",
-					workflowId: workflow.id,
-					executionId: resumeState.executionId,
-					executionTime,
-					nodesExecuted,
-					error: normalizedError.message,
-				});
-
-				const failureResult: WorkflowExecutionResult = {
-					executionId: resumeState.executionId,
-					status: "failed",
-					outputs: {},
-					error: normalizedError,
-					executionTime,
-					nodesExecuted,
-				};
-
-				return failureResult;
-			} finally {
-				workflowSpan.end();
-			}
-		}
-	);
-
-	if (collectorBound) {
-		try {
-			await forceFlush();
-		} catch (flushError) {
-			console.warn("[Workflow] Failed to flush collected spans after resume:", flushError);
-		}
-		result.spans = collector.getSpans();
-		clearActiveCollector();
-	}
-
-	result.spans ??= [];
-
-	publish({
-		type: "workflow.result",
-		workflowId: workflow.id,
-		executionId: result.executionId,
-		result: toSerializedResult(result),
-	});
-
-	return result;
-}
+// resumeWorkflow removed - use TriggerWorkflowManager for event-driven workflows
 
 function normalizeError(error: unknown): Error {
 	if (error instanceof Error) {
