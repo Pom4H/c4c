@@ -41,6 +41,10 @@ interface WorkflowDefinition {
 		type: string;
 		procedureName?: string;
 		next?: string | string[];
+		config?: {
+			branches?: string[];
+			[key: string]: unknown;
+		};
 	}>;
 }
 
@@ -166,8 +170,8 @@ export default function ExecutionGraph({ workflow, execution, onNodeClick }: Exe
 			}
 			
 			// Обработка параллельных нод - создаем ребра к branches
-			if (node.type === "parallel" && (node as any).config?.branches) {
-				const branches = (node as any).config.branches as string[];
+			if (node.type === "parallel" && node.config?.branches) {
+				const branches = node.config.branches;
 				branches.forEach((branchId) => {
 					const sourceExecuted = execution.nodesExecuted.includes(node.id);
 					const targetExecuted = execution.nodesExecuted.includes(branchId);
