@@ -20,6 +20,7 @@ import type {
 } from "./types.js";
 import { publish, type SerializedWorkflowExecutionResult } from "./events.js";
 import { SpanCollector, bindCollector, forceFlush, clearActiveCollector } from "./otel.js";
+import { getExecutionStore } from "./execution-store.js";
 
 const tracer = trace.getTracer("c4c.workflow");
 
@@ -46,6 +47,14 @@ export async function executeWorkflow(
 	} catch (error) {
 		console.warn("[Workflow] Failed to initialize OpenTelemetry collector:", error);
 	}
+
+	// Start tracking execution in store
+	const executionStore = getExecutionStore();
+	executionStore.startExecution(
+		executionId,
+		workflow.id,
+		workflow.name || workflow.id
+	);
 
 	const result = await tracer.startActiveSpan(
 		`workflow.execute`,
@@ -105,7 +114,18 @@ export async function executeWorkflow(
 					timestamp: Date.now(),
 				});
 
+				// Update node status in store
+				executionStore.updateNodeStatus(executionId, currentNodeId, "running", {
+					startTime: new Date(),
+				});
+
 				const nextNodeId = await executeNode(node, workflowContext, registry, workflow);
+
+				// Update node status in store
+				executionStore.updateNodeStatus(executionId, currentNodeId, "completed", {
+					endTime: new Date(),
+					output: workflowContext.nodeOutputs.get(currentNodeId),
+				});
 
 				publish({
 					type: "node.completed",
@@ -147,6 +167,9 @@ export async function executeWorkflow(
 					nodesExecuted,
 				};
 
+				// Save execution result to store
+				executionStore.completeExecution(executionId, workflowResult);
+
 				publish({
 					type: "workflow.completed",
 					workflowId: workflow.id,
@@ -177,15 +200,6 @@ export async function executeWorkflow(
 					normalizedError
 				);
 
-				publish({
-					type: "workflow.failed",
-					workflowId: workflow.id,
-					executionId,
-					executionTime,
-					nodesExecuted,
-					error: normalizedError.message,
-				});
-
 				const failureResult: WorkflowExecutionResult = {
 					executionId,
 					status: "failed",
@@ -194,6 +208,18 @@ export async function executeWorkflow(
 					executionTime,
 					nodesExecuted,
 				};
+
+				// Save failed execution to store
+				executionStore.completeExecution(executionId, failureResult);
+
+				publish({
+					type: "workflow.failed",
+					workflowId: workflow.id,
+					executionId,
+					executionTime,
+					nodesExecuted,
+					error: normalizedError.message,
+				});
 
 				return failureResult;
 			} finally {
@@ -213,6 +239,12 @@ export async function executeWorkflow(
 	}
 
 	result.spans ??= [];
+
+	// Update execution in store with spans
+	const execution = executionStore.getExecution(result.executionId);
+	if (execution) {
+		execution.spans = result.spans;
+	}
 
 	publish({
 		type: "workflow.result",
