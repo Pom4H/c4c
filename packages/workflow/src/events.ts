@@ -60,6 +60,7 @@ export type WorkflowEvent =
       nodeIndex?: number;
       nextNodeId?: string;
       timestamp: number;
+      output?: unknown;
     }
   | {
       type: "workflow.result";

@@ -119,6 +119,7 @@ export default function ExecutionDetailPage() {
 		eventSource.addEventListener("node.started", (event) => {
 			try {
 				const data = JSON.parse(event.data);
+				console.log("[SSE] node.started:", data.nodeId);
 				setExecution(prev => {
 					if (!prev) return prev;
 					return {
@@ -127,6 +128,7 @@ export default function ExecutionDetailPage() {
 							...prev.nodeDetails,
 							[data.nodeId]: {
 								...prev.nodeDetails[data.nodeId],
+								nodeId: data.nodeId,
 								status: "running",
 								startTime: new Date().toISOString(),
 							},
@@ -141,6 +143,7 @@ export default function ExecutionDetailPage() {
 		eventSource.addEventListener("node.completed", (event) => {
 			try {
 				const data = JSON.parse(event.data);
+				console.log("[SSE] node.completed:", data);
 				setExecution(prev => {
 					if (!prev) return prev;
 					
@@ -156,8 +159,11 @@ export default function ExecutionDetailPage() {
 							...prev.nodeDetails,
 							[data.nodeId]: {
 								...prev.nodeDetails[data.nodeId],
+								nodeId: data.nodeId,
 								status: "completed",
+								startTime: prev.nodeDetails[data.nodeId]?.startTime,
 								endTime: new Date().toISOString(),
+								output: data.output, // ← Добавляем output из события!
 							},
 						},
 					};
@@ -170,6 +176,7 @@ export default function ExecutionDetailPage() {
 		eventSource.addEventListener("workflow.completed", (event) => {
 			try {
 				const data = JSON.parse(event.data);
+				console.log("[SSE] workflow.completed:", data);
 				setExecution(prev => {
 					if (!prev) return prev;
 					return {
@@ -180,6 +187,7 @@ export default function ExecutionDetailPage() {
 						nodesExecuted: data.nodesExecuted || prev.nodesExecuted,
 					};
 				});
+				console.log("[SSE] Closing EventSource after workflow.completed");
 				eventSource.close();
 			} catch (error) {
 				console.error("Failed to process SSE event:", error);
@@ -189,6 +197,7 @@ export default function ExecutionDetailPage() {
 		eventSource.addEventListener("workflow.failed", (event) => {
 			try {
 				const data = JSON.parse(event.data);
+				console.log("[SSE] workflow.failed:", data);
 				setExecution(prev => {
 					if (!prev) return prev;
 					return {
@@ -199,6 +208,7 @@ export default function ExecutionDetailPage() {
 						error: data.error,
 					};
 				});
+				console.log("[SSE] Closing EventSource after workflow.failed");
 				eventSource.close();
 			} catch (error) {
 				console.error("Failed to process SSE event:", error);

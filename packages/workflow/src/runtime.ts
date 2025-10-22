@@ -135,6 +135,7 @@ export async function executeWorkflow(
 					nodeIndex,
 					nextNodeId,
 					timestamp: Date.now(),
+					output: workflowContext.nodeOutputs.get(currentNodeId),
 				});
 
 					currentNodeId = nextNodeId;
@@ -399,6 +400,7 @@ async function executeNode(
 					nodeId: node.id,
 					nextNodeId,
 					timestamp: Date.now(),
+					output: context.nodeOutputs.get(node.id),
 				});
 
 				return nextNodeId;
