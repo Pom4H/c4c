@@ -85,27 +85,111 @@ export default function ExecutionDetailPage() {
 
 	useEffect(() => {
 		loadExecution();
-		// Refresh if running
-		const interval = setInterval(() => {
-			if (execution?.status === "running") {
-				loadExecution();
+		
+		// Setup SSE for live updates
+		const eventSource = new EventSource(`/api/workflow/executions/${executionId}/stream`);
+		
+		eventSource.addEventListener("node.started", (event) => {
+			try {
+				const data = JSON.parse(event.data);
+				setExecution(prev => {
+					if (!prev) return prev;
+					return {
+						...prev,
+						nodeDetails: {
+							...prev.nodeDetails,
+							[data.nodeId]: {
+								...prev.nodeDetails[data.nodeId],
+								status: "running",
+								startTime: new Date().toISOString(),
+							},
+						},
+					};
+				});
+			} catch (error) {
+				console.error("Failed to process SSE event:", error);
 			}
-		}, 1000);
-		return () => clearInterval(interval);
-	}, [executionId, execution?.status]);
+		});
+		
+		eventSource.addEventListener("node.completed", (event) => {
+			try {
+				const data = JSON.parse(event.data);
+				setExecution(prev => {
+					if (!prev) return prev;
+					return {
+						...prev,
+						nodeDetails: {
+							...prev.nodeDetails,
+							[data.nodeId]: {
+								...prev.nodeDetails[data.nodeId],
+								status: "completed",
+								endTime: new Date().toISOString(),
+							},
+						},
+					};
+				});
+			} catch (error) {
+				console.error("Failed to process SSE event:", error);
+			}
+		});
+		
+		eventSource.addEventListener("workflow.completed", (event) => {
+			try {
+				const data = JSON.parse(event.data);
+				setExecution(prev => {
+					if (!prev) return prev;
+					return {
+						...prev,
+						status: "completed",
+						endTime: new Date().toISOString(),
+						executionTime: data.executionTime,
+					};
+				});
+				eventSource.close();
+			} catch (error) {
+				console.error("Failed to process SSE event:", error);
+			}
+		});
+		
+		eventSource.addEventListener("workflow.failed", (event) => {
+			try {
+				const data = JSON.parse(event.data);
+				setExecution(prev => {
+					if (!prev) return prev;
+					return {
+						...prev,
+						status: "failed",
+						endTime: new Date().toISOString(),
+						executionTime: data.executionTime,
+						error: data.error,
+					};
+				});
+				eventSource.close();
+			} catch (error) {
+				console.error("Failed to process SSE event:", error);
+			}
+		});
+		
+		eventSource.onerror = () => {
+			console.warn("SSE connection error");
+			// Don't close - will auto-reconnect
+		};
+		
+		return () => {
+			eventSource.close();
+		};
+	}, [executionId]);
 
 	const loadExecution = async () => {
 		try {
-			const apiBase = (process.env.NEXT_PUBLIC_c4c_API_BASE || "http://localhost:3000").replace(/\/$/, "");
-			
 			// Load execution details
-			const execResponse = await fetch(`${apiBase}/workflow/executions/${executionId}`);
+			const execResponse = await fetch(`/api/workflow/executions/${executionId}`);
 			const execData = await execResponse.json();
 			setExecution(execData);
 			
 			// Load workflow definition
 			if (execData.workflowId) {
-				const wfResponse = await fetch(`${apiBase}/workflow/definitions/${execData.workflowId}`);
+				const wfResponse = await fetch(`/api/workflow/definitions/${execData.workflowId}`);
 				const wfData = await wfResponse.json();
 				setWorkflow(wfData);
 			}

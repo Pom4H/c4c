@@ -11,7 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CheckCircle2, XCircle, Loader2, Clock, Eye } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CheckCircle2, XCircle, Loader2, Clock, Eye, Play } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
 interface ExecutionRecord {
@@ -36,23 +37,79 @@ interface ExecutionStats {
 	running: number;
 }
 
+interface WorkflowDefinition {
+	id: string;
+	name: string;
+	nodeCount: number;
+}
+
 export default function ExecutionsPage() {
 	const router = useRouter();
 	const [executions, setExecutions] = useState<ExecutionRecord[]>([]);
 	const [stats, setStats] = useState<ExecutionStats>({ total: 0, completed: 0, failed: 0, running: 0 });
 	const [isLoading, setIsLoading] = useState(true);
+	const [workflows, setWorkflows] = useState<WorkflowDefinition[]>([]);
+	const [selectedWorkflow, setSelectedWorkflow] = useState<string>("");
+	const [isExecuting, setIsExecuting] = useState(false);
 
 	useEffect(() => {
 		loadExecutions();
+		loadWorkflows();
 		// Refresh every 2 seconds
 		const interval = setInterval(loadExecutions, 2000);
 		return () => clearInterval(interval);
 	}, []);
 
+	const loadWorkflows = async () => {
+		try {
+			const response = await fetch("/api/workflow/definitions");
+			const data = await response.json();
+			setWorkflows(data);
+			if (data.length > 0) {
+				setSelectedWorkflow(data[0].id);
+			}
+		} catch (error) {
+			console.error("Failed to load workflows:", error);
+		}
+	};
+
+	const handleExecute = async () => {
+		if (!selectedWorkflow || isExecuting) return;
+		
+		setIsExecuting(true);
+		try {
+			const response = await fetch("/api/workflow/execute", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					workflowId: selectedWorkflow,
+					input: {},
+					options: {
+						executionId: `wf_exec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+					},
+				}),
+			});
+			
+			const result = await response.json();
+			
+			if (response.ok) {
+				// Reload executions to show new one
+				await loadExecutions();
+				// Navigate to execution detail
+				router.push(`/executions/${result.executionId}`);
+			} else {
+				console.error("Failed to execute workflow:", result.error);
+			}
+		} catch (error) {
+			console.error("Failed to execute workflow:", error);
+		} finally {
+			setIsExecuting(false);
+		}
+	};
+
 	const loadExecutions = async () => {
 		try {
-			const apiBase = (process.env.NEXT_PUBLIC_c4c_API_BASE || "http://localhost:3000").replace(/\/$/, "");
-			const response = await fetch(`${apiBase}/workflow/executions`);
+			const response = await fetch("/api/workflow/executions");
 			const data = await response.json();
 			setExecutions(data.executions || []);
 			setStats(data.stats || { total: 0, completed: 0, failed: 0, running: 0 });
@@ -127,6 +184,53 @@ export default function ExecutionsPage() {
 						<ThemeToggle />
 					</div>
 				</div>
+
+				{/* Execute Workflow */}
+				<Card className="mb-6">
+					<CardContent className="p-6">
+						<div className="flex items-center gap-4">
+							<div className="flex-1">
+								<label className="block text-sm font-medium mb-2">
+									Execute Workflow
+								</label>
+								<Select
+									value={selectedWorkflow}
+									onValueChange={setSelectedWorkflow}
+									disabled={isExecuting}
+								>
+									<SelectTrigger>
+										<SelectValue placeholder="Select a workflow" />
+									</SelectTrigger>
+									<SelectContent>
+										{workflows.map((wf) => (
+											<SelectItem key={wf.id} value={wf.id}>
+												{wf.name} ({wf.nodeCount} nodes)
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
+							<Button
+								onClick={handleExecute}
+								disabled={!selectedWorkflow || isExecuting}
+								className="mt-6"
+								size="lg"
+							>
+								{isExecuting ? (
+									<>
+										<Loader2 className="mr-2 h-5 w-5 animate-spin" />
+										Executing...
+									</>
+								) : (
+									<>
+										<Play className="mr-2 h-5 w-5" />
+										Execute
+									</>
+								)}
+							</Button>
+						</div>
+					</CardContent>
+				</Card>
 
 				{/* Stats Cards */}
 				<div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
