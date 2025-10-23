@@ -356,6 +356,12 @@ function generateProcedureCode(options: {
   // Generate environment variable name for base URL
   const envVarName = `${provider.toUpperCase().replace(/-/g, '_')}_URL`;
   
+  // Build the client configuration code with correct baseUrl
+  const sdkConfigCode = `// Configure SDK client with base URL from environment
+const baseUrl = process.env.${envVarName} || '${baseUrl}';
+sdk.client.setConfig({ baseUrl });
+`;
+  
   const imports = useSchemas
     ? `import { applyPolicies, type Procedure, type Contract } from "@c4c/core";
 import { withOAuth, getOAuthHeaders } from "@c4c/policies";
@@ -363,19 +369,13 @@ import * as sdk from "${sdkImportPath}";
 import * as schemas from "${schemaImportPath}";
 import { z } from "zod";
 
-// Configure SDK client with base URL from environment
-const baseUrl = process.env.${envVarName} || 'http://localhost:3001';
-sdk.client.setConfig({ baseUrl });
-`
+${sdkConfigCode}`
     : `import { applyPolicies, type Procedure, type Contract } from "@c4c/core";
 import { withOAuth, getOAuthHeaders } from "@c4c/policies";
 import * as sdk from "${sdkImportPath}";
 import { z } from "zod";
 
-// Configure SDK client with base URL from environment
-const baseUrl = process.env.${envVarName} || 'http://localhost:3001';
-sdk.client.setConfig({ baseUrl });
-`;
+${sdkConfigCode}`;
   
   const procedures = operations.map((op) => {
     const providerPascal = toPascalCase(provider);
