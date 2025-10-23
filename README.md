@@ -82,7 +82,7 @@ export const create: Procedure = {
 
 ## Define Workflows
 
-Workflows orchestrate procedures:
+Workflows orchestrate procedures with **branching** and **parallel execution**:
 
 ```typescript
 import type { WorkflowDefinition } from "@c4c/workflow";
@@ -97,15 +97,56 @@ export const userOnboarding: WorkflowDefinition = {
       id: "create-user",
       type: "procedure",
       procedureName: "users.create",
-      config: {},
-      next: "send-email",
+      next: "check-plan",
+    },
+    // Branching: different paths for premium/free users
+    {
+      id: "check-plan",
+      type: "condition",
+      config: {
+        expression: "get('create-user').plan === 'premium'",
+        trueBranch: "premium-setup",
+        falseBranch: "free-setup",
+      },
+    },
+    // Parallel execution: run multiple tasks simultaneously
+    {
+      id: "premium-setup",
+      type: "parallel",
+      config: {
+        branches: ["setup-analytics", "assign-manager", "enable-features"],
+        waitForAll: true,
+      },
+      next: "send-welcome",
     },
     {
-      id: "send-email",
+      id: "setup-analytics",
+      type: "procedure",
+      procedureName: "analytics.setup",
+    },
+    {
+      id: "assign-manager",
+      type: "procedure",
+      procedureName: "users.assignManager",
+    },
+    {
+      id: "enable-features",
+      type: "procedure",
+      procedureName: "features.enablePremium",
+    },
+    // Free plan path
+    {
+      id: "free-setup",
+      type: "procedure",
+      procedureName: "users.setupFreeTrial",
+      next: "send-welcome",
+    },
+    // Final step
+    {
+      id: "send-welcome",
       type: "procedure",
       procedureName: "emails.sendWelcome",
-      next: null,
-    }
+    },
   ]
 };
 ```
