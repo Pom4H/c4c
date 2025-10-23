@@ -4,7 +4,7 @@
  * Send and manage notifications with webhook triggers
  */
 
-import { defineContract, defineProcedure } from '@c4c/core';
+import type { Procedure } from '@c4c/core';
 import { z } from 'zod';
 
 // ==========================================
@@ -33,26 +33,24 @@ const subscriptions = new Map<string, string[]>(); // topic -> webhooks
 // SEND NOTIFICATION
 // ==========================================
 
-export const sendNotificationContract = defineContract({
-  name: 'notifications.send',
-  description: 'Send a notification',
-  input: z.object({
-    message: z.string().min(1),
-    recipient: z.string().optional(),
-    channel: z.enum(['email', 'sms', 'push', 'webhook']).default('push'),
-    priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
-    metadata: z.record(z.unknown()).optional(),
-  }),
-  output: NotificationSchema,
-  metadata: {
-    exposure: 'external',
-    roles: ['api-endpoint', 'workflow-node', 'sdk-client'],
-    tags: ['notifications', 'send'],
+export const sendNotification: Procedure = {
+  contract: {
+    name: 'notifications.send',
+    description: 'Send a notification',
+    input: z.object({
+      message: z.string().min(1),
+      recipient: z.string().optional(),
+      channel: z.enum(['email', 'sms', 'push', 'webhook']).default('push'),
+      priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
+      metadata: z.record(z.unknown()).optional(),
+    }),
+    output: NotificationSchema,
+    metadata: {
+      exposure: 'external',
+      roles: ['api-endpoint', 'workflow-node', 'sdk-client'],
+      tags: ['notifications', 'send'],
+    },
   },
-});
-
-export const sendNotification = defineProcedure({
-  contract: sendNotificationContract,
   handler: async (input) => {
     const now = new Date().toISOString();
     const id = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -71,39 +69,40 @@ export const sendNotification = defineProcedure({
     
     notifications.set(id, notification);
     
-    console.log(`[Notifications] Sent: ${notification.message}`);
+    console.log(`[Notifications] 🔥 CROSS-APP EVENT RECEIVED! 🔥`);
+    console.log(`  Message: ${notification.message}`);
     console.log(`  Channel: ${notification.channel}`);
     console.log(`  Priority: ${notification.priority}`);
+    console.log(`  From: ${input.metadata?.source || 'unknown'}`);
+    console.log(`  Notification ID: ${id}`);
     
     return notification;
   },
-});
+};
 
 // ==========================================
 // LIST NOTIFICATIONS
 // ==========================================
 
-export const listNotificationsContract = defineContract({
-  name: 'notifications.list',
-  description: 'List all notifications',
-  input: z.object({
-    recipient: z.string().optional(),
-    status: z.enum(['pending', 'sent', 'failed']).optional(),
-    limit: z.number().optional(),
-  }),
-  output: z.object({
-    notifications: z.array(NotificationSchema),
-    total: z.number(),
-  }),
-  metadata: {
-    exposure: 'external',
-    roles: ['api-endpoint', 'workflow-node', 'sdk-client'],
-    tags: ['notifications', 'list'],
+export const listNotifications: Procedure = {
+  contract: {
+    name: 'notifications.list',
+    description: 'List all notifications',
+    input: z.object({
+      recipient: z.string().optional(),
+      status: z.enum(['pending', 'sent', 'failed']).optional(),
+      limit: z.number().optional(),
+    }),
+    output: z.object({
+      notifications: z.array(NotificationSchema),
+      total: z.number(),
+    }),
+    metadata: {
+      exposure: 'external',
+      roles: ['api-endpoint', 'workflow-node', 'sdk-client'],
+      tags: ['notifications', 'list'],
+    },
   },
-});
-
-export const listNotifications = defineProcedure({
-  contract: listNotificationsContract,
   handler: async (input) => {
     let filtered = Array.from(notifications.values());
     
@@ -124,33 +123,31 @@ export const listNotifications = defineProcedure({
       total: filtered.length,
     };
   },
-});
+};
 
 // ==========================================
 // SUBSCRIBE TO NOTIFICATIONS
 // ==========================================
 
-export const subscribeNotificationsContract = defineContract({
-  name: 'notifications.subscribe',
-  description: 'Subscribe to notifications on a topic',
-  input: z.object({
-    topic: z.string(),
-    webhookUrl: z.string().url(),
-  }),
-  output: z.object({
-    success: z.boolean(),
-    subscriptionId: z.string(),
-    topic: z.string(),
-  }),
-  metadata: {
-    exposure: 'external',
-    roles: ['api-endpoint', 'workflow-node', 'sdk-client'],
-    tags: ['notifications', 'subscribe'],
+export const subscribeNotifications: Procedure = {
+  contract: {
+    name: 'notifications.subscribe',
+    description: 'Subscribe to notifications on a topic',
+    input: z.object({
+      topic: z.string(),
+      webhookUrl: z.string().url(),
+    }),
+    output: z.object({
+      success: z.boolean(),
+      subscriptionId: z.string(),
+      topic: z.string(),
+    }),
+    metadata: {
+      exposure: 'external',
+      roles: ['api-endpoint', 'workflow-node', 'sdk-client'],
+      tags: ['notifications', 'subscribe'],
+    },
   },
-});
-
-export const subscribeNotifications = defineProcedure({
-  contract: subscribeNotificationsContract,
   handler: async (input) => {
     const existing = subscriptions.get(input.topic) || [];
     
@@ -171,7 +168,7 @@ export const subscribeNotifications = defineProcedure({
       topic: input.topic,
     };
   },
-});
+};
 
 // ==========================================
 // WEBHOOKS / TRIGGERS
@@ -181,59 +178,31 @@ export const subscribeNotifications = defineProcedure({
  * Notification Sent Trigger
  * Fires when a notification is sent
  */
-export const notificationSentTriggerContract = defineContract({
-  name: 'notifications.trigger.sent',
-  description: 'Webhook trigger that fires when a notification is sent',
-  input: z.object({
-    webhookUrl: z.string().url(),
-    filter: z.object({
-      channel: z.enum(['email', 'sms', 'push', 'webhook']).optional(),
-      priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
-    }).optional(),
-  }),
-  output: NotificationSchema, // What the webhook will send
-  metadata: {
-    exposure: 'external',
-    type: 'trigger',
-    roles: ['trigger', 'workflow-node'],
-    tags: ['notifications', 'webhook', 'trigger'],
-    trigger: {
-      type: 'webhook',
-      eventTypes: ['notification.sent'],
-      supportsFiltering: true,
+export const notificationSentTrigger: Procedure = {
+  contract: {
+    name: 'notifications.trigger.sent',
+    description: 'Webhook trigger that fires when a notification is sent',
+    input: z.object({
+      webhookUrl: z.string().url().optional(),
+      filter: z.object({
+        channel: z.enum(['email', 'sms', 'push', 'webhook']).optional(),
+        priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
+      }).optional(),
+    }),
+    output: NotificationSchema,
+    metadata: {
+      exposure: 'external',
+      type: 'trigger',
+      roles: ['webhook'],
+      trigger: {
+        kind: 'webhook',
+        provider: 'notifications',
+        event: 'sent',
+      },
+      tags: ['notifications', 'webhook', 'trigger'],
     },
-    provider: 'notification-service',
   },
-});
-
-export const notificationSentTrigger = defineProcedure({
-  contract: notificationSentTriggerContract,
-  handler: async (input) => {
-    console.log(`[Notifications] Registered webhook for notification.sent:`);
-    console.log(`  URL: ${input.webhookUrl}`);
-    if (input.filter) {
-      console.log(`  Filter:`, input.filter);
-    }
-    
-    // Return empty notification for type inference
-    return {
-      id: '',
-      message: '',
-      channel: 'push' as const,
-      priority: 'normal' as const,
-      status: 'sent' as const,
-      createdAt: '',
-    };
+  handler: async () => {
+    throw new Error('This is a trigger procedure - it should not be called directly');
   },
-});
-
-// ==========================================
-// EXPORTS
-// ==========================================
-
-export const NotificationProcedures = [
-  sendNotification,
-  listNotifications,
-  subscribeNotifications,
-  notificationSentTrigger,
-];
+};
