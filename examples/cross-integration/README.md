@@ -1,8 +1,8 @@
 # 🔄 Cross-Integration Example
 
-Демонстрация двустороннего взаимодействия между двумя c4c приложениями через OpenAPI спецификации.
+Demonstration of bidirectional interaction between two c4c applications through OpenAPI specifications.
 
-## Архитектура
+## Architecture
 
 ```
 ┌─────────────────────────────────────────┐
@@ -39,51 +39,51 @@
 └─────────────────────────────────────────┘
 ```
 
-## Использование
+## Usage
 
-### 1. Запуск обоих приложений
+### 1. Start both applications
 
 ```bash
 # Terminal 1: App A
 cd examples/cross-integration/app-a
 pnpm install
-pnpm dev  # Запустится на :3001
+pnpm dev  # Will start on :3001
 
 # Terminal 2: App B
 cd examples/cross-integration/app-b
 pnpm install
-pnpm dev  # Запустится на :3002
+pnpm dev  # Will start on :3002
 ```
 
-### 2. Интеграция App A → App B
+### 2. Integrate App A → App B
 
 ```bash
 cd examples/cross-integration/app-b
 
-# Интегрируем App A в App B
+# Integrate App A into App B
 c4c integrate http://localhost:3001/openapi.json --name task-manager
 
-# Теперь App B может вызывать процедуры App A!
+# Now App B can call App A procedures!
 ```
 
-### 3. Интеграция App B → App A
+### 3. Integrate App B → App A
 
 ```bash
 cd examples/cross-integration/app-a
 
-# Интегрируем App B в App A
+# Integrate App B into App A
 c4c integrate http://localhost:3002/openapi.json --name notifications
 
-# Теперь App A может вызывать процедуры App B!
+# Now App A can call App B procedures!
 ```
 
-### 4. Взаимодействие
+### 4. Interaction
 
-После интеграции:
+After integration:
 
-**App A может отправлять уведомления через App B:**
+**App A can send notifications through App B:**
 ```typescript
-// В app-a/workflows/task-workflow.ts
+// In app-a/workflows/task-workflow.ts
 steps: [
   {
     id: 'create-task',
@@ -92,7 +92,7 @@ steps: [
   },
   {
     id: 'notify',
-    procedure: 'notifications.send', // ← Процедура из App B!
+    procedure: 'notifications.send', // ← Procedure from App B!
     input: {
       message: 'New task created: {{ steps.create-task.output.title }}',
     },
@@ -100,13 +100,13 @@ steps: [
 ]
 ```
 
-**App B может получать задачи из App A:**
+**App B can retrieve tasks from App A:**
 ```typescript
-// В app-b/workflows/notification-workflow.ts
+// In app-b/workflows/notification-workflow.ts
 steps: [
   {
     id: 'get-tasks',
-    procedure: 'task-manager.tasks.list', // ← Процедура из App A!
+    procedure: 'task-manager.tasks.list', // ← Procedure from App A!
   },
   {
     id: 'send-summary',
@@ -118,108 +118,108 @@ steps: [
 ]
 ```
 
-## Сценарии
+## Scenarios
 
-### Сценарий 1: Автоматические уведомления о задачах
+### Scenario 1: Automatic task notifications
 
-1. Пользователь создает задачу в App A
-2. App A триггер `task.created` срабатывает
-3. Workflow в App A вызывает `notifications.send` (из App B)
-4. App B отправляет уведомление
+1. User creates a task in App A
+2. App A trigger `task.created` fires
+3. Workflow in App A calls `notifications.send` (from App B)
+4. App B sends a notification
 
-### Сценарий 2: Проверка задач по расписанию
+### Scenario 2: Scheduled task checking
 
-1. App B запускает периодический workflow
-2. Вызывает `task-manager.tasks.list` (из App A)
-3. Фильтрует просроченные задачи
-4. Отправляет уведомления через `notifications.send`
+1. App B runs a periodic workflow
+2. Calls `task-manager.tasks.list` (from App A)
+3. Filters overdue tasks
+4. Sends notifications via `notifications.send`
 
-## OpenAPI спецификации
+## OpenAPI specifications
 
-Оба приложения автоматически экспортируют свои спецификации:
+Both applications automatically export their specifications:
 
 - App A: http://localhost:3001/openapi.json
 - App B: http://localhost:3002/openapi.json
 
-Спецификации включают:
-- ✅ Все procedure endpoints (REST + RPC)
-- ✅ Webhooks для триггеров
-- ✅ Метаданные c4c (`x-c4c-triggers`)
-- ✅ Полные схемы данных
+Specifications include:
+- ✅ All procedure endpoints (REST + RPC)
+- ✅ Webhooks for triggers
+- ✅ C4C metadata (`x-c4c-triggers`)
+- ✅ Complete data schemas
 
-## Структура проекта
+## Project Structure
 
 ```
 cross-integration/
 ├── app-a/                      # Task Manager
-│   ├── package.json            # c4c serve в scripts
+│   ├── package.json            # c4c serve in scripts
 │   ├── procedures/
-│   │   └── tasks.ts           # CRUD для задач + триггеры
+│   │   └── tasks.ts           # CRUD for tasks + triggers
 │   ├── workflows/
-│   │   └── task-workflow.ts   # Workflow с уведомлениями
-│   └── generated/             # После интеграции App B
+│   │   └── task-workflow.ts   # Workflow with notifications
+│   └── generated/             # After App B integration
 │       └── notifications/
 │           ├── sdk.gen.ts
 │           ├── types.gen.ts
 │           └── procedures.gen.ts
 │
 ├── app-b/                      # Notification Service
-│   ├── package.json            # c4c serve в scripts
+│   ├── package.json            # c4c serve in scripts
 │   ├── procedures/
-│   │   └── notifications.ts   # Отправка уведомлений + триггеры
+│   │   └── notifications.ts   # Send notifications + triggers
 │   ├── workflows/
-│   │   └── check-tasks.ts     # Проверка задач из App A
-│   └── generated/             # После интеграции App A
+│   │   └── check-tasks.ts     # Check tasks from App A
+│   └── generated/             # After App A integration
 │       └── task-manager/
 │           ├── sdk.gen.ts
 │           ├── types.gen.ts
 │           └── procedures.gen.ts
 │
 ├── scripts/
-│   ├── integrate-apps.sh      # Автоматическая интеграция
-│   └── test-integration.sh    # Тестирование
+│   ├── integrate-apps.sh      # Automatic integration
+│   └── test-integration.sh    # Integration testing
 │
 └── README.md
 
-ВАЖНО: Нет server.ts файлов!
-Приложения запускаются через c4c serve,
-который автоматически сканирует и загружает процедуры.
+IMPORTANT: No server.ts files!
+Applications are started via c4c serve,
+which automatically scans and loads procedures.
 ```
 
-## Результат
+## Result
 
-После полной интеграции:
+After full integration:
 
-1. ✅ App A имеет доступ к процедурам App B
-2. ✅ App B имеет доступ к процедурам App A
-3. ✅ Оба приложения могут подписываться на триггеры друг друга
-4. ✅ Workflows могут свободно комбинировать процедуры из обоих приложений
-5. ✅ Полная типизация TypeScript для всех вызовов
+1. ✅ App A has access to App B procedures
+2. ✅ App B has access to App A procedures
+3. ✅ Both applications can subscribe to each other's triggers
+4. ✅ Workflows can freely combine procedures from both applications
+5. ✅ Full TypeScript typing for all calls
 
-**Это создает экосистему взаимодействующих микросервисов на c4c!** 🎉
+**This creates an ecosystem of interacting microservices on c4c!** 🎉
 
-## Важные замечания
+## Important Notes
 
-### ⚠️ Нет server.ts!
+### ⚠️ No server.ts!
 
-C4c приложения **не создают свой server.ts**. Вместо этого используется:
+C4C applications **do not create their own server.ts**. Instead, use:
 
 ```bash
 c4c serve --port 3001 --root .
 ```
 
-**c4c serve автоматически:**
-- Сканирует `procedures/` и `workflows/`
-- Загружает все процедуры
-- Создает registry
-- Запускает HTTP сервер
-- Раздает `/openapi.json`
+**c4c serve automatically:**
+- Scans `procedures/` and `workflows/`
+- Loads all procedures
+- Creates registry
+- Starts HTTP server
+- Serves `/openapi.json`
 
-### 🔜 Будущее: c4c prune
+### 🔜 Future: c4c prune
 
-Для production будет команда `c4c prune`, которая:
-- Вычисляет зависимости
-- Генерирует оптимизированный `server.gen.ts` с явными импортами
-- Убирает динамическое сканирование для быстрого холодного старта
+For production there will be a `c4c prune` command that:
+- Calculates dependencies
+- Generates optimized `server.gen.ts` with explicit imports
+- Removes dynamic scanning for fast cold starts
 
-См. `ARCHITECTURE.md` для деталей.
+See `ARCHITECTURE.md` for details.
