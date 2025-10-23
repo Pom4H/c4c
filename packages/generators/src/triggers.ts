@@ -109,6 +109,12 @@ export async function generateProceduresFromTriggers(options: {
     throw new Error(`Required files not found in ${generatedDir}. Need sdk.gen.ts`);
   }
   
+  // Check if we have schemas or types
+  if (!schemasExists && !typesExists) {
+    console.warn('[c4c] Neither schemas.gen.ts nor types.gen.ts found, skipping procedure generation');
+    return;
+  }
+  
   // Use schemas if available, otherwise fall back to types
   const schemaPath = schemasExists ? schemasPath : typesPath;
   const hasSchemas = schemasExists;
