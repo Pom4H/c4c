@@ -240,6 +240,17 @@ function capitalize(str: string): string {
   return str[0].toUpperCase() + str.slice(1);
 }
 
+/**
+ * Convert kebab-case or snake_case to PascalCase
+ * e.g., task-manager -> TaskManager, notification_service -> NotificationService
+ */
+function toPascalCase(str: string): string {
+  return str
+    .split(/[-_]/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join('');
+}
+
 function extractOperationsFromSdk(source: string): Array<{ name: string; description?: string; rawName?: string }> {
   // Extract function exports with JSDoc comments
   const functionPattern = /\/\*\*\n([^*]|\*(?!\/))*\*\/\s*export\s+const\s+([a-zA-Z0-9_]+)\s*=/gs;
@@ -354,13 +365,14 @@ import { z } from "zod";
 `;
   
   const procedures = operations.map((op) => {
-    const contractName = `${capitalize(provider)}${op.pascalName}Contract`;
+    const providerPascal = toPascalCase(provider);
+    const contractName = `${providerPascal}${op.pascalName}Contract`;
     const handlerName = `${op.name}Handler`;
-    const procedureName = `${capitalize(provider)}${op.pascalName}Procedure`;
+    const procedureName = `${providerPascal}${op.pascalName}Procedure`;
     
     const metadata: string[] = [
-      `    exposure: "internal" as const,`,
-      `    roles: ["workflow-node"${op.isTrigger ? ', "trigger"' : ''}],`,
+      `    exposure: "external" as const,`,
+      `    roles: ["api-endpoint", "workflow-node"${op.isTrigger ? ', "trigger"' : ''}],`,
       `    provider: "${provider}",`,
       `    operation: "${op.name}",`,
       `    tags: ["${provider}"],`
@@ -423,9 +435,10 @@ export const ${procedureName}: Procedure = {
 `;
   }).join('\n');
   
+  const providerPascal = toPascalCase(provider);
   const exportList = `
-export const ${capitalize(provider)}Procedures: Procedure[] = [
-${operations.map((op) => `  ${capitalize(provider)}${op.pascalName}Procedure`).join(',\n')}
+export const ${providerPascal}Procedures: Procedure[] = [
+${operations.map((op) => `  ${providerPascal}${op.pascalName}Procedure`).join(',\n')}
 ];
 `;
   

@@ -37,6 +37,8 @@ fi
 echo ""
 echo "📦 Starting App A (Task Manager) on port 3001..."
 cd "$ROOT_DIR/app-a"
+# Set test tokens for cross-app integration
+export NOTIFICATION_SERVICE_TOKEN="${NOTIFICATION_SERVICE_TOKEN:-test-notification-token}"
 nohup pnpm exec c4c serve --port 3001 --root . > "$PID_DIR/app-a.log" 2>&1 &
 APP_A_PID=$!
 echo $APP_A_PID > "$PID_DIR/app-a.pid"
@@ -46,6 +48,8 @@ echo "   Started with PID: $APP_A_PID"
 echo ""
 echo "📦 Starting App B (Notification Service) on port 3002..."
 cd "$ROOT_DIR/app-b"
+# Set test tokens for cross-app integration
+export TASK_MANAGER_TOKEN="${TASK_MANAGER_TOKEN:-test-task-manager-token}"
 nohup pnpm exec c4c serve --port 3002 --root . > "$PID_DIR/app-b.log" 2>&1 &
 APP_B_PID=$!
 echo $APP_B_PID > "$PID_DIR/app-b.pid"
