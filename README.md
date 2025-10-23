@@ -419,6 +419,66 @@ pnpm dev
 
 ---
 
+## Integrations
+
+Integrate external APIs and other c4c applications using OpenAPI specifications:
+
+```bash
+# Integrate external API
+c4c integrate https://api.apis.guru/v2/specs/googleapis.com/calendar/v3/openapi.json --name google-calendar
+
+# Integrate another c4c app
+c4c integrate http://localhost:3001/openapi.json --name task-manager
+```
+
+This command automatically:
+- Generates TypeScript SDK and schemas from OpenAPI spec
+- Creates typed procedures for all API endpoints
+- Sets up authentication and base URL configuration
+- Generates procedures in `procedures/integrations/{name}/procedures.gen.ts`
+
+**Webhooks are automatically enabled** when you start the server:
+```bash
+c4c serve
+# Server starts with webhook endpoints at /webhooks/{provider}
+```
+
+Use the generated procedures in your workflows:
+
+```typescript
+// External API integration - Google Calendar
+steps: [
+  {
+    id: 'create-event',
+    procedure: 'google-calendar.calendar.events.insert',
+    input: { 
+      calendarId: 'primary',
+      summary: 'Meeting',
+      start: { dateTime: '2024-01-01T10:00:00Z' }
+    }
+  }
+]
+
+// c4c app integration - cross-app calls
+steps: [
+  {
+    id: 'create-task',
+    procedure: 'tasks.create',
+    input: { title: 'New task', description: 'Task description' }
+  },
+  {
+    id: 'send-notification',
+    procedure: 'notification-service.notifications.send', // ← From another c4c app!
+    input: { 
+      message: '✅ New task created!',
+      channel: 'push'
+    }
+  }
+]
+```
+
+---
+
 ## Key Concepts
 
 ### 1. Universal Introspection
