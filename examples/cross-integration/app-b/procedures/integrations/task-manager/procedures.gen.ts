@@ -6,6 +6,10 @@ import { withOAuth, getOAuthHeaders } from "@c4c/policies";
 import * as sdk from "../../../generated/task-manager/sdk.gen.js";
 import { z } from "zod";
 
+// Configure SDK client with base URL from environment
+const baseUrl = process.env.TASK_MANAGER_URL || 'http://localhost:3001';
+sdk.client.setConfig({ baseUrl });
+
 
 export const TaskManagerNotificationServiceNotificationsListContract: Contract = {
   name: "task-manager.notification.service.notifications.list",
@@ -40,7 +44,7 @@ const notificationServiceNotificationsListHandler = applyPolicies(
   withOAuth({
     provider: "task-manager",
     metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
+    envVar: "TASK_MANAGER_TOKEN",
   })
 );
 
@@ -83,7 +87,7 @@ const notificationServiceNotificationsListRestHandler = applyPolicies(
   withOAuth({
     provider: "task-manager",
     metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
+    envVar: "TASK_MANAGER_TOKEN",
   })
 );
 
@@ -126,7 +130,7 @@ const notificationServiceNotificationsSendHandler = applyPolicies(
   withOAuth({
     provider: "task-manager",
     metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
+    envVar: "TASK_MANAGER_TOKEN",
   })
 );
 
@@ -169,443 +173,13 @@ const notificationServiceNotificationsSubscribeHandler = applyPolicies(
   withOAuth({
     provider: "task-manager",
     metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
+    envVar: "TASK_MANAGER_TOKEN",
   })
 );
 
 export const TaskManagerNotificationServiceNotificationsSubscribeProcedure: Procedure = {
   contract: TaskManagerNotificationServiceNotificationsSubscribeContract,
   handler: notificationServiceNotificationsSubscribeHandler,
-};
-
-
-export const TaskManagerNotificationServiceTaskManagerTasksCreateContract: Contract = {
-  name: "task-manager.notification.service.task.manager.tasks.create",
-  description: "Create a new task",
-  input: z.any(),
-  output: z.any(),
-  metadata: {
-    exposure: "external" as const,
-    roles: ["api-endpoint", "workflow-node"],
-    provider: "task-manager",
-    operation: "notificationServiceTaskManagerTasksCreate",
-    tags: ["task-manager"],
-  },
-};
-
-const notificationServiceTaskManagerTasksCreateHandler = applyPolicies(
-  async (input, context) => {
-    const headers = getOAuthHeaders(context, "task-manager");
-    const request: Record<string, unknown> = { ...input };
-    if (headers) {
-      request.headers = {
-        ...((request.headers as Record<string, string> | undefined) ?? {}),
-        ...headers,
-      };
-    }
-    const result = await sdk.notificationServiceTaskManagerTasksCreate(request as any);
-    if (result && typeof result === "object" && "data" in result) {
-      return (result as { data: unknown }).data;
-    }
-    return result as unknown;
-  },
-  withOAuth({
-    provider: "task-manager",
-    metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
-  })
-);
-
-export const TaskManagerNotificationServiceTaskManagerTasksCreateProcedure: Procedure = {
-  contract: TaskManagerNotificationServiceTaskManagerTasksCreateContract,
-  handler: notificationServiceTaskManagerTasksCreateHandler,
-};
-
-
-export const TaskManagerNotificationServiceTaskManagerTasksCreateRestContract: Contract = {
-  name: "task-manager.notification.service.task.manager.tasks.create.rest",
-  description: "Create a new task",
-  input: z.any(),
-  output: z.any(),
-  metadata: {
-    exposure: "external" as const,
-    roles: ["api-endpoint", "workflow-node"],
-    provider: "task-manager",
-    operation: "notificationServiceTaskManagerTasksCreateRest",
-    tags: ["task-manager"],
-  },
-};
-
-const notificationServiceTaskManagerTasksCreateRestHandler = applyPolicies(
-  async (input, context) => {
-    const headers = getOAuthHeaders(context, "task-manager");
-    const request: Record<string, unknown> = { ...input };
-    if (headers) {
-      request.headers = {
-        ...((request.headers as Record<string, string> | undefined) ?? {}),
-        ...headers,
-      };
-    }
-    const result = await sdk.notificationServiceTaskManagerTasksCreateRest(request as any);
-    if (result && typeof result === "object" && "data" in result) {
-      return (result as { data: unknown }).data;
-    }
-    return result as unknown;
-  },
-  withOAuth({
-    provider: "task-manager",
-    metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
-  })
-);
-
-export const TaskManagerNotificationServiceTaskManagerTasksCreateRestProcedure: Procedure = {
-  contract: TaskManagerNotificationServiceTaskManagerTasksCreateRestContract,
-  handler: notificationServiceTaskManagerTasksCreateRestHandler,
-};
-
-
-export const TaskManagerNotificationServiceTaskManagerTasksDeleteContract: Contract = {
-  name: "task-manager.notification.service.task.manager.tasks.delete",
-  description: "Delete a task",
-  input: z.any(),
-  output: z.any(),
-  metadata: {
-    exposure: "external" as const,
-    roles: ["api-endpoint", "workflow-node"],
-    provider: "task-manager",
-    operation: "notificationServiceTaskManagerTasksDelete",
-    tags: ["task-manager"],
-  },
-};
-
-const notificationServiceTaskManagerTasksDeleteHandler = applyPolicies(
-  async (input, context) => {
-    const headers = getOAuthHeaders(context, "task-manager");
-    const request: Record<string, unknown> = { ...input };
-    if (headers) {
-      request.headers = {
-        ...((request.headers as Record<string, string> | undefined) ?? {}),
-        ...headers,
-      };
-    }
-    const result = await sdk.notificationServiceTaskManagerTasksDelete(request as any);
-    if (result && typeof result === "object" && "data" in result) {
-      return (result as { data: unknown }).data;
-    }
-    return result as unknown;
-  },
-  withOAuth({
-    provider: "task-manager",
-    metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
-  })
-);
-
-export const TaskManagerNotificationServiceTaskManagerTasksDeleteProcedure: Procedure = {
-  contract: TaskManagerNotificationServiceTaskManagerTasksDeleteContract,
-  handler: notificationServiceTaskManagerTasksDeleteHandler,
-};
-
-
-export const TaskManagerNotificationServiceTaskManagerTasksDeleteRestContract: Contract = {
-  name: "task-manager.notification.service.task.manager.tasks.delete.rest",
-  description: "Delete a task",
-  input: z.any(),
-  output: z.any(),
-  metadata: {
-    exposure: "external" as const,
-    roles: ["api-endpoint", "workflow-node"],
-    provider: "task-manager",
-    operation: "notificationServiceTaskManagerTasksDeleteRest",
-    tags: ["task-manager"],
-  },
-};
-
-const notificationServiceTaskManagerTasksDeleteRestHandler = applyPolicies(
-  async (input, context) => {
-    const headers = getOAuthHeaders(context, "task-manager");
-    const request: Record<string, unknown> = { ...input };
-    if (headers) {
-      request.headers = {
-        ...((request.headers as Record<string, string> | undefined) ?? {}),
-        ...headers,
-      };
-    }
-    const result = await sdk.notificationServiceTaskManagerTasksDeleteRest(request as any);
-    if (result && typeof result === "object" && "data" in result) {
-      return (result as { data: unknown }).data;
-    }
-    return result as unknown;
-  },
-  withOAuth({
-    provider: "task-manager",
-    metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
-  })
-);
-
-export const TaskManagerNotificationServiceTaskManagerTasksDeleteRestProcedure: Procedure = {
-  contract: TaskManagerNotificationServiceTaskManagerTasksDeleteRestContract,
-  handler: notificationServiceTaskManagerTasksDeleteRestHandler,
-};
-
-
-export const TaskManagerNotificationServiceTaskManagerTasksGetContract: Contract = {
-  name: "task-manager.notification.service.task.manager.tasks.get",
-  description: "Get a task by ID",
-  input: z.any(),
-  output: z.any(),
-  metadata: {
-    exposure: "external" as const,
-    roles: ["api-endpoint", "workflow-node"],
-    provider: "task-manager",
-    operation: "notificationServiceTaskManagerTasksGet",
-    tags: ["task-manager"],
-  },
-};
-
-const notificationServiceTaskManagerTasksGetHandler = applyPolicies(
-  async (input, context) => {
-    const headers = getOAuthHeaders(context, "task-manager");
-    const request: Record<string, unknown> = { ...input };
-    if (headers) {
-      request.headers = {
-        ...((request.headers as Record<string, string> | undefined) ?? {}),
-        ...headers,
-      };
-    }
-    const result = await sdk.notificationServiceTaskManagerTasksGet(request as any);
-    if (result && typeof result === "object" && "data" in result) {
-      return (result as { data: unknown }).data;
-    }
-    return result as unknown;
-  },
-  withOAuth({
-    provider: "task-manager",
-    metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
-  })
-);
-
-export const TaskManagerNotificationServiceTaskManagerTasksGetProcedure: Procedure = {
-  contract: TaskManagerNotificationServiceTaskManagerTasksGetContract,
-  handler: notificationServiceTaskManagerTasksGetHandler,
-};
-
-
-export const TaskManagerNotificationServiceTaskManagerTasksGetRestContract: Contract = {
-  name: "task-manager.notification.service.task.manager.tasks.get.rest",
-  description: "Get a task by ID",
-  input: z.any(),
-  output: z.any(),
-  metadata: {
-    exposure: "external" as const,
-    roles: ["api-endpoint", "workflow-node"],
-    provider: "task-manager",
-    operation: "notificationServiceTaskManagerTasksGetRest",
-    tags: ["task-manager"],
-  },
-};
-
-const notificationServiceTaskManagerTasksGetRestHandler = applyPolicies(
-  async (input, context) => {
-    const headers = getOAuthHeaders(context, "task-manager");
-    const request: Record<string, unknown> = { ...input };
-    if (headers) {
-      request.headers = {
-        ...((request.headers as Record<string, string> | undefined) ?? {}),
-        ...headers,
-      };
-    }
-    const result = await sdk.notificationServiceTaskManagerTasksGetRest(request as any);
-    if (result && typeof result === "object" && "data" in result) {
-      return (result as { data: unknown }).data;
-    }
-    return result as unknown;
-  },
-  withOAuth({
-    provider: "task-manager",
-    metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
-  })
-);
-
-export const TaskManagerNotificationServiceTaskManagerTasksGetRestProcedure: Procedure = {
-  contract: TaskManagerNotificationServiceTaskManagerTasksGetRestContract,
-  handler: notificationServiceTaskManagerTasksGetRestHandler,
-};
-
-
-export const TaskManagerNotificationServiceTaskManagerTasksListContract: Contract = {
-  name: "task-manager.notification.service.task.manager.tasks.list",
-  description: "List all tasks with optional filters",
-  input: z.any(),
-  output: z.any(),
-  metadata: {
-    exposure: "external" as const,
-    roles: ["api-endpoint", "workflow-node"],
-    provider: "task-manager",
-    operation: "notificationServiceTaskManagerTasksList",
-    tags: ["task-manager"],
-  },
-};
-
-const notificationServiceTaskManagerTasksListHandler = applyPolicies(
-  async (input, context) => {
-    const headers = getOAuthHeaders(context, "task-manager");
-    const request: Record<string, unknown> = { ...input };
-    if (headers) {
-      request.headers = {
-        ...((request.headers as Record<string, string> | undefined) ?? {}),
-        ...headers,
-      };
-    }
-    const result = await sdk.notificationServiceTaskManagerTasksList(request as any);
-    if (result && typeof result === "object" && "data" in result) {
-      return (result as { data: unknown }).data;
-    }
-    return result as unknown;
-  },
-  withOAuth({
-    provider: "task-manager",
-    metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
-  })
-);
-
-export const TaskManagerNotificationServiceTaskManagerTasksListProcedure: Procedure = {
-  contract: TaskManagerNotificationServiceTaskManagerTasksListContract,
-  handler: notificationServiceTaskManagerTasksListHandler,
-};
-
-
-export const TaskManagerNotificationServiceTaskManagerTasksListRestContract: Contract = {
-  name: "task-manager.notification.service.task.manager.tasks.list.rest",
-  description: "List all tasks with optional filters",
-  input: z.any(),
-  output: z.any(),
-  metadata: {
-    exposure: "external" as const,
-    roles: ["api-endpoint", "workflow-node"],
-    provider: "task-manager",
-    operation: "notificationServiceTaskManagerTasksListRest",
-    tags: ["task-manager"],
-  },
-};
-
-const notificationServiceTaskManagerTasksListRestHandler = applyPolicies(
-  async (input, context) => {
-    const headers = getOAuthHeaders(context, "task-manager");
-    const request: Record<string, unknown> = { ...input };
-    if (headers) {
-      request.headers = {
-        ...((request.headers as Record<string, string> | undefined) ?? {}),
-        ...headers,
-      };
-    }
-    const result = await sdk.notificationServiceTaskManagerTasksListRest(request as any);
-    if (result && typeof result === "object" && "data" in result) {
-      return (result as { data: unknown }).data;
-    }
-    return result as unknown;
-  },
-  withOAuth({
-    provider: "task-manager",
-    metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
-  })
-);
-
-export const TaskManagerNotificationServiceTaskManagerTasksListRestProcedure: Procedure = {
-  contract: TaskManagerNotificationServiceTaskManagerTasksListRestContract,
-  handler: notificationServiceTaskManagerTasksListRestHandler,
-};
-
-
-export const TaskManagerNotificationServiceTaskManagerTasksUpdateContract: Contract = {
-  name: "task-manager.notification.service.task.manager.tasks.update",
-  description: "Update a task",
-  input: z.any(),
-  output: z.any(),
-  metadata: {
-    exposure: "external" as const,
-    roles: ["api-endpoint", "workflow-node"],
-    provider: "task-manager",
-    operation: "notificationServiceTaskManagerTasksUpdate",
-    tags: ["task-manager"],
-  },
-};
-
-const notificationServiceTaskManagerTasksUpdateHandler = applyPolicies(
-  async (input, context) => {
-    const headers = getOAuthHeaders(context, "task-manager");
-    const request: Record<string, unknown> = { ...input };
-    if (headers) {
-      request.headers = {
-        ...((request.headers as Record<string, string> | undefined) ?? {}),
-        ...headers,
-      };
-    }
-    const result = await sdk.notificationServiceTaskManagerTasksUpdate(request as any);
-    if (result && typeof result === "object" && "data" in result) {
-      return (result as { data: unknown }).data;
-    }
-    return result as unknown;
-  },
-  withOAuth({
-    provider: "task-manager",
-    metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
-  })
-);
-
-export const TaskManagerNotificationServiceTaskManagerTasksUpdateProcedure: Procedure = {
-  contract: TaskManagerNotificationServiceTaskManagerTasksUpdateContract,
-  handler: notificationServiceTaskManagerTasksUpdateHandler,
-};
-
-
-export const TaskManagerNotificationServiceTaskManagerTasksUpdateRestContract: Contract = {
-  name: "task-manager.notification.service.task.manager.tasks.update.rest",
-  description: "Update a task",
-  input: z.any(),
-  output: z.any(),
-  metadata: {
-    exposure: "external" as const,
-    roles: ["api-endpoint", "workflow-node"],
-    provider: "task-manager",
-    operation: "notificationServiceTaskManagerTasksUpdateRest",
-    tags: ["task-manager"],
-  },
-};
-
-const notificationServiceTaskManagerTasksUpdateRestHandler = applyPolicies(
-  async (input, context) => {
-    const headers = getOAuthHeaders(context, "task-manager");
-    const request: Record<string, unknown> = { ...input };
-    if (headers) {
-      request.headers = {
-        ...((request.headers as Record<string, string> | undefined) ?? {}),
-        ...headers,
-      };
-    }
-    const result = await sdk.notificationServiceTaskManagerTasksUpdateRest(request as any);
-    if (result && typeof result === "object" && "data" in result) {
-      return (result as { data: unknown }).data;
-    }
-    return result as unknown;
-  },
-  withOAuth({
-    provider: "task-manager",
-    metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
-  })
-);
-
-export const TaskManagerNotificationServiceTaskManagerTasksUpdateRestProcedure: Procedure = {
-  contract: TaskManagerNotificationServiceTaskManagerTasksUpdateRestContract,
-  handler: notificationServiceTaskManagerTasksUpdateRestHandler,
 };
 
 
@@ -642,7 +216,7 @@ const tasksCreateHandler = applyPolicies(
   withOAuth({
     provider: "task-manager",
     metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
+    envVar: "TASK_MANAGER_TOKEN",
   })
 );
 
@@ -685,7 +259,7 @@ const tasksListRestHandler = applyPolicies(
   withOAuth({
     provider: "task-manager",
     metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
+    envVar: "TASK_MANAGER_TOKEN",
   })
 );
 
@@ -728,7 +302,7 @@ const tasksCreateRestHandler = applyPolicies(
   withOAuth({
     provider: "task-manager",
     metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
+    envVar: "TASK_MANAGER_TOKEN",
   })
 );
 
@@ -771,7 +345,7 @@ const tasksDeleteHandler = applyPolicies(
   withOAuth({
     provider: "task-manager",
     metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
+    envVar: "TASK_MANAGER_TOKEN",
   })
 );
 
@@ -814,7 +388,7 @@ const tasksDeleteRestHandler = applyPolicies(
   withOAuth({
     provider: "task-manager",
     metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
+    envVar: "TASK_MANAGER_TOKEN",
   })
 );
 
@@ -857,7 +431,7 @@ const tasksGetRestHandler = applyPolicies(
   withOAuth({
     provider: "task-manager",
     metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
+    envVar: "TASK_MANAGER_TOKEN",
   })
 );
 
@@ -900,7 +474,7 @@ const tasksUpdateRestHandler = applyPolicies(
   withOAuth({
     provider: "task-manager",
     metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
+    envVar: "TASK_MANAGER_TOKEN",
   })
 );
 
@@ -943,7 +517,7 @@ const tasksGetHandler = applyPolicies(
   withOAuth({
     provider: "task-manager",
     metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
+    envVar: "TASK_MANAGER_TOKEN",
   })
 );
 
@@ -986,7 +560,7 @@ const tasksListHandler = applyPolicies(
   withOAuth({
     provider: "task-manager",
     metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
+    envVar: "TASK_MANAGER_TOKEN",
   })
 );
 
@@ -1029,7 +603,7 @@ const tasksUpdateHandler = applyPolicies(
   withOAuth({
     provider: "task-manager",
     metadataTokenKey: "task-managerToken",
-    envVar: "TASK-MANAGER_TOKEN",
+    envVar: "TASK_MANAGER_TOKEN",
   })
 );
 
@@ -1044,16 +618,6 @@ export const TaskManagerProcedures: Procedure[] = [
   TaskManagerNotificationServiceNotificationsListRestProcedure,
   TaskManagerNotificationServiceNotificationsSendProcedure,
   TaskManagerNotificationServiceNotificationsSubscribeProcedure,
-  TaskManagerNotificationServiceTaskManagerTasksCreateProcedure,
-  TaskManagerNotificationServiceTaskManagerTasksCreateRestProcedure,
-  TaskManagerNotificationServiceTaskManagerTasksDeleteProcedure,
-  TaskManagerNotificationServiceTaskManagerTasksDeleteRestProcedure,
-  TaskManagerNotificationServiceTaskManagerTasksGetProcedure,
-  TaskManagerNotificationServiceTaskManagerTasksGetRestProcedure,
-  TaskManagerNotificationServiceTaskManagerTasksListProcedure,
-  TaskManagerNotificationServiceTaskManagerTasksListRestProcedure,
-  TaskManagerNotificationServiceTaskManagerTasksUpdateProcedure,
-  TaskManagerNotificationServiceTaskManagerTasksUpdateRestProcedure,
   TaskManagerTasksCreateProcedure,
   TaskManagerTasksListRestProcedure,
   TaskManagerTasksCreateRestProcedure,

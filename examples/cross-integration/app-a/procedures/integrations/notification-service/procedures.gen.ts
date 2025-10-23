@@ -6,6 +6,10 @@ import { withOAuth, getOAuthHeaders } from "@c4c/policies";
 import * as sdk from "../../../generated/notification-service/sdk.gen.js";
 import { z } from "zod";
 
+// Configure SDK client with base URL from environment
+const baseUrl = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3001';
+sdk.client.setConfig({ baseUrl });
+
 
 export const NotificationServiceTaskManagerNotificationServiceNotificationsListContract: Contract = {
   name: "notification-service.task.manager.notification.service.notifications.list",
@@ -40,7 +44,7 @@ const taskManagerNotificationServiceNotificationsListHandler = applyPolicies(
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -83,7 +87,7 @@ const taskManagerNotificationServiceNotificationsListRestHandler = applyPolicies
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -126,7 +130,7 @@ const taskManagerNotificationServiceNotificationsSendHandler = applyPolicies(
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -169,7 +173,7 @@ const taskManagerNotificationServiceNotificationsSubscribeHandler = applyPolicie
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -212,7 +216,7 @@ const taskManagerTasksCreateHandler = applyPolicies(
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -255,7 +259,7 @@ const taskManagerTasksCreateRestHandler = applyPolicies(
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -298,7 +302,7 @@ const taskManagerTasksDeleteHandler = applyPolicies(
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -341,7 +345,7 @@ const taskManagerTasksDeleteRestHandler = applyPolicies(
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -384,7 +388,7 @@ const taskManagerTasksGetHandler = applyPolicies(
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -427,7 +431,7 @@ const taskManagerTasksGetRestHandler = applyPolicies(
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -470,7 +474,7 @@ const taskManagerTasksListHandler = applyPolicies(
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -513,7 +517,7 @@ const taskManagerTasksListRestHandler = applyPolicies(
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -556,7 +560,7 @@ const taskManagerTasksUpdateHandler = applyPolicies(
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -599,7 +603,7 @@ const taskManagerTasksUpdateRestHandler = applyPolicies(
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -642,7 +646,7 @@ const notificationsListHandler = applyPolicies(
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -685,7 +689,7 @@ const notificationsListRestHandler = applyPolicies(
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -728,7 +732,7 @@ const notificationsSendHandler = applyPolicies(
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
@@ -771,7 +775,7 @@ const notificationsSubscribeHandler = applyPolicies(
   withOAuth({
     provider: "notification-service",
     metadataTokenKey: "notification-serviceToken",
-    envVar: "NOTIFICATION-SERVICE_TOKEN",
+    envVar: "NOTIFICATION_SERVICE_TOKEN",
   })
 );
 
