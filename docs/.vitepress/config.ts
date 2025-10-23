@@ -1,8 +1,14 @@
 import { defineConfig } from 'vitepress'
 
+// https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: 'c4c',
   description: 'TypeScript-first workflow automation framework',
+  
+  // GitHub Pages base path - update this if your repo name is different
+  // For https://username.github.io/repo-name/, use '/repo-name/'
+  // For https://username.github.io/, use '/'
+  base: process.env.BASE_PATH || '/',
   
   head: [
     ['link', { rel: 'icon', href: '/favicon.ico' }]
