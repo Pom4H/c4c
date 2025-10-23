@@ -31,6 +31,7 @@ export {
 export {
 	collectRegistry,
 	collectRegistryDetailed,
+	collectProjectArtifacts,
 	describeRegistry,
 	formatProcedureBadges,
 	formatProcedureMetadata,
@@ -38,9 +39,15 @@ export {
 	isSupportedHandlerFile,
 	listProcedures,
 	loadProceduresFromModule,
+	loadArtifactsFromModule,
 } from "./registry.js";
 
-export type { RegistryLoadResult, RegistryModuleIndex } from "./registry.js";
+export type { 
+	RegistryLoadResult, 
+	RegistryModuleIndex,
+	WorkflowRegistry,
+	ProjectArtifacts,
+} from "./registry.js";
 
 // Executor
 export { executeProcedure, execute, createExecutionContext, applyPolicies } from "./executor.js";

@@ -1,8 +1,8 @@
 import { promises as fs } from "node:fs";
 import { watch, type FileChangeInfo } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { Registry, RegistryModuleIndex } from "@c4c/core";
-import { isSupportedHandlerFile, reloadModuleProcedures, removeModuleProcedures } from "./registry.js";
+import type { Registry, WorkflowRegistry } from "@c4c/core";
+import { isSupportedHandlerFile, reloadModuleArtifacts, removeModuleArtifacts, type ArtifactModuleIndex } from "./registry.js";
 
 export async function fileExists(path: string): Promise<boolean> {
 	try {
@@ -25,26 +25,32 @@ export function isAbortError(error: unknown): boolean {
 	return error instanceof Error && error.name === "AbortError";
 }
 
-export async function watchProcedures(
-	proceduresPath: string,
-	moduleIndex: RegistryModuleIndex,
+/**
+ * Watch entire project for changes to procedures and workflows
+ * Single watcher - handles both artifact types
+ * No hardcoded paths!
+ */
+export async function watchProject(
+	projectRoot: string,
+	moduleIndex: ArtifactModuleIndex,
 	registry: Registry,
+	workflowRegistry: WorkflowRegistry,
 	signal: AbortSignal,
 	onError: (error: unknown) => void
 ): Promise<void> {
 	try {
 		let watcher: AsyncIterable<FileChangeInfo<string>>;
 		try {
-			watcher = watch(proceduresPath, {
+			watcher = watch(projectRoot, {
 				recursive: true,
 				signal,
 			});
 		} catch (error) {
 			if (isRecursiveWatchUnavailable(error)) {
 				console.warn(
-					"[c4c] Recursive watching is not supported on this platform. Watching the top-level procedures directory only."
+					"[c4c] Recursive watching is not supported on this platform. Watching only top-level directory."
 				);
-				watcher = watch(proceduresPath, { signal });
+				watcher = watch(projectRoot, { signal });
 			} else {
 				throw error;
 			}
@@ -53,17 +59,17 @@ export async function watchProcedures(
 		for await (const event of watcher) {
 			const fileName = event.filename;
 			if (!fileName) continue;
-			const filePath = resolve(proceduresPath, fileName);
+			const filePath = resolve(projectRoot, fileName);
 			if (!isSupportedHandlerFile(filePath)) continue;
 
 			const exists = await fileExists(filePath);
 			if (event.eventType === "rename" && !exists) {
-				await removeModuleProcedures(moduleIndex, registry, filePath, proceduresPath);
+				await removeModuleArtifacts(moduleIndex, registry, workflowRegistry, filePath, projectRoot);
 				continue;
 			}
 
 			if (!exists) continue;
-			await reloadModuleProcedures(moduleIndex, registry, filePath, proceduresPath);
+			await reloadModuleArtifacts(moduleIndex, registry, workflowRegistry, filePath, projectRoot);
 		}
 	} catch (error) {
 		if (!isAbortError(error)) {
@@ -74,3 +80,9 @@ export async function watchProcedures(
 		}
 	}
 }
+
+/**
+ * Legacy function for backward compatibility
+ * @deprecated Use watchProject instead
+ */
+export const watchProcedures = watchProject;

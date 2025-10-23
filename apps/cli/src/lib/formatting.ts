@@ -1,5 +1,6 @@
 import { relative } from "node:path";
 import { formatProcedureBadges, type AuthRequirements, type Procedure } from "@c4c/core";
+import type { WorkflowDefinition } from "@c4c/workflow";
 
 const COLOR_RESET = "\u001B[0m";
 const COLOR_DIM = "\u001B[90m";
@@ -143,4 +144,38 @@ export function logProcedureChange(
 export function formatProceduresLabel(proceduresPath: string): string {
 	const label = relative(process.cwd(), proceduresPath) || proceduresPath;
 	return label;
+}
+
+export function logWorkflowChange(
+	action: string,
+	workflowId: string,
+	workflow: WorkflowDefinition | undefined,
+	sourcePath: string,
+	projectRoot: string
+) {
+	const parts: string[] = [];
+	parts.push(`[Workflow] ${formatRegistryAction(action)} ${workflowId}`);
+
+	if (workflow?.description) {
+		parts.push(`"${workflow.description}"`);
+	}
+
+	if (workflow?.version) {
+		parts.push(`v${workflow.version}`);
+	}
+
+	if (workflow?.nodes) {
+		parts.push(`(${workflow.nodes.length} nodes)`);
+	}
+
+	if (workflow?.isTriggered) {
+		parts.push("[triggered]");
+	}
+
+	const location = formatProcedureLocation(sourcePath, projectRoot);
+	if (location) {
+		parts.push(location);
+	}
+
+	console.log(parts.join(" "));
 }

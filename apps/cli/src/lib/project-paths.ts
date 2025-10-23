@@ -1,20 +1,15 @@
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 
+/**
+ * Resolve project root
+ * No more hardcoded "procedures" or "workflows" paths!
+ * We use introspection to discover everything.
+ */
 export function resolveProjectRoot(projectRoot?: string): string {
   if (!projectRoot || projectRoot === ".") {
     return process.cwd();
   }
   return isAbsolute(projectRoot) ? projectRoot : resolve(process.cwd(), projectRoot);
-}
-
-// Procedures must live strictly under <root>/procedures
-export function determineProceduresPath(root: string): string {
-  return join(root, "procedures");
-}
-
-// Workflows must live strictly under <root>/workflows
-export function determineWorkflowsPath(root: string): string {
-  return join(root, "workflows");
 }
 
 export function resolveOutputPath(path: string): string {

@@ -2,29 +2,26 @@ import { resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { serve as runServe, type ServeOptions } from "../lib/server.js";
 import type { ServeMode } from "../lib/types.js";
-import { determineProceduresPath, determineWorkflowsPath } from "../lib/project-paths.js";
 
 interface ServeCommandOptions {
     port?: number;
     root?: string;
-    workflows?: string;
     docs?: boolean;
     apiBase?: string;
 }
 
+/**
+ * Serve command - starts HTTP server with artifacts discovered via introspection
+ * No hardcoded paths! Scans entire project.
+ */
 export async function serveCommand(modeArg: string, options: ServeCommandOptions): Promise<void> {
 	const rootDir = resolve(options.root ?? process.cwd());
-    const proceduresPath = determineProceduresPath(rootDir);
-	const workflowsPath = options.workflows ?? determineWorkflowsPath(rootDir);
-
-    const enableDocs = options.docs ? true : undefined;
+	const enableDocs = options.docs ? true : undefined;
 
 	const serveOptions: ServeOptions = {
 		port: options.port,
-		proceduresPath,
-		workflowsPath,
+		root: rootDir,
 		enableDocs,
-		projectRoot: rootDir,
 	};
 
 	if (modeArg === "ui") {
@@ -55,7 +52,7 @@ async function startUi(options: ServeOptions): Promise<void> {
 		`[c4c] Starting workflow UI on http://localhost:${uiPort} (API ${apiBase})`
 	);
 
-	const workflowsDir = options.workflowsPath ?? determineWorkflowsPath(process.cwd());
+	const projectRoot = options.root ?? process.cwd();
 
 	const child = spawn("pnpm", ["--filter", "@c4c/app-workflow", "dev"], {
 		stdio: "inherit",
@@ -65,7 +62,7 @@ async function startUi(options: ServeOptions): Promise<void> {
 			PORT: String(uiPort),
 			C4C_API_BASE: apiBase,
 			C4C_RPC_BASE: `${apiBase.replace(/\/$/, "")}/rpc`,
-			C4C_WORKFLOWS_DIR: workflowsDir,
+			C4C_PROJECT_ROOT: projectRoot,
 			NEXT_PUBLIC_C4C_API_BASE: apiBase,
 			NEXT_PUBLIC_C4C_WORKFLOW_STREAM_BASE: `${apiBase.replace(/\/$/, "")}/workflow/executions`,
 		},

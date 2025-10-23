@@ -1,9 +1,8 @@
 import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
-import { collectRegistry } from "@c4c/core";
+import { collectProjectArtifacts } from "@c4c/core";
 import { execute } from "@c4c/core";
 import { executeWorkflow } from "@c4c/workflow";
-import { determineProceduresPath, determineWorkflowsPath } from "../lib/project-paths.js";
 
 interface ExecProcedureOptions {
 	root?: string;
@@ -14,7 +13,7 @@ interface ExecProcedureOptions {
 
 interface ExecWorkflowOptions {
 	root?: string;
-	file: string;
+	workflow: string;
 	input?: string;
 	inputFile?: string;
 	json?: boolean;
@@ -22,19 +21,20 @@ interface ExecWorkflowOptions {
 
 /**
  * Execute a procedure
+ * Discovers all artifacts via introspection
  */
 export async function execProcedureCommand(
 	procedureName: string,
 	options: ExecProcedureOptions
 ): Promise<void> {
 	const rootDir = resolve(options.root ?? process.cwd());
-	const proceduresPath = determineProceduresPath(rootDir);
 
-	// Load registry
+	// Load all artifacts via introspection
 	if (!options.json) {
-		console.log(`[c4c] Loading procedures from ${proceduresPath}...`);
+		console.log(`[c4c] Discovering artifacts in ${rootDir}...`);
 	}
-	const registry = await collectRegistry(proceduresPath);
+	const artifacts = await collectProjectArtifacts(rootDir);
+	const registry = artifacts.procedures;
 
 	// Get procedure
 	const procedure = registry.get(procedureName);
@@ -90,47 +90,29 @@ export async function execProcedureCommand(
 }
 
 /**
- * Execute a workflow
+ * Execute a workflow by ID
+ * Workflows are discovered via introspection - no hardcoded paths!
  */
 export async function execWorkflowCommand(options: ExecWorkflowOptions): Promise<void> {
 	const rootDir = resolve(options.root ?? process.cwd());
-	const proceduresPath = determineProceduresPath(rootDir);
-	const workflowsPath = determineWorkflowsPath(rootDir);
-	
-	// Try to resolve workflow path - check if it's already a full path or needs to be resolved
-	let workflowPath: string;
-	if (options.file.endsWith('.ts') || options.file.endsWith('.js')) {
-		// If it has an extension, treat as relative path from root or absolute
-		workflowPath = resolve(rootDir, options.file);
-	} else {
-		// Otherwise, try to find it in workflows directory
-		workflowPath = resolve(workflowsPath, `${options.file}.ts`);
-	}
 
-	// Load registry
+	// Load all artifacts via introspection
 	if (!options.json) {
-		console.log(`[c4c] Loading procedures from ${proceduresPath}...`);
+		console.log(`[c4c] Discovering artifacts in ${rootDir}...`);
 	}
-	const registry = await collectRegistry(proceduresPath);
+	const artifacts = await collectProjectArtifacts(rootDir);
 
-	// Load workflow
-	if (!options.json) {
-		console.log(`[c4c] Loading workflow from ${workflowPath}...`);
-	}
-
-	let workflow: any;
-	try {
-		const workflowModule = await import(workflowPath);
-		workflow = workflowModule.default || workflowModule;
-
-		// If the module exports a workflow builder, get the workflow
-		if (typeof workflow === "object" && workflow.workflow) {
-			workflow = workflow.workflow;
-		}
-	} catch (error) {
+	// Find workflow by ID
+	const workflow = artifacts.workflows.get(options.workflow);
+	if (!workflow) {
+		const availableWorkflows = Array.from(artifacts.workflows.keys()).join(", ");
 		throw new Error(
-			`Failed to load workflow from '${workflowPath}': ${error instanceof Error ? error.message : String(error)}`
+			`Workflow '${options.workflow}' not found. Available workflows: ${availableWorkflows || "none"}`
 		);
+	}
+
+	if (!options.json) {
+		console.log(`[c4c] Found workflow: ${workflow.name} (v${workflow.version})`);
 	}
 
 	// Parse input
@@ -146,18 +128,22 @@ export async function execWorkflowCommand(options: ExecWorkflowOptions): Promise
 
 	// Execute
 	if (!options.json) {
-		console.log(`[c4c] Executing workflow...`);
+		console.log(`[c4c] Executing workflow '${workflow.id}'...`);
 		console.log(`[c4c] Input:`, JSON.stringify(input, null, 2));
 	}
 
 	try {
-		const result = await executeWorkflow(workflow, registry, input as Record<string, unknown>);
+		const result = await executeWorkflow(workflow, artifacts.procedures, input as Record<string, unknown>);
 
 		if (options.json) {
 			console.log(JSON.stringify(result, null, 2));
 		} else {
 			console.log(`[c4c] ✅ Workflow completed successfully!`);
-			console.log(`[c4c] Output:`, JSON.stringify(result, null, 2));
+			console.log(`[c4c] Execution ID:`, result.executionId);
+			console.log(`[c4c] Status:`, result.status);
+			console.log(`[c4c] Nodes executed:`, result.nodesExecuted);
+			console.log(`[c4c] Execution time:`, `${result.executionTime}ms`);
+			console.log(`[c4c] Output:`, JSON.stringify(result.outputs, null, 2));
 		}
 	} catch (error) {
 		if (options.json) {
