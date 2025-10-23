@@ -10,3 +10,8 @@ export {
   generateOpenAPIYAML,
 } from "./openapi.js";
 export { generateRpcClientModule, type RpcClientGeneratorOptions } from "./client.js";
+export {
+  generateTriggers,
+  generateProceduresFromTriggers,
+  type TriggerGeneratorOptions,
+} from "./triggers.js";

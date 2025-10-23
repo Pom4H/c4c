@@ -6,6 +6,7 @@ import { serveCommand } from "./commands/serve.js";
 import { devCommand, devLogsCommand, devStopCommand, devStatusCommand } from "./commands/dev.js";
 import { generateClientCommand } from "./commands/generate.js";
 import { execCommand } from "./commands/exec.js";
+import { integrateCommand } from "./commands/integrate.js";
 import { 
 	getAllCompletions, 
 	generateBashCompletion, 
@@ -137,6 +138,23 @@ program
 	.action(async (name: string, options) => {
 		try {
 			await execCommand(name, options);
+		} catch (error) {
+			console.error(
+				`[c4c] ${error instanceof Error ? error.message : String(error)}`
+			);
+			process.exit(1);
+		}
+	});
+
+program
+	.command("integrate <url>")
+	.description("Integrate an external API from OpenAPI specification")
+	.option("--root <path>", "Project root directory", process.cwd())
+	.option("--name <name>", "Integration name (auto-detected from URL if not provided)")
+	.option("--output <path>", "Output directory for generated files")
+	.action(async (url: string, options) => {
+		try {
+			await integrateCommand(url, options);
 		} catch (error) {
 			console.error(
 				`[c4c] ${error instanceof Error ? error.message : String(error)}`
