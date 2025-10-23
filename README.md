@@ -446,7 +446,7 @@ c4c serve
 Use the generated procedures in your workflows:
 
 ```typescript
-// External API integration
+// External API integration - Google Calendar
 steps: [
   {
     id: 'create-event',
@@ -459,12 +459,20 @@ steps: [
   }
 ]
 
-// c4c app integration
+// c4c app integration - cross-app calls
 steps: [
   {
     id: 'create-task',
-    procedure: 'task-manager.tasks.create',
+    procedure: 'tasks.create',
     input: { title: 'New task', description: 'Task description' }
+  },
+  {
+    id: 'send-notification',
+    procedure: 'notification-service.notifications.send', // ← From another c4c app!
+    input: { 
+      message: '✅ New task created!',
+      channel: 'push'
+    }
   }
 ]
 ```
