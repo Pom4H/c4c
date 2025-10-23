@@ -1,50 +1,33 @@
 import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
-import { collectRegistry } from "@c4c/core";
+import { collectProjectArtifacts } from "@c4c/core";
 import { execute } from "@c4c/core";
 import { executeWorkflow } from "@c4c/workflow";
-import { determineProceduresPath, determineWorkflowsPath } from "../lib/project-paths.js";
 
-interface ExecProcedureOptions {
+interface ExecOptions {
 	root?: string;
-	input?: string;
-	inputFile?: string;
-	json?: boolean;
-}
-
-interface ExecWorkflowOptions {
-	root?: string;
-	file: string;
 	input?: string;
 	inputFile?: string;
 	json?: boolean;
 }
 
 /**
- * Execute a procedure
+ * Execute a procedure or workflow by name/ID
+ * Unified approach with priority: procedure > workflow
  */
-export async function execProcedureCommand(
-	procedureName: string,
-	options: ExecProcedureOptions
+export async function execCommand(
+	name: string,
+	options: ExecOptions
 ): Promise<void> {
 	const rootDir = resolve(options.root ?? process.cwd());
-	const proceduresPath = determineProceduresPath(rootDir);
 
-	// Load registry
+	// Load all artifacts via introspection
 	if (!options.json) {
-		console.log(`[c4c] Loading procedures from ${proceduresPath}...`);
+		console.log(`[c4c] Discovering artifacts in ${rootDir}...`);
 	}
-	const registry = await collectRegistry(proceduresPath);
+	const artifacts = await collectProjectArtifacts(rootDir);
 
-	// Get procedure
-	const procedure = registry.get(procedureName);
-	if (!procedure) {
-		throw new Error(
-			`Procedure '${procedureName}' not found. Available: ${Array.from(registry.keys()).join(", ")}`
-		);
-	}
-
-	// Parse input
+	// Parse input (same for both procedures and workflows)
 	let input: unknown;
 	if (options.inputFile) {
 		const content = await readFile(options.inputFile, "utf-8");
@@ -55,6 +38,60 @@ export async function execProcedureCommand(
 		input = {};
 	}
 
+	// Priority 1: Try to find procedure
+	const procedure = artifacts.procedures.get(name);
+	if (procedure) {
+		await executeProcedure(name, procedure, artifacts.procedures, input, options);
+		return;
+	}
+
+	// Priority 2: Try to find workflow
+	const workflow = artifacts.workflows.get(name);
+	if (workflow) {
+		await executeWorkflowById(name, workflow, artifacts.procedures, input, options);
+		return;
+	}
+
+	// Not found - show helpful error
+	const availableProcedures = Array.from(artifacts.procedures.keys());
+	const availableWorkflows = Array.from(artifacts.workflows.keys());
+	
+	let errorMessage = `Artifact '${name}' not found.\n\n`;
+	
+	if (availableProcedures.length > 0) {
+		errorMessage += `Available procedures (${availableProcedures.length}):\n`;
+		errorMessage += availableProcedures.slice(0, 10).map(p => `  - ${p}`).join('\n');
+		if (availableProcedures.length > 10) {
+			errorMessage += `\n  ... and ${availableProcedures.length - 10} more`;
+		}
+		errorMessage += '\n\n';
+	}
+	
+	if (availableWorkflows.length > 0) {
+		errorMessage += `Available workflows (${availableWorkflows.length}):\n`;
+		errorMessage += availableWorkflows.slice(0, 10).map(w => `  - ${w}`).join('\n');
+		if (availableWorkflows.length > 10) {
+			errorMessage += `\n  ... and ${availableWorkflows.length - 10} more`;
+		}
+	}
+	
+	if (availableProcedures.length === 0 && availableWorkflows.length === 0) {
+		errorMessage += 'No procedures or workflows found in project.';
+	}
+
+	throw new Error(errorMessage);
+}
+
+/**
+ * Execute a procedure
+ */
+async function executeProcedure(
+	procedureName: string,
+	procedure: any,
+	registry: any,
+	input: unknown,
+	options: ExecOptions
+): Promise<void> {
 	// Execute
 	if (!options.json) {
 		console.log(`[c4c] Executing procedure '${procedureName}'...`);
@@ -92,61 +129,20 @@ export async function execProcedureCommand(
 /**
  * Execute a workflow
  */
-export async function execWorkflowCommand(options: ExecWorkflowOptions): Promise<void> {
-	const rootDir = resolve(options.root ?? process.cwd());
-	const proceduresPath = determineProceduresPath(rootDir);
-	const workflowsPath = determineWorkflowsPath(rootDir);
-	
-	// Try to resolve workflow path - check if it's already a full path or needs to be resolved
-	let workflowPath: string;
-	if (options.file.endsWith('.ts') || options.file.endsWith('.js')) {
-		// If it has an extension, treat as relative path from root or absolute
-		workflowPath = resolve(rootDir, options.file);
-	} else {
-		// Otherwise, try to find it in workflows directory
-		workflowPath = resolve(workflowsPath, `${options.file}.ts`);
-	}
-
-	// Load registry
+async function executeWorkflowById(
+	workflowId: string,
+	workflow: any,
+	registry: any,
+	input: unknown,
+	options: ExecOptions
+): Promise<void> {
 	if (!options.json) {
-		console.log(`[c4c] Loading procedures from ${proceduresPath}...`);
-	}
-	const registry = await collectRegistry(proceduresPath);
-
-	// Load workflow
-	if (!options.json) {
-		console.log(`[c4c] Loading workflow from ${workflowPath}...`);
-	}
-
-	let workflow: any;
-	try {
-		const workflowModule = await import(workflowPath);
-		workflow = workflowModule.default || workflowModule;
-
-		// If the module exports a workflow builder, get the workflow
-		if (typeof workflow === "object" && workflow.workflow) {
-			workflow = workflow.workflow;
-		}
-	} catch (error) {
-		throw new Error(
-			`Failed to load workflow from '${workflowPath}': ${error instanceof Error ? error.message : String(error)}`
-		);
-	}
-
-	// Parse input
-	let input: unknown;
-	if (options.inputFile) {
-		const content = await readFile(options.inputFile, "utf-8");
-		input = JSON.parse(content);
-	} else if (options.input) {
-		input = JSON.parse(options.input);
-	} else {
-		input = {};
+		console.log(`[c4c] Found workflow: ${workflow.name} (v${workflow.version})`);
 	}
 
 	// Execute
 	if (!options.json) {
-		console.log(`[c4c] Executing workflow...`);
+		console.log(`[c4c] Executing workflow '${workflow.id}'...`);
 		console.log(`[c4c] Input:`, JSON.stringify(input, null, 2));
 	}
 
@@ -157,7 +153,11 @@ export async function execWorkflowCommand(options: ExecWorkflowOptions): Promise
 			console.log(JSON.stringify(result, null, 2));
 		} else {
 			console.log(`[c4c] ✅ Workflow completed successfully!`);
-			console.log(`[c4c] Output:`, JSON.stringify(result, null, 2));
+			console.log(`[c4c] Execution ID:`, result.executionId);
+			console.log(`[c4c] Status:`, result.status);
+			console.log(`[c4c] Nodes executed:`, result.nodesExecuted);
+			console.log(`[c4c] Execution time:`, `${result.executionTime}ms`);
+			console.log(`[c4c] Output:`, JSON.stringify(result.outputs, null, 2));
 		}
 	} catch (error) {
 		if (options.json) {

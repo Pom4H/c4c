@@ -93,7 +93,23 @@ export interface ExecutionContext {
  * Contract definition for a procedure
  */
 export interface Contract<TInput = unknown, TOutput = unknown> {
-	name: string;
+	/**
+	 * Procedure name (optional - will use export name if not provided)
+	 * 
+	 * @example
+	 * // Auto-naming (uses export name)
+	 * export const createUser: Procedure = {
+	 *   contract: { input: ..., output: ... },  // name = "createUser"
+	 *   handler: ...
+	 * };
+	 * 
+	 * // Explicit naming
+	 * export const createUser: Procedure = {
+	 *   contract: { name: "users.create", input: ..., output: ... },
+	 *   handler: ...
+	 * };
+	 */
+	name?: string;
 	description?: string;
 	input: z.ZodType<TInput>;
 	output: z.ZodType<TOutput>;

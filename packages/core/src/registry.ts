@@ -3,6 +3,17 @@ import { extname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { AuthRequirements, Procedure, ProcedureRole, Registry } from "./types.js";
 
+// Minimal WorkflowDefinition interface to avoid circular dependency
+interface WorkflowDefinition {
+	id: string;
+	name: string;
+	description?: string;
+	version: string;
+	nodes: unknown[];
+	startNode: string;
+	isTriggered?: boolean;
+}
+
 let tsLoaderReady: Promise<void> | null = null;
 const COLOR_RESET = "\u001B[0m";
 const COLOR_DIM = "\u001B[90m";
@@ -20,6 +31,14 @@ export type RegistryModuleIndex = Map<string, Set<string>>;
 export interface RegistryLoadResult {
 	registry: Registry;
 	moduleIndex: RegistryModuleIndex;
+}
+
+export type WorkflowRegistry = Map<string, WorkflowDefinition>;
+
+export interface ProjectArtifacts {
+	procedures: Registry;
+	workflows: WorkflowRegistry;
+	moduleIndex: Map<string, { procedures: Set<string>; workflows: Set<string> }>;
 }
 
 async function ensureTypeScriptLoader() {
@@ -47,12 +66,55 @@ async function ensureTypeScriptLoader() {
 }
 
 /**
- * Collects all procedures from procedures directory
+ * Collects all procedures from a specific directory
  * This implements the "zero boilerplate, maximum reflection" principle
  */
 export async function collectRegistry(proceduresPath = "src/procedures"): Promise<Registry> {
 	const { registry } = await collectRegistryDetailed(proceduresPath);
 	return registry;
+}
+
+/**
+ * Collects all procedures and workflows from entire project via introspection
+ * Scans all supported files and discovers artifacts by their shape
+ * No hardcoded paths - pure introspection!
+ */
+export async function collectProjectArtifacts(rootPath: string): Promise<ProjectArtifacts> {
+	const procedures: Registry = new Map();
+	const workflows: WorkflowRegistry = new Map();
+	const moduleIndex = new Map<string, { procedures: Set<string>; workflows: Set<string> }>();
+	const absoluteRoot = resolve(rootPath);
+	const allFiles = await findAllSupportedFiles(absoluteRoot);
+
+	for (const file of allFiles) {
+		try {
+			const artifacts = await loadArtifactsFromModule(file);
+			const procedureNames = new Set<string>();
+			const workflowIds = new Set<string>();
+
+			// Collect procedures
+			for (const [procedureName, procedure] of artifacts.procedures) {
+				procedures.set(procedureName, procedure);
+				procedureNames.add(procedureName);
+				logProcedureEvent("Registered", procedureName, procedure, absoluteRoot, file);
+			}
+
+			// Collect workflows
+			for (const [workflowId, workflow] of artifacts.workflows) {
+				workflows.set(workflowId, workflow);
+				workflowIds.add(workflowId);
+				logWorkflowEvent("Registered", workflowId, workflow, absoluteRoot, file);
+			}
+
+			if (procedureNames.size > 0 || workflowIds.size > 0) {
+				moduleIndex.set(file, { procedures: procedureNames, workflows: workflowIds });
+			}
+		} catch (error) {
+			console.error(`[Registry] Failed to load artifacts from ${file}:`, error);
+		}
+	}
+
+	return { procedures, workflows, moduleIndex };
 }
 
 export async function collectRegistryDetailed(proceduresPath = "src/procedures"): Promise<RegistryLoadResult> {
@@ -95,16 +157,62 @@ export async function loadProceduresFromModule(
 
 	for (const [exportName, exportValue] of Object.entries(imported)) {
 		if (isProcedure(exportValue)) {
-			const procedureName = exportValue.contract.name || exportName;
-			procedures.set(procedureName, exportValue as Procedure);
+			const procedure = exportValue as Procedure;
+			// Auto-naming: use export name if contract.name is not provided
+			const procedureName = procedure.contract.name || exportName;
+			
+			// Ensure contract.name is set for consistency
+			if (!procedure.contract.name) {
+				procedure.contract.name = procedureName;
+			}
+			
+			procedures.set(procedureName, procedure);
 		}
 	}
 
 	return procedures;
 }
 
+/**
+ * Load both procedures and workflows from a module
+ * Single pass - discovers both artifact types
+ */
+export async function loadArtifactsFromModule(
+	modulePath: string,
+	options: { versionHint?: string } = {}
+): Promise<{ procedures: Map<string, Procedure>; workflows: Map<string, WorkflowDefinition> }> {
+	if (modulePath.endsWith(".ts") || modulePath.endsWith(".tsx")) {
+		await ensureTypeScriptLoader();
+	}
+
+	const specifier = buildModuleSpecifier(modulePath, options.versionHint);
+	const imported = await import(specifier);
+	const procedures = new Map<string, Procedure>();
+	const workflows = new Map<string, WorkflowDefinition>();
+
+	for (const [exportName, exportValue] of Object.entries(imported)) {
+		if (isProcedure(exportValue)) {
+			const procedure = exportValue as Procedure;
+			// Auto-naming: use export name if contract.name is not provided
+			const procedureName = procedure.contract.name || exportName;
+			
+			// Ensure contract.name is set for consistency (generators may use it)
+			if (!procedure.contract.name) {
+				procedure.contract.name = procedureName;
+			}
+			
+			procedures.set(procedureName, procedure);
+		} else if (isWorkflow(exportValue)) {
+			const workflow = exportValue as WorkflowDefinition;
+			workflows.set(workflow.id, workflow);
+		}
+	}
+
+	return { procedures, workflows };
+}
+
 const ALLOWED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
-const IGNORED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build"]);
+const IGNORED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", "scripts", "generated", ".next", ".c4c"]);
 const TEST_FILE_PATTERN = /\.(test|spec)\.[^.]+$/i;
 
 export function isSupportedHandlerFile(filePath: string): boolean {
@@ -115,6 +223,14 @@ export function isSupportedHandlerFile(filePath: string): boolean {
 }
 
 async function findProcedureFiles(root: string): Promise<string[]> {
+	return findAllSupportedFiles(root);
+}
+
+/**
+ * Find all supported files in project (no path restrictions)
+ * Scans entire directory tree except ignored directories
+ */
+async function findAllSupportedFiles(root: string): Promise<string[]> {
 	const result: string[] = [];
 
 	async function walk(directory: string) {
@@ -149,6 +265,28 @@ function isProcedure(value: unknown): value is Procedure {
 		"contract" in value &&
 		"handler" in value &&
 		typeof (value as { handler: unknown }).handler === "function"
+	);
+}
+
+/**
+ * Type guard to check if an export is a valid WorkflowDefinition
+ */
+function isWorkflow(value: unknown): value is WorkflowDefinition {
+	if (typeof value !== "object" || value === null) {
+		return false;
+	}
+
+	const obj = value as Record<string, unknown>;
+
+	// Must have required fields
+	return (
+		typeof obj.id === "string" &&
+		typeof obj.name === "string" &&
+		typeof obj.version === "string" &&
+		Array.isArray(obj.nodes) &&
+		typeof obj.startNode === "string" &&
+		// Make sure it's not a Procedure
+		!isProcedure(value)
 	);
 }
 
@@ -195,7 +333,7 @@ function logProcedureEvent(
 	sourcePath?: string
 ) {
 	const parts: string[] = [];
-	parts.push(`[Registry] ${formatRegistryAction(action)} ${procedureName}`);
+	parts.push(`[Procedure] ${formatRegistryAction(action)} ${procedureName}`);
 
 	const badges = formatProcedureBadges(procedure);
 	if (badges) {
@@ -208,6 +346,35 @@ function logProcedureEvent(
 	}
 
 	const location = proceduresRoot && sourcePath ? formatProcedureLocation(proceduresRoot, sourcePath) : "";
+	if (location) {
+		parts.push(location);
+	}
+
+	console.log(parts.join(" "));
+}
+
+function logWorkflowEvent(
+	action: string,
+	workflowId: string,
+	workflow: WorkflowDefinition,
+	projectRoot?: string,
+	sourcePath?: string
+) {
+	const parts: string[] = [];
+	parts.push(`[Workflow] ${formatRegistryAction(action)} ${workflowId}`);
+
+	if (workflow.description) {
+		parts.push(`"${workflow.description}"`);
+	}
+
+	parts.push(`v${workflow.version}`);
+	parts.push(`(${workflow.nodes.length} nodes)`);
+
+	if (workflow.isTriggered) {
+		parts.push("[triggered]");
+	}
+
+	const location = projectRoot && sourcePath ? formatProcedureLocation(projectRoot, sourcePath) : "";
 	if (location) {
 		parts.push(location);
 	}

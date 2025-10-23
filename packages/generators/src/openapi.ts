@@ -77,10 +77,11 @@ export function generateOpenAPISpec(
 }
 
 function buildRpcOperation(contract: Contract) {
+	const name = contract.name || "unknown";
 	return {
-		summary: contract.description || contract.name,
+		summary: contract.description || name,
 		description: contract.description,
-		operationId: contract.name,
+		operationId: name,
 		tags: extractTags(contract),
 		requestBody: {
 			content: {
@@ -96,7 +97,8 @@ function buildRpcOperation(contract: Contract) {
 function buildRestOperation(
 	contract: Contract
 ): { path: string; method: string; operation: any } | null {
-	const parts = contract.name.split(".");
+	const name = contract.name || "unknown";
+	const parts = name.split(".");
 	if (parts.length < 2) return null;
 
 	const [resource, action] = parts;
@@ -104,7 +106,7 @@ function buildRestOperation(
 	if (!mapping) return null;
 
 	const operation: any = {
-		summary: contract.description || contract.name,
+		summary: contract.description || name,
 		description: contract.description,
 		operationId: `${contract.name}_rest`,
 		tags: extractTags(contract),
@@ -254,7 +256,8 @@ function extractTags(contract: Contract): string[] {
 	if (contract.metadata?.tags && Array.isArray(contract.metadata.tags)) {
 		return contract.metadata.tags as string[];
 	}
-	const parts = contract.name.split(".");
+	const name = contract.name || "unknown";
+	const parts = name.split(".");
 	return parts.length > 1 ? [parts[0] || ""] : ["default"];
 }
 

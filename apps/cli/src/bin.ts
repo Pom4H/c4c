@@ -5,7 +5,7 @@ import process from "node:process";
 import { serveCommand } from "./commands/serve.js";
 import { devCommand, devLogsCommand, devStopCommand, devStatusCommand } from "./commands/dev.js";
 import { generateClientCommand } from "./commands/generate.js";
-import { execProcedureCommand, execWorkflowCommand } from "./commands/exec.js";
+import { execCommand } from "./commands/exec.js";
 import { 
 	getAllCompletions, 
 	generateBashCompletion, 
@@ -27,7 +27,7 @@ program
 	.description("Start the c4c HTTP server")
 	.argument("[mode]", "Mode to run (all|rest|workflow|rpc|ui)", "all")
 	.option("-p, --port <number>", "Port to listen on", parsePort)
-	.option("--root <path>", "Project root containing procedures/ and workflows", process.cwd())
+	.option("--root <path>", "Project root directory to scan for artifacts", process.cwd())
     .option("--docs", "Force enable docs endpoints")
 	.option("--api-base <url>", "Workflow API base URL used in UI mode", process.env.C4C_API_BASE)
 	.action(async (modeArg: string, options) => {
@@ -45,7 +45,7 @@ const devCommandDef = program
     .command("dev")
     .description("Start the c4c HTTP server with watch mode")
     .option("-p, --port <number>", "Port to listen on", parsePort)
-	.option("--root <path>", "Project root containing procedures/", process.cwd())
+	.option("--root <path>", "Project root directory to scan", process.cwd())
     .option("--docs", "Force enable docs endpoints")
     .action(async (options) => {
 		try {
@@ -61,7 +61,7 @@ const devCommandDef = program
 devCommandDef
 	.command("stop")
 	.description("Stop the running c4c dev server")
-	.option("--root <path>", "Project root containing procedures/", process.cwd())
+	.option("--root <path>", "Project root directory to scan", process.cwd())
 	.action(async (options) => {
 		try {
 			await devStopCommand(options);
@@ -76,7 +76,7 @@ devCommandDef
 devCommandDef
 	.command("logs")
 	.description("Print stdout logs from the running c4c dev server")
-	.option("--root <path>", "Project root containing procedures/", process.cwd())
+	.option("--root <path>", "Project root directory to scan", process.cwd())
     .option("--json", "Output raw JSONL instead of pretty output")
 	.option("--tail <number>", "Number of log lines from the end of the file to display")
 	.action(async (options) => {
@@ -93,7 +93,7 @@ devCommandDef
 devCommandDef
     .command("status")
     .description("Show status of the running c4c dev server")
-    .option("--root <path>", "Project root containing handlers/", process.cwd())
+    .option("--root <path>", "Project root directory", process.cwd())
     .option("--json", "Output JSON status report")
     .action(async (options) => {
         try {
@@ -113,7 +113,7 @@ const generate = program
 generate
 	.command("client")
 	.description("Generate a typed client from contracts")
-	.option("--root <path>", "Project root containing procedures/", process.cwd())
+	.option("--root <path>", "Project root directory to scan", process.cwd())
 	.option("--out <file>", "Output file for the generated client", "c4c-client.ts")
 	.option("--base-url <url>", "Base URL embedded in generated client")
 	.action(async (options) => {
@@ -129,24 +129,14 @@ generate
 
 program
 	.command("exec <name>")
-	.description("Execute a procedure or workflow (use workflow/name for workflows)")
-	.option("--root <path>", "Project root containing procedures/", process.cwd())
+	.description("Execute a procedure or workflow (procedures have priority)")
+	.option("--root <path>", "Project root directory to scan", process.cwd())
 	.option("-i, --input <json>", "Input data as JSON string")
 	.option("-f, --input-file <file>", "Input data from JSON file")
 	.option("--json", "Output only JSON result (no logging)")
 	.action(async (name: string, options) => {
 		try {
-			// Check if it's a workflow (starts with workflow/ or procedure/)
-			if (name.startsWith("workflow/")) {
-				const workflowPath = name.replace("workflow/", "");
-				await execWorkflowCommand({ ...options, file: workflowPath });
-			} else if (name.startsWith("procedure/")) {
-				const procedureName = name.replace("procedure/", "");
-				await execProcedureCommand(procedureName, options);
-			} else {
-				// Default to procedure
-				await execProcedureCommand(name, options);
-			}
+			await execCommand(name, options);
 		} catch (error) {
 			console.error(
 				`[c4c] ${error instanceof Error ? error.message : String(error)}`

@@ -2,10 +2,10 @@ import { promises as fs } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { watch } from "node:fs/promises";
-import { collectRegistry, collectRegistryDetailed, type Registry, type RegistryModuleIndex } from "@c4c/core";
+import { collectProjectArtifacts, type Registry, type WorkflowRegistry } from "@c4c/core";
 import { createHttpServer, type HttpAppOptions } from "@c4c/adapters";
 import { DEFAULTS } from "./constants.js";
-import { formatProceduresLabel, logProcedureChange } from "./formatting.js";
+import { dim } from "./formatting.js";
 import { createLogWriter, interceptConsole } from "./logging.js";
 import {
 	ensureDevSessionAvailability,
@@ -14,29 +14,39 @@ import {
 	writeDevSessionMetadata,
 } from "./session.js";
 import type { DevSessionMetadata, ServeMode } from "./types.js";
-import { watchProcedures } from "./watcher.js";
-// Dev control RPCs removed; file-based control is used instead.
+import { watchProject } from "./watcher.js";
 
 export interface ServeOptions {
 	port?: number;
-	proceduresPath?: string;
-	workflowsPath?: string;
+	root?: string;
 	enableDocs?: boolean;
 	enableRest?: boolean;
 	enableRpc?: boolean;
 	enableWorkflow?: boolean;
 	apiBaseUrl?: string;
-	projectRoot?: string;
 }
 
+/**
+ * Serve mode - starts HTTP server with artifacts from entire project
+ * No hardcoded paths! Pure introspection!
+ */
 export async function serve(mode: ServeMode, options: ServeOptions = {}) {
-	const { proceduresPath, httpOptions } = resolveServeConfiguration(mode, options);
-	const registry = await collectRegistry(proceduresPath);
-	return createHttpServer(registry, httpOptions.port ?? 3000, httpOptions);
+	const { projectRoot, httpOptions } = resolveServeConfiguration(mode, options);
+	
+	console.log(`[c4c] Discovering artifacts in ${dim(projectRoot)}`);
+	const artifacts = await collectProjectArtifacts(projectRoot);
+	
+	console.log(`[c4c] Found ${artifacts.procedures.size} procedures, ${artifacts.workflows.size} workflows`);
+	
+	return createHttpServer(artifacts.procedures, httpOptions.port ?? 3000, httpOptions);
 }
 
+/**
+ * Dev mode - serves with hot reload
+ * Watches entire project for changes
+ */
 export async function dev(mode: ServeMode, options: ServeOptions = {}) {
-	const { proceduresPath, httpOptions, projectRoot } = resolveServeConfiguration(mode, options);
+	const { projectRoot, httpOptions } = resolveServeConfiguration(mode, options);
 	const sessionPaths = getDevSessionPaths(projectRoot);
 	await ensureDevSessionAvailability(sessionPaths);
 
@@ -47,7 +57,14 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 	const restoreConsole = interceptConsole(logWriter);
 
 	const sessionId = randomUUID();
-	const { registry, moduleIndex } = await collectRegistryDetailed(proceduresPath);
+	
+	console.log(`[c4c] Discovering artifacts in ${dim(projectRoot)}`);
+	const artifacts = await collectProjectArtifacts(projectRoot);
+	console.log(`[c4c] Found ${artifacts.procedures.size} procedures, ${artifacts.workflows.size} workflows`);
+
+	const registry = artifacts.procedures;
+	const workflowRegistry = artifacts.workflows;
+	const moduleIndex = artifacts.moduleIndex;
 
 	if (!httpOptions.enableRpc) {
 		httpOptions.enableRpc = true;
@@ -62,7 +79,7 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 		port,
 		mode,
 		projectRoot,
-		proceduresPath,
+		proceduresPath: projectRoot, // Legacy field - now same as projectRoot
 		logFile: sessionPaths.logFile,
 		startedAt: new Date().toISOString(),
 		status: "running",
@@ -138,21 +155,21 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 		}
 	};
 
-    // Watch session.json for status changes. If status != running, shutdown.
-    startSessionWatcher(sessionPaths.directory, sessionPaths.sessionFile, controller.signal, async () => {
-        try {
-            const raw = await fs.readFile(sessionPaths.sessionFile, "utf8");
-            const meta = JSON.parse(raw) as DevSessionMetadata;
-            if (meta.status !== "running") {
-                console.log("[c4c] Stop requested (session status changed)");
-                triggerShutdown("session-status");
-            }
-        } catch {
-            // If the file is removed or unreadable, initiate shutdown as a safe default
-            console.log("[c4c] Session file missing or unreadable. Stopping.");
-            triggerShutdown("session-file-missing");
-        }
-    });
+	// Watch session.json for status changes. If status != running, shutdown.
+	startSessionWatcher(sessionPaths.directory, sessionPaths.sessionFile, controller.signal, async () => {
+		try {
+			const raw = await fs.readFile(sessionPaths.sessionFile, "utf8");
+			const meta = JSON.parse(raw) as DevSessionMetadata;
+			if (meta.status !== "running") {
+				console.log("[c4c] Stop requested (session status changed)");
+				triggerShutdown("session-status");
+			}
+		} catch {
+			// If the file is removed or unreadable, initiate shutdown as a safe default
+			console.log("[c4c] Session file missing or unreadable. Stopping.");
+			triggerShutdown("session-file-missing");
+		}
+	});
 
 	server = createHttpServer(registry, port, httpOptions);
 
@@ -164,14 +181,14 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 		process.on(signal, handler);
 	}
 
-	const proceduresLabel = formatProceduresLabel(proceduresPath);
-	console.log(`[c4c] Watching procedures in ${proceduresLabel}`);
-    console.log(`[c4c] Press Ctrl+C or run: pnpm "c4c dev stop" to stop the dev server`);
+	console.log(`[c4c] Watching ${dim(projectRoot)} for changes`);
+	console.log(`[c4c] Press Ctrl+C or run: pnpm "c4c dev stop" to stop the dev server`);
 
-	const watchTask = watchProcedures(
-		proceduresPath,
+	const watchTask = watchProject(
+		projectRoot,
 		moduleIndex,
 		registry,
+		workflowRegistry,
 		controller.signal,
 		() => triggerShutdown("watcher")
 	);
@@ -184,9 +201,7 @@ export async function dev(mode: ServeMode, options: ServeOptions = {}) {
 }
 
 function resolveServeConfiguration(mode: ServeMode, options: ServeOptions = {}) {
-	const projectRoot = options.projectRoot ? resolve(options.projectRoot) : process.cwd();
-	const proceduresOption = options.proceduresPath ?? process.env.C4C_PROCEDURES ?? "src/procedures";
-	const proceduresPath = resolve(projectRoot, proceduresOption);
+	const projectRoot = options.root ? resolve(options.root) : process.cwd();
 	const defaults = DEFAULTS[mode] ?? DEFAULTS.all;
 	const httpOptions: HttpAppOptions = {
 		port: options.port ?? 3000,
@@ -194,10 +209,10 @@ function resolveServeConfiguration(mode: ServeMode, options: ServeOptions = {}) 
 		enableRest: options.enableRest ?? defaults.enableRest,
 		enableRpc: options.enableRpc ?? defaults.enableRpc,
 		enableWorkflow: options.enableWorkflow ?? defaults.enableWorkflow,
-		workflowsPath: options.workflowsPath ?? defaults.workflowsPath,
+		workflowsPath: undefined, // Not needed anymore - workflows discovered via introspection
 	};
 
-	return { proceduresPath, httpOptions, projectRoot };
+	return { projectRoot, httpOptions };
 }
 
 async function closeServer(server: unknown): Promise<void> {
@@ -215,26 +230,26 @@ async function closeServer(server: unknown): Promise<void> {
 }
 
 function startSessionWatcher(
-    sessionDir: string,
-    sessionFilePath: string,
-    signal: AbortSignal,
-    onSessionChanged: () => void
+	sessionDir: string,
+	sessionFilePath: string,
+	signal: AbortSignal,
+	onSessionChanged: () => void
 ): void {
-    (async () => {
-        try {
-            const watcher = watch(sessionDir, { signal });
-            for await (const event of watcher) {
-                if (!event || !event.filename) continue;
-                if (event.filename === "session.json") {
-                    onSessionChanged();
-                }
-            }
-        } catch (error) {
-            if (!(error instanceof Error && error.name === "AbortError")) {
-                console.warn(
-                    `[c4c] Session watcher error: ${error instanceof Error ? error.message : String(error)}`
-                );
-            }
-        }
-    })().catch(() => {});
+	(async () => {
+		try {
+			const watcher = watch(sessionDir, { signal });
+			for await (const event of watcher) {
+				if (!event || !event.filename) continue;
+				if (event.filename === "session.json") {
+					onSessionChanged();
+				}
+			}
+		} catch (error) {
+			if (!(error instanceof Error && error.name === "AbortError")) {
+				console.warn(
+					`[c4c] Session watcher error: ${error instanceof Error ? error.message : String(error)}`
+				);
+			}
+		}
+	})().catch(() => {});
 }
