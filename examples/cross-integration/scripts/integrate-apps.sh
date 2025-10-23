@@ -5,6 +5,9 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 echo "🔄 C4C Cross-Integration Setup"
 echo "================================"
 echo ""
@@ -14,13 +17,25 @@ echo "📡 Checking if apps are running..."
 
 if ! curl -s http://localhost:3001/openapi.json > /dev/null 2>&1; then
   echo "❌ App A (Task Manager) is not running on port 3001"
-  echo "   Start it with: cd app-a && pnpm dev"
+  echo ""
+  echo "💡 Start apps with:"
+  echo "   ./scripts/start-apps.sh"
+  echo ""
+  echo "   Or manually:"
+  echo "   Terminal 1: cd app-a && pnpm dev"
+  echo "   Terminal 2: cd app-b && pnpm dev"
   exit 1
 fi
 
 if ! curl -s http://localhost:3002/openapi.json > /dev/null 2>&1; then
   echo "❌ App B (Notification Service) is not running on port 3002"
-  echo "   Start it with: cd app-b && pnpm dev"
+  echo ""
+  echo "💡 Start apps with:"
+  echo "   ./scripts/start-apps.sh"
+  echo ""
+  echo "   Or manually:"
+  echo "   Terminal 1: cd app-a && pnpm dev"
+  echo "   Terminal 2: cd app-b && pnpm dev"
   exit 1
 fi
 
@@ -29,16 +44,16 @@ echo ""
 
 # Integrate App B into App A
 echo "📥 Step 1: Integrating App B (Notification Service) into App A (Task Manager)..."
-cd ../app-a
-c4c integrate http://localhost:3002/openapi.json --name notification-service
+cd "$ROOT_DIR/app-a"
+pnpm exec c4c integrate http://localhost:3002/openapi.json --name notification-service
 
 echo "✅ App A can now use notification-service procedures!"
 echo ""
 
 # Integrate App A into App B
 echo "📥 Step 2: Integrating App A (Task Manager) into App B (Notification Service)..."
-cd ../app-b
-c4c integrate http://localhost:3001/openapi.json --name task-manager
+cd "$ROOT_DIR/app-b"
+pnpm exec c4c integrate http://localhost:3001/openapi.json --name task-manager
 
 echo "✅ App B can now use task-manager procedures!"
 echo ""
