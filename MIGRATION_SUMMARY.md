@@ -97,11 +97,12 @@ isWorkflow(export) => boolean
 c4c serve --root .
 c4c dev --root ./my-project
 
-# Execute procedure
+# Execute - унифицированная команда (приоритет: procedure > workflow)
 c4c exec users.create --input '{"name":"Alice"}'
+c4c exec simple-math-workflow --input '{}'
 
-# Execute workflow by ID
-c4c exec simple-math-workflow --workflow
+# JSON output для скриптов
+c4c exec math.add --input '{"a":5,"b":3}' --json
 ```
 
 ### API
@@ -299,8 +300,9 @@ c4c dev --root .
 
 4. **Execute:**
 ```bash
+# Автоматически определяет тип (приоритет: procedure > workflow)
 c4c exec math.add --input '{"a":5,"b":3}'
-c4c exec simple-math-workflow --workflow
+c4c exec simple-math-workflow
 ```
 
 ---

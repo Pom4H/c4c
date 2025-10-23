@@ -5,7 +5,7 @@ import process from "node:process";
 import { serveCommand } from "./commands/serve.js";
 import { devCommand, devLogsCommand, devStopCommand, devStatusCommand } from "./commands/dev.js";
 import { generateClientCommand } from "./commands/generate.js";
-import { execProcedureCommand, execWorkflowCommand } from "./commands/exec.js";
+import { execCommand } from "./commands/exec.js";
 import { 
 	getAllCompletions, 
 	generateBashCompletion, 
@@ -129,22 +129,14 @@ generate
 
 program
 	.command("exec <name>")
-	.description("Execute a procedure or workflow by name/ID")
+	.description("Execute a procedure or workflow (procedures have priority)")
 	.option("--root <path>", "Project root directory to scan", process.cwd())
 	.option("-i, --input <json>", "Input data as JSON string")
 	.option("-f, --input-file <file>", "Input data from JSON file")
 	.option("--json", "Output only JSON result (no logging)")
-	.option("--workflow", "Force execution as workflow (by ID)")
 	.action(async (name: string, options) => {
 		try {
-			// Check if it's a workflow
-			if (options.workflow || name.startsWith("workflow:")) {
-				const workflowId = options.workflow ? name : name.replace("workflow:", "");
-				await execWorkflowCommand({ ...options, workflow: workflowId });
-			} else {
-				// Default to procedure
-				await execProcedureCommand(name, options);
-			}
+			await execCommand(name, options);
 		} catch (error) {
 			console.error(
 				`[c4c] ${error instanceof Error ? error.message : String(error)}`

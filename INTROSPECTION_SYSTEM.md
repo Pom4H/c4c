@@ -199,6 +199,10 @@ c4c serve --procedures ./procedures --workflows ./workflows
 
 # Нужно указывать пути явно
 c4c serve --procedures ./src/handlers --workflows ./src/flows
+
+# Execute требовал разных команд
+c4c exec-procedure users.create
+c4c exec-workflow user-onboarding
 ```
 
 ### После
@@ -211,6 +215,10 @@ c4c serve --root .
 c4c serve
 
 # Сканирует весь проект, находит все артефакты
+
+# Execute - унифицированная команда (приоритет: procedure > workflow)
+c4c exec users.create --input '{"name":"Alice"}'
+c4c exec simple-math-workflow --input '{}'
 ```
 
 ### Примеры
@@ -219,14 +227,17 @@ c4c serve
 # Dev mode с hot reload
 c4c dev --root ./my-project
 
-# Execute procedure
+# Execute - автоматически определяет тип (приоритет: procedure > workflow)
 c4c exec users.create --input '{"name":"Alice","email":"alice@example.com"}'
 
-# Execute workflow by ID
-c4c exec simple-math-workflow --workflow
+# Execute workflow (если нет procedure с таким же именем)
+c4c exec simple-math-workflow --input '{}'
 
-# Или с префиксом
-c4c exec workflow:simple-math-workflow
+# Input можно передать из файла
+c4c exec users.create --input-file ./data.json
+
+# JSON output (для скриптов)
+c4c exec math.add --input '{"a":5,"b":3}' --json
 ```
 
 ---
@@ -417,7 +428,25 @@ export const userOnboarding: WorkflowDefinition = { ... };
 **A:** 
 - Procedures используют уникальное поле `contract.name`
 - Workflows используют уникальное поле `id`
-- При дубликатах выводится warning
+- При дубликатах в registry выводится warning
+- **Команда `exec`:** если procedure и workflow имеют одинаковое имя/id, **procedure имеет приоритет**
+
+Пример:
+```typescript
+// Procedure
+export const test: Procedure = {
+  contract: { name: "test", ... },  // ← Будет выполнена через exec
+  ...
+}
+
+// Workflow
+export const testWorkflow: WorkflowDefinition = {
+  id: "test",  // ← Игнорируется если есть procedure с именем "test"
+  ...
+}
+
+// c4c exec test → выполнит procedure, не workflow
+```
 
 ### Q: Что если я хочу исключить некоторые файлы?
 

@@ -4,28 +4,20 @@ import { collectProjectArtifacts } from "@c4c/core";
 import { execute } from "@c4c/core";
 import { executeWorkflow } from "@c4c/workflow";
 
-interface ExecProcedureOptions {
+interface ExecOptions {
 	root?: string;
-	input?: string;
-	inputFile?: string;
-	json?: boolean;
-}
-
-interface ExecWorkflowOptions {
-	root?: string;
-	workflow: string;
 	input?: string;
 	inputFile?: string;
 	json?: boolean;
 }
 
 /**
- * Execute a procedure
- * Discovers all artifacts via introspection
+ * Execute a procedure or workflow by name/ID
+ * Unified approach with priority: procedure > workflow
  */
-export async function execProcedureCommand(
-	procedureName: string,
-	options: ExecProcedureOptions
+export async function execCommand(
+	name: string,
+	options: ExecOptions
 ): Promise<void> {
 	const rootDir = resolve(options.root ?? process.cwd());
 
@@ -34,17 +26,8 @@ export async function execProcedureCommand(
 		console.log(`[c4c] Discovering artifacts in ${rootDir}...`);
 	}
 	const artifacts = await collectProjectArtifacts(rootDir);
-	const registry = artifacts.procedures;
 
-	// Get procedure
-	const procedure = registry.get(procedureName);
-	if (!procedure) {
-		throw new Error(
-			`Procedure '${procedureName}' not found. Available: ${Array.from(registry.keys()).join(", ")}`
-		);
-	}
-
-	// Parse input
+	// Parse input (same for both procedures and workflows)
 	let input: unknown;
 	if (options.inputFile) {
 		const content = await readFile(options.inputFile, "utf-8");
@@ -55,6 +38,60 @@ export async function execProcedureCommand(
 		input = {};
 	}
 
+	// Priority 1: Try to find procedure
+	const procedure = artifacts.procedures.get(name);
+	if (procedure) {
+		await executeProcedure(name, procedure, artifacts.procedures, input, options);
+		return;
+	}
+
+	// Priority 2: Try to find workflow
+	const workflow = artifacts.workflows.get(name);
+	if (workflow) {
+		await executeWorkflowById(name, workflow, artifacts.procedures, input, options);
+		return;
+	}
+
+	// Not found - show helpful error
+	const availableProcedures = Array.from(artifacts.procedures.keys());
+	const availableWorkflows = Array.from(artifacts.workflows.keys());
+	
+	let errorMessage = `Artifact '${name}' not found.\n\n`;
+	
+	if (availableProcedures.length > 0) {
+		errorMessage += `Available procedures (${availableProcedures.length}):\n`;
+		errorMessage += availableProcedures.slice(0, 10).map(p => `  - ${p}`).join('\n');
+		if (availableProcedures.length > 10) {
+			errorMessage += `\n  ... and ${availableProcedures.length - 10} more`;
+		}
+		errorMessage += '\n\n';
+	}
+	
+	if (availableWorkflows.length > 0) {
+		errorMessage += `Available workflows (${availableWorkflows.length}):\n`;
+		errorMessage += availableWorkflows.slice(0, 10).map(w => `  - ${w}`).join('\n');
+		if (availableWorkflows.length > 10) {
+			errorMessage += `\n  ... and ${availableWorkflows.length - 10} more`;
+		}
+	}
+	
+	if (availableProcedures.length === 0 && availableWorkflows.length === 0) {
+		errorMessage += 'No procedures or workflows found in project.';
+	}
+
+	throw new Error(errorMessage);
+}
+
+/**
+ * Execute a procedure
+ */
+async function executeProcedure(
+	procedureName: string,
+	procedure: any,
+	registry: any,
+	input: unknown,
+	options: ExecOptions
+): Promise<void> {
 	// Execute
 	if (!options.json) {
 		console.log(`[c4c] Executing procedure '${procedureName}'...`);
@@ -90,40 +127,17 @@ export async function execProcedureCommand(
 }
 
 /**
- * Execute a workflow by ID
- * Workflows are discovered via introspection - no hardcoded paths!
+ * Execute a workflow
  */
-export async function execWorkflowCommand(options: ExecWorkflowOptions): Promise<void> {
-	const rootDir = resolve(options.root ?? process.cwd());
-
-	// Load all artifacts via introspection
-	if (!options.json) {
-		console.log(`[c4c] Discovering artifacts in ${rootDir}...`);
-	}
-	const artifacts = await collectProjectArtifacts(rootDir);
-
-	// Find workflow by ID
-	const workflow = artifacts.workflows.get(options.workflow);
-	if (!workflow) {
-		const availableWorkflows = Array.from(artifacts.workflows.keys()).join(", ");
-		throw new Error(
-			`Workflow '${options.workflow}' not found. Available workflows: ${availableWorkflows || "none"}`
-		);
-	}
-
+async function executeWorkflowById(
+	workflowId: string,
+	workflow: any,
+	registry: any,
+	input: unknown,
+	options: ExecOptions
+): Promise<void> {
 	if (!options.json) {
 		console.log(`[c4c] Found workflow: ${workflow.name} (v${workflow.version})`);
-	}
-
-	// Parse input
-	let input: unknown;
-	if (options.inputFile) {
-		const content = await readFile(options.inputFile, "utf-8");
-		input = JSON.parse(content);
-	} else if (options.input) {
-		input = JSON.parse(options.input);
-	} else {
-		input = {};
 	}
 
 	// Execute
@@ -133,7 +147,7 @@ export async function execWorkflowCommand(options: ExecWorkflowOptions): Promise
 	}
 
 	try {
-		const result = await executeWorkflow(workflow, artifacts.procedures, input as Record<string, unknown>);
+		const result = await executeWorkflow(workflow, registry, input as Record<string, unknown>);
 
 		if (options.json) {
 			console.log(JSON.stringify(result, null, 2));
