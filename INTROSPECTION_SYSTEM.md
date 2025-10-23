@@ -426,17 +426,17 @@ export const userOnboarding: WorkflowDefinition = { ... };
 ### Q: Как избежать конфликтов имен?
 
 **A:** 
-- Procedures используют уникальное поле `contract.name`
+- Procedures используют `contract.name` (или имя экспорта если не указано)
 - Workflows используют уникальное поле `id`
 - При дубликатах в registry выводится warning
 - **Команда `exec`:** если procedure и workflow имеют одинаковое имя/id, **procedure имеет приоритет**
 
 Пример:
 ```typescript
-// Procedure
+// Procedure с auto-naming
 export const test: Procedure = {
-  contract: { name: "test", ... },  // ← Будет выполнена через exec
-  ...
+  contract: { input: ..., output: ... },  // name = "test"
+  handler: ...
 }
 
 // Workflow
@@ -447,6 +447,39 @@ export const testWorkflow: WorkflowDefinition = {
 
 // c4c exec test → выполнит procedure, не workflow
 ```
+
+### Q: Нужно ли всегда указывать contract.name?
+
+**A:** Нет! `contract.name` теперь опциональное.
+
+**Auto-naming (рекомендуется для новых процедур):**
+```typescript
+export const createUser: Procedure = {
+  contract: {
+    // name НЕ указан → автоматически "createUser"
+    input: z.object(...),
+    output: z.object(...),
+  },
+  handler: ...
+};
+// Доступно как: c4c exec createUser
+// IDE refactoring работает! ✅
+```
+
+**Explicit naming (для public API):**
+```typescript
+export const createUser: Procedure = {
+  contract: {
+    name: "users.create",  // ← Явное имя для API
+    input: z.object(...),
+    output: z.object(...),
+  },
+  handler: ...
+};
+// Доступно как: c4c exec users.create
+```
+
+📖 Подробности: [AUTO_NAMING.md](./AUTO_NAMING.md)
 
 ### Q: Что если я хочу исключить некоторые файлы?
 

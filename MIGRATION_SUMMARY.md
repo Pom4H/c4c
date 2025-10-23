@@ -17,8 +17,14 @@
 - `WorkflowRegistry = Map<string, WorkflowDefinition>`
 - `ProjectArtifacts = { procedures, workflows, moduleIndex }`
 
+**Auto-naming:**
+- `contract.name` теперь опциональное
+- Если не указано → используется имя экспорта
+- IDE refactoring работает полностью! 🎉
+
 **Файлы:**
-- ✅ `packages/core/src/registry.ts` - добавлена интроспекция
+- ✅ `packages/core/src/types.ts` - `contract.name` теперь optional
+- ✅ `packages/core/src/registry.ts` - добавлена интроспекция + auto-naming
 - ✅ `packages/core/src/index.ts` - экспортированы новые типы
 
 ### 2. CLI Package (`apps/cli/`)
@@ -35,9 +41,17 @@
 - ✅ `src/lib/server.ts` - полностью переписан для новой системы
 - ✅ `src/bin.ts` - обновлены описания и параметры
 
-### 3. Документация
+### 3. Примеры
+
+Добавлены новые примеры:
+- ✅ `examples/basic/procedures/auto-naming-demo.ts` - демо auto-naming
+- ✅ `examples/basic/procedures/explicit-naming-demo.ts` - демо explicit naming
+
+### 4. Документация
 
 - ✅ `INTROSPECTION_SYSTEM.md` - полное описание новой системы
+- ✅ `AUTO_NAMING.md` - auto-naming система и best practices
+- ✅ `EXEC_UNIFIED_APPROACH.md` - унифицированная команда exec
 - ✅ `MIGRATION_SUMMARY.md` - этот файл
 
 ---
@@ -219,10 +233,25 @@ packages/
 
 ### Naming
 
-**Procedures:** используют `contract.name`
+**Procedures:** используют `contract.name` (опционально - можно использовать auto-naming)
+
 ```typescript
+// Auto-naming (рекомендуется)
 export const createUser: Procedure = {
-  contract: { name: "users.create", ... },
+  contract: { 
+    input: ..., 
+    output: ... 
+  },  // name = "createUser"
+  handler: ...
+}
+
+// Explicit naming (для public API)
+export const createUser: Procedure = {
+  contract: { 
+    name: "users.create",  // ← Явное имя
+    input: ..., 
+    output: ... 
+  },
   handler: ...
 }
 ```
@@ -235,6 +264,8 @@ export const userOnboarding: WorkflowDefinition = {
   ...
 }
 ```
+
+📖 **Подробнее:** [AUTO_NAMING.md](./AUTO_NAMING.md)
 
 ### Ignored Files
 
@@ -313,6 +344,7 @@ c4c exec simple-math-workflow
 - ❌ Hardcoded пути `procedures/` и `workflows/`
 - ❌ Отдельные функции для procedures и workflows
 - ❌ Необходимость конфигурации для кастомных путей
+- ❌ Обязательное указание `contract.name`
 
 ### Добавлено
 - ✅ Universal introspection - весь проект
@@ -320,11 +352,14 @@ c4c exec simple-math-workflow
 - ✅ Единый проход для procedures и workflows
 - ✅ Поддержка любых структур папок
 - ✅ Hot reload для всего проекта
+- ✅ **Auto-naming** - `contract.name` опциональное
+- ✅ IDE refactoring полностью работает
 
 ### Осталось
-- ✅ Backward compatibility
+- ✅ Backward compatibility (100%)
 - ✅ Все старые примеры работают
 - ✅ Логирование улучшено
+- ✅ Генераторы API работают с auto-naming
 
 ---
 

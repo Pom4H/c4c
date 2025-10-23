@@ -147,8 +147,16 @@ export async function loadProceduresFromModule(
 
 	for (const [exportName, exportValue] of Object.entries(imported)) {
 		if (isProcedure(exportValue)) {
-			const procedureName = exportValue.contract.name || exportName;
-			procedures.set(procedureName, exportValue as Procedure);
+			const procedure = exportValue as Procedure;
+			// Auto-naming: use export name if contract.name is not provided
+			const procedureName = procedure.contract.name || exportName;
+			
+			// Ensure contract.name is set for consistency
+			if (!procedure.contract.name) {
+				procedure.contract.name = procedureName;
+			}
+			
+			procedures.set(procedureName, procedure);
 		}
 	}
 
@@ -174,8 +182,16 @@ export async function loadArtifactsFromModule(
 
 	for (const [exportName, exportValue] of Object.entries(imported)) {
 		if (isProcedure(exportValue)) {
-			const procedureName = exportValue.contract.name || exportName;
-			procedures.set(procedureName, exportValue as Procedure);
+			const procedure = exportValue as Procedure;
+			// Auto-naming: use export name if contract.name is not provided
+			const procedureName = procedure.contract.name || exportName;
+			
+			// Ensure contract.name is set for consistency (generators may use it)
+			if (!procedure.contract.name) {
+				procedure.contract.name = procedureName;
+			}
+			
+			procedures.set(procedureName, procedure);
 		} else if (isWorkflow(exportValue)) {
 			const workflow = exportValue as WorkflowDefinition;
 			workflows.set(workflow.id, workflow);
