@@ -9,15 +9,29 @@
 ```bash
 cd examples/cross-integration/app-a
 pnpm install
-pnpm dev
+pnpm dev  # Запускает c4c serve --port 3001
 ```
+
+**`c4c serve` автоматически:**
+- Сканирует `procedures/` и загружает процедуры
+- Создает registry
+- Запускает HTTP сервер
+- Раздает OpenAPI спецификацию
 
 Вы увидите:
 ```
-🚀 Task Manager App started!
+🚀 c4c server started
    Port: 3001
    OpenAPI: http://localhost:3001/openapi.json
-   Docs: http://localhost:3001/docs
+   
+📦 Loaded 7 procedure(s):
+   - tasks.create
+   - tasks.list
+   - tasks.get
+   - tasks.update
+   - tasks.delete
+   - tasks.trigger.created
+   - tasks.trigger.updated
 ```
 
 ### Терминал 2: App B (Notification Service)
@@ -25,15 +39,20 @@ pnpm dev
 ```bash
 cd examples/cross-integration/app-b
 pnpm install
-pnpm dev
+pnpm dev  # Запускает c4c serve --port 3002
 ```
 
 Вы увидите:
 ```
-🚀 Notification Service App started!
+🚀 c4c server started
    Port: 3002
    OpenAPI: http://localhost:3002/openapi.json
-   Docs: http://localhost:3002/docs
+   
+📦 Loaded 4 procedure(s):
+   - notifications.send
+   - notifications.list
+   - notifications.subscribe
+   - notifications.trigger.sent
 ```
 
 ## Шаг 2: Интеграция приложений (1 минута)

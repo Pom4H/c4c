@@ -88,27 +88,44 @@ export const userCreatedTrigger = defineProcedure({
 });
 ```
 
-### 4. Запустите сервер
+### 4. Запустите сервер через c4c serve
 
-```typescript
-// src/server.ts
-import { createRegistry } from '@c4c/core';
-import { createHttpServer } from '@c4c/adapters';
-import { createUser } from '../procedures/users.js';
-import { userCreatedTrigger } from '../procedures/webhooks.js';
-
-const registry = createRegistry();
-registry.register(createUser);
-registry.register(userCreatedTrigger);
-
-createHttpServer(registry, 3000);
+```json
+// package.json
+{
+  "scripts": {
+    "dev": "c4c serve --port 3000 --root .",
+    "start": "c4c serve --port 3000 --root ."
+  }
+}
 ```
 
 ```bash
 pnpm dev
-# Server started on http://localhost:3000
-# OpenAPI: http://localhost:3000/openapi.json ← Автоматически!
+# или
+c4c serve --port 3000
+
+# c4c serve автоматически:
+# - Сканирует procedures/ и workflows/
+# - Загружает все процедуры в registry
+# - Запускает HTTP сервер
+# - Раздает /openapi.json
 ```
+
+**Вывод:**
+```
+🚀 c4c server started
+   Port: 3000
+   OpenAPI: http://localhost:3000/openapi.json
+   
+📦 Loaded 2 procedure(s):
+   - users.create
+   - users.trigger.created
+```
+
+> **Примечание:** В будущем будет команда `c4c prune` для генерации 
+> оптимизированного `server.ts` с явными импортами для быстрого 
+> холодного старта в production.
 
 ## Интеграция с другими приложениями
 

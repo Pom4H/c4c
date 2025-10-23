@@ -161,7 +161,7 @@ cross-integration/
 
 ### Сценарий: App A ↔ App B
 
-#### Шаг 1: App A определяет процедуры
+#### Шаг 1: App A определяет процедуры и запускается через c4c serve
 
 ```typescript
 // app-a/procedures/tasks.ts
@@ -201,14 +201,36 @@ export const taskCreatedTrigger = defineProcedure({
 });
 ```
 
-#### Шаг 2: App A запускается и раздает OpenAPI
+#### Шаг 2: App A запускается через c4c serve
 
 ```bash
 cd app-a
-pnpm dev  # Port 3001
+c4c serve --port 3001
+# или
+pnpm dev  # Запускает c4c serve --port 3001
 
-# OpenAPI доступен автоматически:
-# http://localhost:3001/openapi.json
+# c4c serve автоматически:
+# - Сканирует procedures/ директорию
+# - Загружает все процедуры (createTask, taskCreatedTrigger, etc.)
+# - Создает registry
+# - Запускает HTTP сервер
+# - Раздает /openapi.json
+```
+
+**Вывод:**
+```
+🚀 c4c server started
+   Port: 3001
+   OpenAPI: http://localhost:3001/openapi.json
+   
+📦 Loaded 7 procedure(s):
+   - tasks.create
+   - tasks.list
+   - tasks.get
+   - tasks.update
+   - tasks.delete
+   - tasks.trigger.created ← триггер
+   - tasks.trigger.updated ← триггер
 ```
 
 #### Шаг 3: App B интегрирует App A
