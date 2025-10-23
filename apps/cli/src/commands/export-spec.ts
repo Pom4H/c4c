@@ -6,7 +6,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { createRegistry } from '@c4c/core';
+import { collectRegistry } from '@c4c/core';
 import { generateOpenAPISpec } from '@c4c/generators';
 
 export interface ExportSpecOptions {
@@ -44,61 +44,35 @@ export async function exportSpecCommand(options: ExportSpecOptions = {}): Promis
     path.join(root, 'src/procedures'),
   ];
 
-  const registry = createRegistry();
-  let procedureCount = 0;
-  let triggerCount = 0;
-
-  // 2. Load all procedures
-  for (const dir of procedureDirs) {
-    try {
-      await fs.access(dir);
-      console.log(`📂 Scanning: ${dir}`);
-      
-      const files = await findProcedureFiles(dir);
-      
-      for (const file of files) {
-        try {
-          const module = await import(file);
-          
-          // Register all exported procedures
-          for (const [exportName, exportValue] of Object.entries(module)) {
-            if (isProcedure(exportValue)) {
-              const procedure = exportValue as any;
-              const name = procedure.contract.name || exportName;
-              
-              registry.register(procedure);
-              procedureCount++;
-              
-              const isTrigger = procedure.contract.metadata?.type === 'trigger' || 
-                               procedure.contract.metadata?.roles?.includes('trigger');
-              
-              if (isTrigger) {
-                triggerCount++;
-                console.log(`  ✓ ${name} (trigger)`);
-              } else {
-                console.log(`  ✓ ${name}`);
-              }
-            }
-          }
-        } catch (error) {
-          console.warn(`  ⚠ Failed to load ${file}:`, (error as Error).message);
-        }
-      }
-    } catch {
-      // Directory doesn't exist, skip
-    }
-  }
+  // 2. Collect registry from procedures
+  console.log('📂 Scanning for procedures...');
+  
+  const registry = await collectRegistry(root);
+  
+  const procedures = Array.from(registry.values());
+  const procedureCount = procedures.length;
+  const triggerCount = procedures.filter(p => 
+    p.contract.metadata?.type === 'trigger' || 
+    p.contract.metadata?.roles?.includes('trigger')
+  ).length;
 
   if (procedureCount === 0) {
     console.log('\n❌ No procedures found!');
-    console.log('\nMake sure you have procedures in one of these directories:');
-    procedureDirs.forEach(dir => console.log(`  - ${dir}`));
+    console.log('\nMake sure you have procedures in:');
+    console.log(`  - ${root}/procedures/`);
+    console.log(`  - ${root}/src/procedures/`);
     process.exit(1);
   }
 
   console.log(`\n📊 Found ${procedureCount} procedure(s)`);
   if (triggerCount > 0) {
     console.log(`   Including ${triggerCount} trigger(s)`);
+  }
+  
+  for (const [name, proc] of registry.entries()) {
+    const isTrigger = proc.contract.metadata?.type === 'trigger' || 
+                     proc.contract.metadata?.roles?.includes('trigger');
+    console.log(`  ✓ ${name}${isTrigger ? ' (trigger)' : ''}`);
   }
 
   // 3. Generate OpenAPI spec

@@ -39,8 +39,13 @@ echo "════════════════════════�
 
 echo "Checking App A OpenAPI..."
 if curl -sf http://localhost:3001/openapi.json > /dev/null; then
-  PROCEDURES_A=$(curl -s http://localhost:3001/openapi.json | jq -r '.paths | keys | length')
-  echo "✅ App A is responding ($PROCEDURES_A endpoints)"
+  if command -v jq &> /dev/null; then
+    PROCEDURES_A=$(curl -s http://localhost:3001/openapi.json | jq -r '.paths | keys | length')
+    echo "✅ App A is responding ($PROCEDURES_A endpoints)"
+  else
+    echo "✅ App A is responding"
+    PROCEDURES_A="N/A"
+  fi
 else
   echo "❌ App A is not responding"
   exit 1
@@ -48,8 +53,13 @@ fi
 
 echo "Checking App B OpenAPI..."
 if curl -sf http://localhost:3002/openapi.json > /dev/null; then
-  PROCEDURES_B=$(curl -s http://localhost:3002/openapi.json | jq -r '.paths | keys | length')
-  echo "✅ App B is responding ($PROCEDURES_B endpoints)"
+  if command -v jq &> /dev/null; then
+    PROCEDURES_B=$(curl -s http://localhost:3002/openapi.json | jq -r '.paths | keys | length')
+    echo "✅ App B is responding ($PROCEDURES_B endpoints)"
+  else
+    echo "✅ App B is responding"
+    PROCEDURES_B="N/A"
+  fi
 else
   echo "❌ App B is not responding"
   exit 1
