@@ -7,6 +7,7 @@ import { devCommand, devLogsCommand, devStopCommand, devStatusCommand } from "./
 import { generateClientCommand } from "./commands/generate.js";
 import { execCommand } from "./commands/exec.js";
 import { integrateCommand } from "./commands/integrate.js";
+import { exportSpecCommand } from "./commands/export-spec.js";
 import { 
 	getAllCompletions, 
 	generateBashCompletion, 
@@ -155,6 +156,39 @@ program
 	.action(async (url: string, options) => {
 		try {
 			await integrateCommand(url, options);
+		} catch (error) {
+			console.error(
+				`[c4c] ${error instanceof Error ? error.message : String(error)}`
+			);
+			process.exit(1);
+		}
+	});
+
+program
+	.command("export-spec")
+	.description("Export OpenAPI specification from c4c procedures")
+	.option("-o, --output <path>", "Output file path", "./openapi.json")
+	.option("-f, --format <format>", "Output format: json or yaml", "json")
+	.option("--root <path>", "Project root directory", process.cwd())
+	.option("--title <title>", "API title")
+	.option("--version <version>", "API version", "1.0.0")
+	.option("--description <description>", "API description")
+	.option("--server-url <url>", "Server URL")
+	.option("--no-webhooks", "Exclude webhooks from spec")
+	.option("--no-triggers", "Exclude trigger metadata from spec")
+	.action(async (options) => {
+		try {
+			await exportSpecCommand({
+				output: options.output,
+				format: options.format,
+				root: options.root,
+				title: options.title,
+				version: options.version,
+				description: options.description,
+				serverUrl: options.serverUrl,
+				includeWebhooks: options.webhooks,
+				includeTriggers: options.triggers,
+			});
 		} catch (error) {
 			console.error(
 				`[c4c] ${error instanceof Error ? error.message : String(error)}`

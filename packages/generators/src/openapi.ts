@@ -12,6 +12,8 @@ export interface OpenAPISpec {
 	servers?: Array<{ url: string; description?: string }>;
 	paths: Record<string, unknown>;
 	components?: Record<string, unknown>;
+	webhooks?: Record<string, unknown>;
+	'x-c4c-triggers'?: Record<string, unknown>;
 }
 
 interface Parameter {
@@ -28,6 +30,8 @@ export function generateOpenAPISpec(
 		version?: string;
 		description?: string;
 		servers?: Array<{ url: string; description?: string }>;
+		includeWebhooks?: boolean;
+		includeTriggers?: boolean;
 	} = {}
 ): OpenAPISpec {
 	const {
@@ -35,12 +39,41 @@ export function generateOpenAPISpec(
 		version = "1.0.0",
 		description = "API generated from c4c contracts",
 		servers = [{ url: "http://localhost:3000", description: "Development server" }],
+		includeWebhooks = true,
+		includeTriggers = true,
 	} = options;
 
 	const paths: Record<string, any> = {};
+	const webhooks: Record<string, any> = {};
+	const triggers: Record<string, any> = {};
 
 	for (const [name, procedure] of registry.entries()) {
 		const { contract } = procedure;
+
+		// Check if this is a trigger
+		const isTrigger = contract.metadata?.type === "trigger" || 
+		                  contract.metadata?.roles?.includes("trigger");
+
+		if (isTrigger && includeWebhooks) {
+			// Add to webhooks section
+			const webhookOperation = buildWebhookOperation(contract, name);
+			if (webhookOperation) {
+				webhooks[name] = webhookOperation;
+			}
+
+			// Add trigger metadata
+			if (includeTriggers && contract.metadata?.trigger) {
+				triggers[name] = {
+					type: contract.metadata.trigger.type,
+					provider: contract.metadata.provider,
+					eventTypes: contract.metadata.trigger.eventTypes,
+					stopProcedure: contract.metadata.trigger.stopProcedure,
+					requiresChannelManagement: contract.metadata.trigger.requiresChannelManagement,
+					supportsFiltering: contract.metadata.trigger.supportsFiltering,
+					pollingInterval: contract.metadata.trigger.pollingInterval,
+				};
+			}
+		}
 
 		if (isProcedureVisible(contract, "rpc")) {
 			const rpcPath = `/rpc/${name}`;
@@ -73,7 +106,19 @@ export function generateOpenAPISpec(
 		paths,
 	});
 
-	return document as OpenAPISpec;
+	const spec = document as OpenAPISpec;
+
+	// Add webhooks if any
+	if (Object.keys(webhooks).length > 0) {
+		spec.webhooks = webhooks;
+	}
+
+	// Add c4c trigger metadata
+	if (Object.keys(triggers).length > 0) {
+		spec['x-c4c-triggers'] = triggers;
+	}
+
+	return spec;
 }
 
 function buildRpcOperation(contract: Contract) {
@@ -250,6 +295,43 @@ function getRestMapping(
 		default:
 			return null;
 	}
+}
+
+function buildWebhookOperation(contract: Contract, name: string) {
+	const triggerMetadata = contract.metadata?.trigger;
+	
+	return {
+		post: {
+			summary: contract.description || `${name} webhook`,
+			description: contract.description || `Webhook callback for ${name} trigger`,
+			operationId: `${name}_webhook`,
+			tags: extractTags(contract),
+			'x-c4c-trigger-type': triggerMetadata?.type || 'webhook',
+			'x-c4c-provider': contract.metadata?.provider,
+			'x-c4c-event-types': triggerMetadata?.eventTypes,
+			requestBody: {
+				description: 'Webhook payload',
+				content: {
+					'application/json': {
+						schema: contract.output, // Output schema = what trigger emits
+					},
+				},
+			},
+			responses: {
+				'200': {
+					description: 'Webhook received successfully',
+					content: {
+						'application/json': {
+							schema: z.object({
+								success: z.boolean(),
+								message: z.string().optional(),
+							}),
+						},
+					},
+				},
+			},
+		},
+	};
 }
 
 function extractTags(contract: Contract): string[] {
