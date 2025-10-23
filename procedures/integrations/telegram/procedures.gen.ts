@@ -230,10 +230,14 @@ export const TelegramPostCloseContract: Contract = {
   output: z.any(),
   metadata: {
     exposure: "internal" as const,
-    roles: ["workflow-node"],
+    roles: ["workflow-node", "trigger"],
     provider: "telegram",
     operation: "postClose",
     tags: ["telegram"],
+    type: "trigger" as const,
+    trigger: {
+      type: "subscription",
+    },
   },
 };
 
@@ -531,10 +535,14 @@ export const TelegramPostDeleteWebhookContract: Contract = {
   output: z.any(),
   metadata: {
     exposure: "internal" as const,
-    roles: ["workflow-node"],
+    roles: ["workflow-node", "trigger"],
     provider: "telegram",
     operation: "postDeleteWebhook",
     tags: ["telegram"],
+    type: "trigger" as const,
+    trigger: {
+      type: "subscription",
+    },
   },
 };
 
@@ -1262,10 +1270,14 @@ export const TelegramPostGetUpdatesContract: Contract = {
   output: z.any(),
   metadata: {
     exposure: "internal" as const,
-    roles: ["workflow-node"],
+    roles: ["workflow-node", "trigger"],
     provider: "telegram",
     operation: "postGetUpdates",
     tags: ["telegram"],
+    type: "trigger" as const,
+    trigger: {
+      type: "subscription",
+    },
   },
 };
 
@@ -1348,10 +1360,14 @@ export const TelegramPostGetWebhookInfoContract: Contract = {
   output: z.any(),
   metadata: {
     exposure: "internal" as const,
-    roles: ["workflow-node"],
+    roles: ["workflow-node", "trigger"],
     provider: "telegram",
     operation: "postGetWebhookInfo",
     tags: ["telegram"],
+    type: "trigger" as const,
+    trigger: {
+      type: "subscription",
+    },
   },
 };
 
@@ -2896,10 +2912,14 @@ export const TelegramPostSetWebhookContract: Contract = {
   output: z.any(),
   metadata: {
     exposure: "internal" as const,
-    roles: ["workflow-node"],
+    roles: ["workflow-node", "trigger"],
     provider: "telegram",
     operation: "postSetWebhook",
     tags: ["telegram"],
+    type: "trigger" as const,
+    trigger: {
+      type: "subscription",
+    },
   },
 };
 
