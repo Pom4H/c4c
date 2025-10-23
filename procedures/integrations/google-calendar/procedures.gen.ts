@@ -578,14 +578,10 @@ export const Google-calendarCalendarEventsListContract: Contract = {
   output: z.any(),
   metadata: {
     exposure: "internal" as const,
-    roles: ["workflow-node", "trigger"],
+    roles: ["workflow-node"],
     provider: "google-calendar",
     operation: "calendarEventsList",
     tags: ["google-calendar"],
-    type: "trigger" as const,
-    trigger: {
-      type: "subscription",
-    },
   },
 };
 
@@ -625,14 +621,10 @@ export const Google-calendarCalendarEventsInsertContract: Contract = {
   output: z.any(),
   metadata: {
     exposure: "internal" as const,
-    roles: ["workflow-node", "trigger"],
+    roles: ["workflow-node"],
     provider: "google-calendar",
     operation: "calendarEventsInsert",
     tags: ["google-calendar"],
-    type: "trigger" as const,
-    trigger: {
-      type: "subscription",
-    },
   },
 };
 
@@ -672,14 +664,10 @@ export const Google-calendarCalendarEventsImportContract: Contract = {
   output: z.any(),
   metadata: {
     exposure: "internal" as const,
-    roles: ["workflow-node", "trigger"],
+    roles: ["workflow-node"],
     provider: "google-calendar",
     operation: "calendarEventsImport",
     tags: ["google-calendar"],
-    type: "trigger" as const,
-    trigger: {
-      type: "subscription",
-    },
   },
 };
 
@@ -719,14 +707,10 @@ export const Google-calendarCalendarEventsQuickAddContract: Contract = {
   output: z.any(),
   metadata: {
     exposure: "internal" as const,
-    roles: ["workflow-node", "trigger"],
+    roles: ["workflow-node"],
     provider: "google-calendar",
     operation: "calendarEventsQuickAdd",
     tags: ["google-calendar"],
-    type: "trigger" as const,
-    trigger: {
-      type: "subscription",
-    },
   },
 };
 
@@ -813,14 +797,10 @@ export const Google-calendarCalendarEventsDeleteContract: Contract = {
   output: z.any(),
   metadata: {
     exposure: "internal" as const,
-    roles: ["workflow-node", "trigger"],
+    roles: ["workflow-node"],
     provider: "google-calendar",
     operation: "calendarEventsDelete",
     tags: ["google-calendar"],
-    type: "trigger" as const,
-    trigger: {
-      type: "subscription",
-    },
   },
 };
 
@@ -860,14 +840,10 @@ export const Google-calendarCalendarEventsGetContract: Contract = {
   output: z.any(),
   metadata: {
     exposure: "internal" as const,
-    roles: ["workflow-node", "trigger"],
+    roles: ["workflow-node"],
     provider: "google-calendar",
     operation: "calendarEventsGet",
     tags: ["google-calendar"],
-    type: "trigger" as const,
-    trigger: {
-      type: "subscription",
-    },
   },
 };
 
@@ -907,14 +883,10 @@ export const Google-calendarCalendarEventsPatchContract: Contract = {
   output: z.any(),
   metadata: {
     exposure: "internal" as const,
-    roles: ["workflow-node", "trigger"],
+    roles: ["workflow-node"],
     provider: "google-calendar",
     operation: "calendarEventsPatch",
     tags: ["google-calendar"],
-    type: "trigger" as const,
-    trigger: {
-      type: "subscription",
-    },
   },
 };
 
@@ -954,14 +926,10 @@ export const Google-calendarCalendarEventsUpdateContract: Contract = {
   output: z.any(),
   metadata: {
     exposure: "internal" as const,
-    roles: ["workflow-node", "trigger"],
+    roles: ["workflow-node"],
     provider: "google-calendar",
     operation: "calendarEventsUpdate",
     tags: ["google-calendar"],
-    type: "trigger" as const,
-    trigger: {
-      type: "subscription",
-    },
   },
 };
 
@@ -1001,14 +969,10 @@ export const Google-calendarCalendarEventsInstancesContract: Contract = {
   output: z.any(),
   metadata: {
     exposure: "internal" as const,
-    roles: ["workflow-node", "trigger"],
+    roles: ["workflow-node"],
     provider: "google-calendar",
     operation: "calendarEventsInstances",
     tags: ["google-calendar"],
-    type: "trigger" as const,
-    trigger: {
-      type: "subscription",
-    },
   },
 };
 
@@ -1048,14 +1012,10 @@ export const Google-calendarCalendarEventsMoveContract: Contract = {
   output: z.any(),
   metadata: {
     exposure: "internal" as const,
-    roles: ["workflow-node", "trigger"],
+    roles: ["workflow-node"],
     provider: "google-calendar",
     operation: "calendarEventsMove",
     tags: ["google-calendar"],
-    type: "trigger" as const,
-    trigger: {
-      type: "subscription",
-    },
   },
 };
 

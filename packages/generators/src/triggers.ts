@@ -511,14 +511,36 @@ function determineTriggerKind(
     }
   }
   
-  // Subscription heuristics from path
-  const hasSubscribeInPath = /\/(subscribe|subscriptions|webhook|watch|events)/i.test(path);
+  // Watch endpoints - must be explicit "watch" at the end or in operation name
+  const hasWatchInOperation = opId.endsWith('watch') || opId.includes('watch');
+  const hasWatchInPath = /\/(watch|observe)$/i.test(path); // Only at the end of path
+  const hasWatchInDescription = /watch\s+(for|changes|updates|notifications)/i.test(description) ||
+                                /receive\s+(notifications|updates|changes)/i.test(description);
+  
+  if (hasWatchInOperation || hasWatchInPath || hasWatchInDescription) {
+    return 'subscription';
+  }
+  
+  // Subscription heuristics from path and parameters
+  const hasSubscribeInPath = /\/(subscribe|subscriptions|webhook)$/i.test(path); // Only at end
   const hasTopic = operation['x-topic'] || operation.extensions?.['x-topic'];
   const hasCallbackUrl = operation.parameters?.some(
-    (p: any) => p.name === 'callbackUrl' || p.name === 'callback_url' || p.name === 'webhookUrl' || p.name === 'url'
+    (p: any) => {
+      const name = p.name?.toLowerCase() || '';
+      return name === 'callbackurl' || 
+             name === 'callback_url' || 
+             name === 'webhookurl' || 
+             name === 'webhook_url' ||
+             (name === 'url' && (summary.includes('webhook') || description.includes('webhook')));
+    }
   );
   
-  if (hasSubscribeInPath || hasTopic || hasCallbackUrl) {
+  // Push notification / channel endpoints
+  const hasPushNotification = description.includes('push notification') || 
+                              description.includes('receive notification') ||
+                              summary.includes('push notification');
+  
+  if (hasSubscribeInPath || hasTopic || hasCallbackUrl || hasPushNotification) {
     return 'subscription';
   }
   

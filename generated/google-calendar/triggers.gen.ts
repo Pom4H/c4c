@@ -42,37 +42,37 @@ export const triggerMetadata = {
     "kind": "operation"
   },
   "calendareventslist": {
-    "kind": "subscription"
+    "kind": "operation"
   },
   "calendareventsinsert": {
-    "kind": "subscription"
+    "kind": "operation"
   },
   "calendareventsimport": {
-    "kind": "subscription"
+    "kind": "operation"
   },
   "calendareventsquickadd": {
-    "kind": "subscription"
+    "kind": "operation"
   },
   "calendareventswatch": {
     "kind": "subscription"
   },
   "calendareventsget": {
-    "kind": "subscription"
+    "kind": "operation"
   },
   "calendareventsupdate": {
-    "kind": "subscription"
+    "kind": "operation"
   },
   "calendareventspatch": {
-    "kind": "subscription"
+    "kind": "operation"
   },
   "calendareventsdelete": {
-    "kind": "subscription"
+    "kind": "operation"
   },
   "calendareventsinstances": {
-    "kind": "subscription"
+    "kind": "operation"
   },
   "calendareventsmove": {
-    "kind": "subscription"
+    "kind": "operation"
   },
   "calendarchannelsstop": {
     "kind": "operation"

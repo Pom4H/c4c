@@ -1493,10 +1493,14 @@ export const TelegramPostLogOutContract: Contract = {
   output: z.any(),
   metadata: {
     exposure: "internal" as const,
-    roles: ["workflow-node"],
+    roles: ["workflow-node", "trigger"],
     provider: "telegram",
     operation: "postLogOut",
     tags: ["telegram"],
+    type: "trigger" as const,
+    trigger: {
+      type: "subscription",
+    },
   },
 };
 
