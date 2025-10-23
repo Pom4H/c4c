@@ -419,6 +419,58 @@ pnpm dev
 
 ---
 
+## Integrations
+
+c4c supports seamless integration with external services through generated adapters:
+
+```typescript
+// Generated integration adapters
+import { GoogleCalendar } from "@c4c/integrations/google-calendar";
+import { Telegram } from "@c4c/integrations/telegram";
+
+// Use in procedures
+export const scheduleMeeting: Procedure = {
+  contract: {
+    input: z.object({
+      title: z.string(),
+      startTime: z.string(),
+      participants: z.array(z.string()),
+    }),
+    output: z.object({ eventId: z.string() }),
+  },
+  handler: async (input) => {
+    const calendar = new GoogleCalendar({ apiKey: process.env.GOOGLE_API_KEY });
+    const event = await calendar.events.create({
+      summary: input.title,
+      start: { dateTime: input.startTime },
+      attendees: input.participants.map(email => ({ email })),
+    });
+    
+    // Send notification via Telegram
+    const telegram = new Telegram({ botToken: process.env.TELEGRAM_BOT_TOKEN });
+    await telegram.sendMessage({
+      chatId: process.env.ADMIN_CHAT_ID,
+      text: `Meeting scheduled: ${input.title}`,
+    });
+    
+    return { eventId: event.id };
+  }
+};
+```
+
+**Available integrations:**
+- Google Calendar - Event management and scheduling
+- Telegram - Bot messaging and notifications
+- More integrations coming soon...
+
+**Generate integration adapters:**
+```bash
+c4c generate integration google-calendar
+c4c generate integration telegram
+```
+
+---
+
 ## Key Concepts
 
 ### 1. Universal Introspection
