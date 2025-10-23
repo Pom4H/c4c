@@ -421,28 +421,41 @@ pnpm dev
 
 ## Integrations
 
-Integrate external services and APIs with the `c4c integrate` command:
+Integrate external APIs and services using OpenAPI specifications:
 
 ```bash
-# Integrate with external services
-c4c integrate google-calendar
-c4c integrate telegram
-c4c integrate stripe
+# Integrate from OpenAPI spec URL
+c4c integrate https://api.apis.guru/v2/specs/telegram.org/5.0.0/openapi.json --name telegram
+c4c integrate https://raw.githubusercontent.com/Pom4H/openapi-ts/main/examples/openapi-ts-trigger/google-calendar-api.json --name google-calendar
 
-# List available integrations
-c4c integrate list
+# Integrate from local OpenAPI file
+c4c integrate ./api-spec.json --name my-service
 
-# Show integration details
-c4c integrate info google-calendar
+# Integrate another c4c app
+c4c integrate http://localhost:3001/openapi.json --name task-manager
 ```
 
 This command automatically:
-- Generates type-safe adapters for the service
-- Creates procedure templates
-- Sets up authentication schemas
-- Provides usage examples
+- Generates TypeScript SDK and schemas from OpenAPI spec
+- Creates typed procedures for all API endpoints
+- Sets up authentication and base URL configuration
+- Generates procedures in `procedures/integrations/{name}/procedures.gen.ts`
 
-The generated integrations are ready to use in your procedures and workflows with full TypeScript support.
+Use the generated procedures in your workflows with full type safety:
+
+```typescript
+// Generated procedures are ready to use
+import { TelegramProcedures } from './procedures/integrations/telegram/procedures.gen.js';
+
+// In your workflow
+steps: [
+  {
+    id: 'send-message',
+    procedure: 'telegram.post.send.message',
+    input: { chat_id: '123', text: 'Hello!' }
+  }
+]
+```
 
 ---
 
