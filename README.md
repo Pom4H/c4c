@@ -148,24 +148,30 @@ packages/
 ## CLI Commands
 
 ```bash
-# Start dev server (scans entire project)
+# Start dev server (scans current directory by default)
 c4c dev
 
-# Start production server
-c4c serve --root .
+# Start production server (scans current directory by default)
+c4c serve
 
-# Execute procedure or workflow
-c4c exec users.create --input '{"name":"Alice","email":"alice@example.com"}'
-c4c exec user-onboarding --input '{}'
+# Or specify a different directory
+c4c serve --root /path/to/project
+
+# Execute procedure or workflow (input is optional, defaults to {})
+c4c exec createUser
+c4c exec userOnboarding
+
+# With input
+c4c exec createUser --input '{"name":"Alice","email":"alice@example.com"}'
 
 # Execute with JSON output (for scripts)
-c4c exec math.add --input '{"a":5,"b":3}' --json
+c4c exec mathAdd --input '{"a":5,"b":3}' --json
 
 # Generate typed client
 c4c generate client --out ./client.ts
 
 # Start workflow UI
-c4c serve ui --port 3100 --api-base http://localhost:3000
+c4c serve ui
 ```
 
 ---
@@ -226,17 +232,21 @@ c4c generate client --out ./client.ts
 
 Use it:
 ```typescript
-import { createc4cClient } from "./client";
+import { createClient } from "./client";
 
-const client = createc4cClient({ 
+const client = createClient({ 
   baseUrl: "http://localhost:3000" 
 });
 
 // Fully typed with autocomplete!
-const user = await client.procedures.createUser({
+const user = await client.createUser({
   name: "Alice",
   email: "alice@example.com"
 });
+
+// All procedures are available as direct methods
+await client.getUser({ id: "123" });
+await client.updateUser({ id: "123", name: "Bob" });
 ```
 
 ---
@@ -363,7 +373,10 @@ One command executes both procedures and workflows:
 
 ```bash
 c4c exec createUser               # Executes procedure
-c4c exec user-onboarding          # Executes workflow
+c4c exec userOnboarding           # Executes workflow
+
+# Input is optional (defaults to {})
+c4c exec createUser --input '{"name":"Alice"}'
 
 # Priority: procedures > workflows (if names conflict)
 ```
