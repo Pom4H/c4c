@@ -421,11 +421,14 @@ pnpm dev
 
 ## Integrations
 
-Integrate external APIs and services using OpenAPI specifications:
+Integrate external APIs and other c4c applications using OpenAPI specifications:
 
 ```bash
-# Integrate Google Calendar API
+# Integrate external API
 c4c integrate https://api.apis.guru/v2/specs/googleapis.com/calendar/v3/openapi.json --name google-calendar
+
+# Integrate another c4c app
+c4c integrate http://localhost:3001/openapi.json --name task-manager
 ```
 
 This command automatically:
@@ -434,13 +437,16 @@ This command automatically:
 - Sets up authentication and base URL configuration
 - Generates procedures in `procedures/integrations/{name}/procedures.gen.ts`
 
-Use the generated procedures in your workflows with full type safety:
+**Webhooks are automatically enabled** when you start the server:
+```bash
+c4c serve
+# Server starts with webhook endpoints at /webhooks/{provider}
+```
+
+Use the generated procedures in your workflows:
 
 ```typescript
-// Generated procedures are ready to use
-import { GoogleCalendarProcedures } from './procedures/integrations/google-calendar/procedures.gen.js';
-
-// In your workflow
+// External API integration
 steps: [
   {
     id: 'create-event',
@@ -450,6 +456,15 @@ steps: [
       summary: 'Meeting',
       start: { dateTime: '2024-01-01T10:00:00Z' }
     }
+  }
+]
+
+// c4c app integration
+steps: [
+  {
+    id: 'create-task',
+    procedure: 'task-manager.tasks.create',
+    input: { title: 'New task', description: 'Task description' }
   }
 ]
 ```
