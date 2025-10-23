@@ -270,17 +270,17 @@ pnpm c4c generate client --out ./client.ts
 Use the generated client:
 
 ```typescript
-import { createc4cClient } from "./client";
+import { createClient } from "./client";
 
-const client = createc4cClient({
+const client = createClient({
   baseUrl: "http://localhost:3000"
 });
 
 // Fully typed!
-const result = await client.procedures.add({ a: 5, b: 3 });
+const result = await client.add({ a: 5, b: 3 });
 console.log(result.result); // 8
 
-const user = await client.procedures.createUser({
+const user = await client.createUser({
   name: "Alice",
   email: "alice@example.com"
 });

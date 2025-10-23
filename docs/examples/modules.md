@@ -340,32 +340,32 @@ pnpm test:client
 ## Using the Generated Client
 
 ```typescript
-import { createc4cClient } from "./generated/client";
+import { createClient } from "./generated/client";
 
-const client = createc4cClient({
+const client = createClient({
   baseUrl: "http://localhost:3000"
 });
 
 // User operations
-const user = await client.procedures["users.create"]({
+const user = await client.usersCreate({
   name: "Alice",
   email: "alice@example.com"
 });
 
-const users = await client.procedures["users.list"]({
+const users = await client.usersList({
   limit: 10,
   offset: 0
 });
 
 // Product operations
-const product = await client.procedures["products.create"]({
+const product = await client.productsCreate({
   name: "Widget",
   description: "A useful widget",
   price: 9.99
 });
 
 // Analytics
-await client.procedures["analytics.track"]({
+await client.analyticsTrack({
   userId: user.id,
   event: "product_created",
   properties: { productId: product.id }

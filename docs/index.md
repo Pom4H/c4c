@@ -83,22 +83,27 @@ export const createUser: Procedure = {
 ### Build a Workflow
 
 ```typescript
-import { workflow, step } from "@c4c/workflow";
+import type { WorkflowDefinition } from "@c4c/workflow";
 
-export default workflow("user-onboarding")
-  .name("User Onboarding Flow")
-  .version("1.0.0")
-  .step(step({
-    id: "create-user",
-    execute: ({ engine, inputData }) => 
-      engine.run("users.create", inputData),
-  }))
-  .step(step({
-    id: "send-welcome",
-    execute: ({ engine }) => 
-      engine.run("emails.sendWelcome"),
-  }))
-  .commit();
+export const userOnboarding: WorkflowDefinition = {
+  id: "user-onboarding",
+  name: "User Onboarding Flow",
+  version: "1.0.0",
+  startNode: "create-user",
+  nodes: [
+    {
+      id: "create-user",
+      type: "procedure",
+      procedureName: "users.create",
+      next: "send-welcome",
+    },
+    {
+      id: "send-welcome",
+      type: "procedure",
+      procedureName: "emails.sendWelcome",
+    },
+  ],
+};
 ```
 
 ### Execute

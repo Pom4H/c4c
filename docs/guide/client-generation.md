@@ -13,14 +13,14 @@ This creates a fully-typed client with all your procedures.
 ## Using the Client
 
 ```typescript
-import { createc4cClient } from "./client";
+import { createClient } from "./client";
 
-const client = createc4cClient({
+const client = createClient({
   baseUrl: "http://localhost:3000"
 });
 
 // Fully typed!
-const user = await client.procedures.createUser({
+const user = await client.createUser({
   name: "Alice",
   email: "alice@example.com"
 });
@@ -29,7 +29,7 @@ const user = await client.procedures.createUser({
 ## Client Options
 
 ```typescript
-const client = createc4cClient({
+const client = createClient({
   baseUrl: "http://localhost:3000",
   authToken: "your-token",
   headers: {
@@ -41,7 +41,7 @@ const client = createc4cClient({
 ## Dynamic Tokens
 
 ```typescript
-const client = createc4cClient({
+const client = createClient({
   baseUrl: "http://localhost:3000",
   getAuthToken: async () => {
     return await getToken();
@@ -55,13 +55,13 @@ Generated clients are fully typed:
 
 ```typescript
 // ✅ Type-safe
-const user = await client.procedures.createUser({
+const user = await client.createUser({
   name: "Alice",
   email: "alice@example.com"
 });
 
 // ❌ Type error
-const user = await client.procedures.createUser({
+const user = await client.createUser({
   name: "Alice"
   // Error: Property 'email' is missing
 });

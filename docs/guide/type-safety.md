@@ -103,25 +103,25 @@ function createCrudProcedure<T extends z.ZodType>(
 Generated clients are fully typed:
 
 ```typescript
-import { createc4cClient } from "./client";
+import { createClient } from "./client";
 
-const client = createc4cClient();
+const client = createClient();
 
 // ✅ Fully typed
-const user = await client.procedures.createUser({
+const user = await client.createUser({
   name: "Alice",
   email: "alice@example.com"
 });
 // user: { id: string; name: string; email: string }
 
 // ❌ Type error - missing required field
-await client.procedures.createUser({
+await client.createUser({
   name: "Alice"
   // Error: Property 'email' is missing
 });
 
 // ❌ Type error - wrong type
-await client.procedures.createUser({
+await client.createUser({
   name: 123,  // Error: Type 'number' is not assignable to type 'string'
   email: "alice@example.com"
 });

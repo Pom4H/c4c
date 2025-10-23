@@ -11,34 +11,35 @@ A workflow is a series of steps that execute procedures in a specific order. Wor
 - **Conditional branching** - Different paths based on conditions
 - **Context sharing** - Steps can access outputs from previous steps
 
-## Fluent Builder API
+## Declarative API
 
-The recommended way to define workflows using a fluent builder:
+Define workflows using a declarative structure:
 
 ```typescript
-import { workflow, step } from "@c4c/workflow";
-import { z } from "zod";
+import type { WorkflowDefinition } from "@c4c/workflow";
 
-export default workflow("user-onboarding")
-  .name("User Onboarding Flow")
-  .version("1.0.0")
-  .step(step({
-    id: "create-user",
-    input: z.object({ name: z.string(), email: z.string() }),
-    output: z.object({ id: z.string(), name: z.string(), email: z.string() }),
-    execute: ({ engine, inputData }) => 
-      engine.run("users.create", inputData),
-  }))
-  .step(step({
-    id: "send-welcome",
-    input: z.object({ userId: z.string() }),
-    output: z.object({ sent: z.boolean() }),
-    execute: ({ engine, context }) => {
-      const user = context.get("create-user");
-      return engine.run("emails.sendWelcome", { userId: user.id });
+export const userOnboarding: WorkflowDefinition = {
+  id: "user-onboarding",
+  name: "User Onboarding Flow",
+  version: "1.0.0",
+  startNode: "create-user",
+  nodes: [
+    {
+      id: "create-user",
+      type: "procedure",
+      procedureName: "users.create",
+      next: "send-welcome",
     },
-  }))
-  .commit();
+    {
+      id: "send-welcome",
+      type: "procedure",
+      procedureName: "emails.sendWelcome",
+      config: {
+        userId: "{{create-user.id}}",
+      },
+    },
+  ],
+};
 ```
 
 ## Basic Step
@@ -90,19 +91,18 @@ step({
 
 ## Running Procedures
 
-Execute procedures within steps using the engine:
+Execute procedures by referencing their names:
 
 ```typescript
-step({
+{
   id: "create-user",
-  execute: ({ engine, inputData }) => {
-    // Run a procedure
-    return engine.run("users.create", {
-      name: inputData.name,
-      email: inputData.email
-    });
-  },
-})
+  type: "procedure",
+  procedureName: "users.create",
+  config: {
+    name: "{{input.name}}",
+    email: "{{input.email}}"
+  }
+}
 ```
 
 ## Parallel Execution
@@ -110,31 +110,37 @@ step({
 Execute multiple steps simultaneously:
 
 ```typescript
-import { parallel } from "@c4c/workflow";
-
-const parallelSetup = parallel({
-  id: "parallel-setup",
-  branches: [
-    step({
+export const systemSetup: WorkflowDefinition = {
+  id: "system-setup",
+  name: "System Setup",
+  version: "1.0.0",
+  startNode: "parallel-setup",
+  nodes: [
+    {
+      id: "parallel-setup",
+      type: "parallel",
+      config: {
+        branches: ["setup-database", "setup-cache", "setup-messaging"],
+        waitForAll: true,
+      },
+    },
+    {
       id: "setup-database",
-      execute: ({ engine }) => engine.run("db.setup"),
-    }),
-    step({
+      type: "procedure",
+      procedureName: "db.setup",
+    },
+    {
       id: "setup-cache",
-      execute: ({ engine }) => engine.run("cache.setup"),
-    }),
-    step({
+      type: "procedure",
+      procedureName: "cache.setup",
+    },
+    {
       id: "setup-messaging",
-      execute: ({ engine }) => engine.run("messaging.setup"),
-    }),
+      type: "procedure",
+      procedureName: "messaging.setup",
+    },
   ],
-  waitForAll: true,  // Wait for all branches to complete
-  output: z.object({ setupComplete: z.boolean() }),
-});
-
-export default workflow("system-setup")
-  .step(parallelSetup)
-  .commit();
+};
 ```
 
 ### Partial Completion
@@ -142,16 +148,15 @@ export default workflow("system-setup")
 Execute parallel steps but continue if some fail:
 
 ```typescript
-const parallelStep = parallel({
+{
   id: "notify-services",
-  branches: [
-    step({ id: "notify-email", ... }),
-    step({ id: "notify-sms", ... }),
-    step({ id: "notify-push", ... }),
-  ],
-  waitForAll: false,  // Don't wait for all
-  minSuccess: 1,      // Continue if at least 1 succeeds
-});
+  type: "parallel",
+  config: {
+    branches: ["notify-email", "notify-sms", "notify-push"],
+    waitForAll: false,
+    minSuccess: 1,
+  }
+}
 ```
 
 ## Conditional Branching
@@ -159,29 +164,53 @@ const parallelStep = parallel({
 Execute different steps based on conditions:
 
 ```typescript
-import { condition } from "@c4c/workflow";
-
-const planCheck = condition({
+{
   id: "check-plan",
-  input: z.object({ plan: z.string() }),
-  predicate: (context) => {
-    const user = context.get("create-user");
-    return user.plan === "premium";
-  },
-  whenTrue: step({
-    id: "premium-setup",
-    execute: ({ engine }) => engine.run("features.enablePremium"),
-  }),
-  whenFalse: step({
-    id: "free-setup",
-    execute: ({ engine }) => engine.run("features.enableFree"),
-  }),
-});
+  type: "condition",
+  config: {
+    expression: "get('create-user').plan === 'premium'",
+    trueBranch: "premium-setup",
+    falseBranch: "free-setup",
+  }
+}
+```
 
-export default workflow("user-onboarding")
-  .step(createUserStep)
-  .step(planCheck)
-  .commit();
+Full example:
+
+```typescript
+export const userOnboarding: WorkflowDefinition = {
+  id: "user-onboarding",
+  name: "User Onboarding",
+  version: "1.0.0",
+  startNode: "create-user",
+  nodes: [
+    {
+      id: "create-user",
+      type: "procedure",
+      procedureName: "users.create",
+      next: "check-plan",
+    },
+    {
+      id: "check-plan",
+      type: "condition",
+      config: {
+        expression: "get('create-user').plan === 'premium'",
+        trueBranch: "premium-setup",
+        falseBranch: "free-setup",
+      },
+    },
+    {
+      id: "premium-setup",
+      type: "procedure",
+      procedureName: "features.enablePremium",
+    },
+    {
+      id: "free-setup",
+      type: "procedure",
+      procedureName: "features.enableFree",
+    },
+  ],
+};
 ```
 
 ## Complex Workflow Example
@@ -189,102 +218,92 @@ export default workflow("user-onboarding")
 Here's a complete example with all features:
 
 ```typescript
-import { workflow, step, parallel, condition } from "@c4c/workflow";
-import { z } from "zod";
+import type { WorkflowDefinition } from "@c4c/workflow";
 
-// Define reusable steps
-const createUserStep = step({
-  id: "create-user",
-  input: z.object({ name: z.string(), email: z.string(), plan: z.string() }),
-  output: z.object({ id: z.string(), name: z.string(), email: z.string(), plan: z.string() }),
-  execute: ({ engine, inputData }) => 
-    engine.run("users.create", inputData),
-});
-
-const setupAnalytics = step({
-  id: "setup-analytics",
-  input: z.object({ userId: z.string() }),
-  output: z.object({ trackingId: z.string() }),
-  execute: ({ engine, context }) => {
-    const user = context.get("create-user");
-    return engine.run("analytics.setup", { userId: user.id });
-  },
-});
-
-const assignManager = step({
-  id: "assign-manager",
-  input: z.object({ userId: z.string() }),
-  output: z.object({ managerId: z.string() }),
-  execute: ({ engine, context }) => {
-    const user = context.get("create-user");
-    return engine.run("users.assignManager", { userId: user.id });
-  },
-});
-
-const enableFeatures = step({
-  id: "enable-features",
-  input: z.object({ userId: z.string() }),
-  output: z.object({ features: z.array(z.string()) }),
-  execute: ({ engine, context }) => {
-    const user = context.get("create-user");
-    return engine.run("features.enablePremium", { userId: user.id });
-  },
-});
-
-// Parallel execution for premium users
-const premiumSetup = parallel({
-  id: "premium-setup",
-  branches: [setupAnalytics, assignManager, enableFeatures],
-  waitForAll: true,
-  output: z.object({ setupComplete: z.boolean() }),
-});
-
-// Free tier setup
-const freeSetup = step({
-  id: "free-setup",
-  input: z.object({ userId: z.string() }),
-  output: z.object({ trialDays: z.number() }),
-  execute: ({ engine, context }) => {
-    const user = context.get("create-user");
-    return engine.run("users.setupFreeTrial", { userId: user.id });
-  },
-});
-
-// Conditional branching
-const planCheck = condition({
-  id: "check-plan",
-  input: z.object({ plan: z.string() }),
-  predicate: (context) => {
-    const user = context.get("create-user");
-    return user.plan === "premium";
-  },
-  whenTrue: premiumSetup,
-  whenFalse: freeSetup,
-});
-
-// Send welcome email
-const sendWelcome = step({
-  id: "send-welcome",
-  input: z.object({ userId: z.string() }),
-  output: z.object({ sent: z.boolean() }),
-  execute: ({ engine, context }) => {
-    const user = context.get("create-user");
-    return engine.run("emails.sendWelcome", { 
-      userId: user.id,
-      email: user.email,
-      name: user.name
-    });
-  },
-});
-
-// Build the complete workflow
-export default workflow("user-onboarding")
-  .name("User Onboarding Flow")
-  .version("1.0.0")
-  .step(createUserStep)
-  .step(planCheck)
-  .step(sendWelcome)
-  .commit();
+export const userOnboardingComplete: WorkflowDefinition = {
+  id: "user-onboarding-complete",
+  name: "User Onboarding Flow",
+  version: "1.0.0",
+  startNode: "create-user",
+  nodes: [
+    // Step 1: Create user
+    {
+      id: "create-user",
+      type: "procedure",
+      procedureName: "users.create",
+      next: "check-plan",
+    },
+    
+    // Step 2: Check user plan
+    {
+      id: "check-plan",
+      type: "condition",
+      config: {
+        expression: "get('create-user').plan === 'premium'",
+        trueBranch: "premium-setup",
+        falseBranch: "free-setup",
+      },
+    },
+    
+    // Premium user setup (parallel execution)
+    {
+      id: "premium-setup",
+      type: "parallel",
+      config: {
+        branches: ["setup-analytics", "assign-manager", "enable-features"],
+        waitForAll: true,
+      },
+      next: "send-welcome",
+    },
+    {
+      id: "setup-analytics",
+      type: "procedure",
+      procedureName: "analytics.setup",
+      config: {
+        userId: "{{create-user.id}}",
+      },
+    },
+    {
+      id: "assign-manager",
+      type: "procedure",
+      procedureName: "users.assignManager",
+      config: {
+        userId: "{{create-user.id}}",
+      },
+    },
+    {
+      id: "enable-features",
+      type: "procedure",
+      procedureName: "features.enablePremium",
+      config: {
+        userId: "{{create-user.id}}",
+      },
+    },
+    
+    // Free tier setup
+    {
+      id: "free-setup",
+      type: "procedure",
+      procedureName: "users.setupFreeTrial",
+      config: {
+        userId: "{{create-user.id}}",
+      },
+      next: "send-welcome",
+    },
+    
+    // Step 3: Send welcome email
+    {
+      id: "send-welcome",
+      type: "procedure",
+      procedureName: "emails.sendWelcome",
+      config: {
+        userId: "{{create-user.id}}",
+        email: "{{create-user.email}}",
+        name: "{{create-user.name}}",
+      },
+    },
+  ],
+};
 ```
 
 ## Declarative API

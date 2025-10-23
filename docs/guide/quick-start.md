@@ -99,14 +99,14 @@ c4c generate client --out ./client.ts
 Use it in your code:
 
 ```typescript
-import { createc4cClient } from "./client";
+import { createClient } from "./client";
 
-const client = createc4cClient({
+const client = createClient({
   baseUrl: "http://localhost:3000"
 });
 
 // Fully typed!
-const result = await client.procedures.add({ a: 5, b: 3 });
+const result = await client.add({ a: 5, b: 3 });
 console.log(result.result); // 8
 ```
 
@@ -115,29 +115,31 @@ console.log(result.result); // 8
 Create a file `workflows/calculator.ts`:
 
 ```typescript
-import { workflow, step } from "@c4c/workflow";
-import { z } from "zod";
+import type { WorkflowDefinition } from "@c4c/workflow";
 
-export default workflow("calculator")
-  .name("Calculator Workflow")
-  .version("1.0.0")
-  .step(step({
-    id: "multiply",
-    input: z.object({ a: z.number(), b: z.number() }),
-    output: z.object({ result: z.number() }),
-    execute: ({ engine, inputData }) => 
-      engine.run("multiply", inputData),
-  }))
-  .step(step({
-    id: "add-ten",
-    input: z.object({ result: z.number() }),
-    output: z.object({ result: z.number() }),
-    execute: ({ context }) => {
-      const multiplyResult = context.get("multiply");
-      return { result: multiplyResult.result + 10 };
+export const calculator: WorkflowDefinition = {
+  id: "calculator",
+  name: "Calculator Workflow",
+  version: "1.0.0",
+  startNode: "multiply",
+  nodes: [
+    {
+      id: "multiply",
+      type: "procedure",
+      procedureName: "multiply",
+      next: "add-ten",
     },
-  }))
-  .commit();
+    {
+      id: "add-ten",
+      type: "procedure",
+      procedureName: "add",
+      config: {
+        a: "{{multiply.result}}",
+        b: 10,
+      },
+    },
+  ],
+};
 ```
 
 ## Execute Your Workflow
@@ -243,30 +245,30 @@ export const getUser: Procedure = {
 
 ```typescript
 // workflows/onboarding.ts
-import { workflow, step } from "@c4c/workflow";
-import { z } from "zod";
+import type { WorkflowDefinition } from "@c4c/workflow";
 
-export default workflow("user-onboarding")
-  .name("User Onboarding Flow")
-  .version("1.0.0")
-  .step(step({
-    id: "create-user",
-    input: z.object({ name: z.string(), email: z.string() }),
-    output: z.object({ id: z.string() }),
-    execute: ({ engine, inputData }) => 
-      engine.run("createUser", inputData),
-  }))
-  .step(step({
-    id: "send-welcome-email",
-    input: z.object({ userId: z.string() }),
-    output: z.object({ sent: z.boolean() }),
-    execute: ({ context }) => {
-      const user = context.get("create-user");
-      console.log(`Sending welcome email to user ${user.id}`);
-      return { sent: true };
+export const userOnboarding: WorkflowDefinition = {
+  id: "user-onboarding",
+  name: "User Onboarding Flow",
+  version: "1.0.0",
+  startNode: "create-user",
+  nodes: [
+    {
+      id: "create-user",
+      type: "procedure",
+      procedureName: "createUser",
+      next: "send-welcome-email",
     },
-  }))
-  .commit();
+    {
+      id: "send-welcome-email",
+      type: "procedure",
+      procedureName: "sendWelcomeEmail",
+      config: {
+        userId: "{{create-user.id}}",
+      },
+    },
+  ],
+};
 ```
 
 Start the server and execute:

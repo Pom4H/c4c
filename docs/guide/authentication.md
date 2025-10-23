@@ -55,13 +55,13 @@ handler: async (input, context) => {
 Clients automatically add auth headers:
 
 ```typescript
-const client = createc4cClient({
+const client = createClient({
   baseUrl: "http://localhost:3000",
   authToken: "your-jwt-token"
 });
 
 // Authorization header added automatically
-await client.procedures.deleteUser({ userId: "123" });
+await client.deleteUser({ userId: "123" });
 ```
 
 ## Next Steps

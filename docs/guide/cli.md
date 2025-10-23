@@ -277,13 +277,13 @@ c4c generate client --root ./procedures --out ./client.ts
 ### Using Generated Client
 
 ```typescript
-import { createc4cClient } from "./client";
+import { createClient } from "./client";
 
-const client = createc4cClient({
+const client = createClient({
   baseUrl: "http://localhost:3000"
 });
 
-const user = await client.procedures.createUser({
+const user = await client.createUser({
   name: "Alice",
   email: "alice@example.com"
 });
