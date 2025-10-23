@@ -20,7 +20,17 @@ export async function integrateCommand(
     // Extract integration name from URL if not provided
     const integrationName = options.name || extractIntegrationName(url);
     
+    // Extract base URL from OpenAPI spec URL  
+    let baseUrl = 'http://localhost:3000';
+    try {
+        const urlObj = new URL(url);
+        baseUrl = `${urlObj.protocol}//${urlObj.host}`;
+    } catch {
+        // Keep default
+    }
+    
     console.log(`[c4c] Integrating ${integrationName} from ${url}`);
+    console.log(`[c4c] Base URL: ${baseUrl}`);
     
     // Determine output directory
     const outputBase = options.output
@@ -43,7 +53,8 @@ export async function integrateCommand(
         await generateProceduresFromTriggers({
             generatedDir: outputBase,
             outputDir: proceduresOutput,
-            provider: integrationName
+            provider: integrationName,
+            baseUrl: baseUrl
         });
         
         console.log(`[c4c] ✓ Successfully integrated ${integrationName}`);

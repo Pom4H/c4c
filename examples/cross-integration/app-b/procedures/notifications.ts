@@ -69,9 +69,12 @@ export const sendNotification: Procedure = {
     
     notifications.set(id, notification);
     
-    console.log(`[Notifications] Sent: ${notification.message}`);
+    console.log(`[Notifications] 🔥 CROSS-APP EVENT RECEIVED! 🔥`);
+    console.log(`  Message: ${notification.message}`);
     console.log(`  Channel: ${notification.channel}`);
     console.log(`  Priority: ${notification.priority}`);
+    console.log(`  From: ${input.metadata?.source || 'unknown'}`);
+    console.log(`  Notification ID: ${id}`);
     
     return notification;
   },
