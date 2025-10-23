@@ -3,75 +3,99 @@
  * 
  * После интеграции с App B (notification-service),
  * этот workflow автоматически отправляет уведомление при создании задачи
+ * 
+ * ПРИМЕЧАНИЕ: Это псевдокод для иллюстрации идеи.
+ * Реальная реализация будет использовать @c4c/workflow API.
  */
 
-import type { WorkflowDefinition } from '@c4c/workflow';
+import { workflow, step } from '@c4c/workflow';
+import { z } from 'zod';
 
-export const notifyOnTaskCreated: WorkflowDefinition = {
-  id: 'notify-on-task-created',
+// Шаг 1: Получить детали задачи
+const getTaskDetails = step({
+  id: 'get-task',
+  input: z.object({ taskId: z.string() }),
+  output: z.object({
+    id: z.string(),
+    title: z.string(),
+    priority: z.string().optional(),
+  }),
+  execute: ({ engine, inputData }) => 
+    engine.run('tasks.get', { id: inputData.taskId }),
+});
+
+// Шаг 2: Отправить уведомление через App B (после интеграции!)
+const sendNotification = step({
+  id: 'send-notification',
+  input: z.object({
+    title: z.string(),
+    priority: z.string().optional(),
+  }),
+  output: z.object({
+    id: z.string(),
+    message: z.string(),
+  }),
+  execute: ({ engine, inputData }) => 
+    engine.run('notification-service.notifications.send', {
+      message: `🆕 New task created: ${inputData.title}`,
+      channel: 'push',
+      priority: inputData.priority === 'high' ? 'urgent' : 'normal',
+    }),
+});
+
+// Собираем workflow
+export const notifyOnTaskCreated = workflow('notify-on-task-created')
+  .step(getTaskDetails)
+  .step(sendNotification)
+  .commit();
+
+/**
+ * Как это работает:
+ * 
+ * 1. Триггер tasks.trigger.created срабатывает при создании задачи
+ * 2. Workflow получает taskId из trigger data
+ * 3. Шаг 1 вызывает tasks.get (локальная процедура App A)
+ * 4. Шаг 2 вызывает notification-service.notifications.send (из App B!)
+ * 5. App B получает запрос и отправляет уведомление
+ */
+
+// Альтернативный вариант (псевдокод):
+/*
+export const notifyOnTaskCreatedV2 = {
+  id: 'notify-on-task-created-v2',
   name: 'Send notification when task is created',
-  description: 'Integrates with notification service to send alerts',
   
-  // Триггер: новая задача создана
   trigger: {
-    type: 'webhook',
-    config: {
-      procedure: 'tasks.trigger.created',
-      provider: 'task-manager',
-    },
+    provider: 'task-manager',
+    triggerProcedure: 'tasks.trigger.created',
+    eventType: 'task.created',
   },
   
-  steps: [
-    // Шаг 1: Получить детали задачи
+  nodes: [
+    {
+      id: 'start',
+      type: 'trigger',
+      procedureName: 'tasks.trigger.created',
+      next: 'get-task',
+    },
     {
       id: 'get-task',
-      name: 'Get task details',
-      procedure: 'tasks.get',
-      input: {
-        id: '{{ trigger.data.id }}',
-      },
+      type: 'procedure',
+      procedureName: 'tasks.get',
+      next: 'send-notification',
     },
-    
-    // Шаг 2: Отправить уведомление через App B (после интеграции!)
-    // После выполнения: c4c integrate http://localhost:3002/openapi.json --name notification-service
-    // Станет доступна процедура: notification-service.notifications.send
     {
       id: 'send-notification',
-      name: 'Send notification via Notification Service',
-      procedure: 'notification-service.notifications.send', // ← Процедура из App B!
-      input: {
-        message: '🆕 New task created: {{ steps.get-task.output.title }}',
-        channel: 'push',
-        priority: '{{ steps.get-task.output.priority === "high" ? "urgent" : "normal" }}',
-        metadata: {
-          taskId: '{{ steps.get-task.output.id }}',
-          status: '{{ steps.get-task.output.status }}',
-          source: 'task-manager',
-        },
-      },
+      type: 'procedure',
+      procedureName: 'notification-service.notifications.send', // ← Из App B!
+      next: 'end',
     },
-    
-    // Шаг 3: Логирование
     {
-      id: 'log',
-      name: 'Log notification sent',
-      procedure: 'system.log',
-      input: {
-        level: 'info',
-        message: 'Notification sent for task creation',
-        data: {
-          taskId: '{{ steps.get-task.output.id }}',
-          notificationId: '{{ steps.send-notification.output.id }}',
-        },
-      },
+      id: 'end',
+      type: 'procedure',
+      procedureName: 'system.log',
     },
   ],
+  startNode: 'start',
 };
-
-// Пример использования ПОСЛЕ интеграции:
-// 1. Запустите App B: cd app-b && pnpm dev
-// 2. Интегрируйте App B в App A:
-//    cd app-a && c4c integrate http://localhost:3002/openapi.json --name notification-service
-// 3. Теперь процедура 'notification-service.notifications.send' доступна!
-// 4. Создайте задачу через API App A
-// 5. Workflow автоматически отправит уведомление через App B
+*/
