@@ -82,7 +82,83 @@ export const create: Procedure = {
 
 ## Define Workflows
 
-Workflows orchestrate procedures:
+Workflows orchestrate procedures with **branching** and **parallel execution**.
+
+**Fluent Builder API (recommended):**
+
+```typescript
+import { workflow, step, parallel, condition } from "@c4c/workflow";
+import { z } from "zod";
+
+// Define reusable steps
+const createUserStep = step({
+  id: "create-user",
+  input: z.object({ name: z.string(), email: z.string(), plan: z.string() }),
+  output: z.object({ id: z.string(), plan: z.string() }),
+  execute: ({ engine, inputData }) => engine.run("users.create", inputData),
+});
+
+// Parallel execution for premium users
+const premiumSetup = parallel({
+  id: "premium-setup",
+  branches: [
+    step({
+      id: "setup-analytics",
+      input: z.object({ userId: z.string() }),
+      output: z.object({ trackingId: z.string() }),
+      execute: ({ engine }) => engine.run("analytics.setup"),
+    }),
+    step({
+      id: "assign-manager",
+      input: z.object({ userId: z.string() }),
+      output: z.object({ managerId: z.string() }),
+      execute: ({ engine }) => engine.run("users.assignManager"),
+    }),
+    step({
+      id: "enable-features",
+      input: z.object({ userId: z.string() }),
+      output: z.object({ features: z.array(z.string()) }),
+      execute: ({ engine }) => engine.run("features.enablePremium"),
+    }),
+  ],
+  waitForAll: true,
+  output: z.object({ setupComplete: z.boolean() }),
+});
+
+// Branching based on user plan
+const planCheck = condition({
+  id: "check-plan",
+  input: z.object({ plan: z.string() }),
+  predicate: (ctx) => ctx.get("create-user")?.plan === "premium",
+  whenTrue: premiumSetup,
+  whenFalse: step({
+    id: "free-setup",
+    input: z.object({ userId: z.string() }),
+    output: z.object({ trialDays: z.number() }),
+    execute: ({ engine }) => engine.run("users.setupFreeTrial"),
+  }),
+});
+
+// Build the complete workflow
+export default workflow("user-onboarding")
+  .name("User Onboarding Flow")
+  .version("1.0.0")
+  .step(createUserStep)
+  .step(planCheck)
+  .step(step({
+    id: "send-welcome",
+    input: z.object({ userId: z.string() }),
+    output: z.object({ sent: z.boolean() }),
+    execute: ({ engine }) => engine.run("emails.sendWelcome"),
+  }))
+  .commit();
+
+// ✅ Both export styles work:
+// export default workflow(...)     - default export (recommended)
+// export const myWorkflow = ...    - named export
+```
+
+**Declarative API (also supported):**
 
 ```typescript
 import type { WorkflowDefinition } from "@c4c/workflow";
@@ -97,15 +173,27 @@ export const userOnboarding: WorkflowDefinition = {
       id: "create-user",
       type: "procedure",
       procedureName: "users.create",
-      config: {},
-      next: "send-email",
+      next: "check-plan",
     },
     {
-      id: "send-email",
-      type: "procedure",
-      procedureName: "emails.sendWelcome",
-      next: null,
-    }
+      id: "check-plan",
+      type: "condition",
+      config: {
+        expression: "get('create-user').plan === 'premium'",
+        trueBranch: "premium-setup",
+        falseBranch: "free-setup",
+      },
+    },
+    {
+      id: "premium-setup",
+      type: "parallel",
+      config: {
+        branches: ["setup-analytics", "assign-manager", "enable-features"],
+        waitForAll: true,
+      },
+      next: "send-welcome",
+    },
+    // ... other nodes
   ]
 };
 ```
