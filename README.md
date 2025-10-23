@@ -152,6 +152,10 @@ export default workflow("user-onboarding")
     execute: ({ engine }) => engine.run("emails.sendWelcome"),
   }))
   .commit();
+
+// ✅ Both export styles work:
+// export default workflow(...)     - default export (recommended)
+// export const myWorkflow = ...    - named export
 ```
 
 **Declarative API (also supported):**
