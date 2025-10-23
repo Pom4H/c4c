@@ -424,15 +424,8 @@ pnpm dev
 Integrate external APIs and services using OpenAPI specifications:
 
 ```bash
-# Integrate from OpenAPI spec URL
-c4c integrate https://api.apis.guru/v2/specs/telegram.org/5.0.0/openapi.json --name telegram
-c4c integrate https://raw.githubusercontent.com/Pom4H/openapi-ts/main/examples/openapi-ts-trigger/google-calendar-api.json --name google-calendar
-
-# Integrate from local OpenAPI file
-c4c integrate ./api-spec.json --name my-service
-
-# Integrate another c4c app
-c4c integrate http://localhost:3001/openapi.json --name task-manager
+# Integrate Google Calendar API
+c4c integrate https://api.apis.guru/v2/specs/googleapis.com/calendar/v3/openapi.json --name google-calendar
 ```
 
 This command automatically:
@@ -445,14 +438,18 @@ Use the generated procedures in your workflows with full type safety:
 
 ```typescript
 // Generated procedures are ready to use
-import { TelegramProcedures } from './procedures/integrations/telegram/procedures.gen.js';
+import { GoogleCalendarProcedures } from './procedures/integrations/google-calendar/procedures.gen.js';
 
 // In your workflow
 steps: [
   {
-    id: 'send-message',
-    procedure: 'telegram.post.send.message',
-    input: { chat_id: '123', text: 'Hello!' }
+    id: 'create-event',
+    procedure: 'google-calendar.calendar.events.insert',
+    input: { 
+      calendarId: 'primary',
+      summary: 'Meeting',
+      start: { dateTime: '2024-01-01T10:00:00Z' }
+    }
   }
 ]
 ```
