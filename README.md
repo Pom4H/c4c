@@ -3,6 +3,8 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue.svg)](https://www.typescriptlang.org/)
 [![Zod](https://img.shields.io/badge/Zod-Schema-green.svg)](https://zod.dev/)
 [![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-Enabled-orange.svg)](https://opentelemetry.io/)
+[![Documentation](https://img.shields.io/badge/docs-VitePress-green.svg)](https://github.com/Pom4H/c4c/tree/main/docs)
+[![Deploy Docs](https://github.com/Pom4H/c4c/actions/workflows/deploy-docs.yml/badge.svg)](https://github.com/Pom4H/c4c/actions/workflows/deploy-docs.yml)
 
 > **TypeScript-first workflow automation framework.**  
 > Build type-safe procedures and workflows with zero configuration. Full introspection, git versioning, and OpenTelemetry tracing out of the box.
@@ -579,9 +581,29 @@ pnpm dev
 
 ## Documentation
 
+- **[Full Documentation](docs/)** - Comprehensive VitePress documentation
+  - [Getting Started](docs/guide/introduction.md)
+  - [Quick Start](docs/guide/quick-start.md)
+  - [Package References](docs/packages/overview.md)
+  - [Examples](docs/examples/basic.md)
 - **README** (this file) - Quick start and overview
 - **examples/** - Working examples for different use cases
 - **packages/*/README.md** - Package-specific documentation
+
+### Local Documentation
+
+Run the documentation site locally:
+
+```bash
+# Start documentation server
+pnpm docs:dev
+
+# Build documentation
+pnpm docs:build
+
+# Preview built documentation
+pnpm docs:preview
+```
 
 ---
 
