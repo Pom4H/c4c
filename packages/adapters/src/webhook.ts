@@ -223,6 +223,25 @@ export interface WebhookRouterOptions {
 }
 
 /**
+ * Get all trigger procedures from registry
+ */
+function getTriggerProcedures(registry: Registry): Array<{ name: string; metadata: any }> {
+	const triggers: Array<{ name: string; metadata: any }> = [];
+	
+	for (const [name, procedure] of registry.entries()) {
+		const metadata = procedure.contract.metadata;
+		const isTrigger = metadata?.roles?.includes('trigger') || 
+		                  metadata?.type === 'trigger';
+		
+		if (isTrigger) {
+			triggers.push({ name, metadata });
+		}
+	}
+	
+	return triggers;
+}
+
+/**
  * Create webhook router for Hono app
  */
 export function createWebhookRouter(
@@ -237,6 +256,18 @@ export function createWebhookRouter(
 	} = options;
 
 	const app = new Hono();
+	
+	// Discover and log trigger procedures
+	const triggers = getTriggerProcedures(registry);
+	if (enableLogging && triggers.length > 0) {
+		console.log(`\n🎯 Discovered ${triggers.length} trigger procedure(s):`);
+		for (const trigger of triggers) {
+			const triggerMetadata = trigger.metadata.trigger;
+			const kind = triggerMetadata?.kind || 'subscription';
+			const provider = trigger.metadata.provider || 'unknown';
+			console.log(`   - ${trigger.name} (${kind}, provider: ${provider})`);
+		}
+	}
 
 	/**
 	 * Generic webhook endpoint: POST /webhooks/:provider
@@ -370,6 +401,62 @@ export function createWebhookRouter(
 		const subscriptions = webhookRegistry.getSubscriptionsByProvider(provider);
 		
 		return c.json({ subscriptions }, 200);
+	});
+	
+	/**
+	 * List available triggers: GET /webhooks/triggers
+	 */
+	app.get("/triggers", async (c: Context) => {
+		const triggers = getTriggerProcedures(registry);
+		const triggerList = triggers.map(t => ({
+			name: t.name,
+			provider: t.metadata.provider,
+			kind: t.metadata.trigger?.kind || 'subscription',
+			transport: t.metadata.trigger?.transport,
+			description: t.metadata.description,
+		}));
+		
+		return c.json({ triggers: triggerList }, 200);
+	});
+	
+	/**
+	 * Execute trigger procedure: POST /webhooks/triggers/:triggerName
+	 * Allows manual invocation of trigger procedures
+	 */
+	app.post("/triggers/:triggerName", async (c: Context) => {
+		const triggerName = c.req.param("triggerName");
+		const procedure = registry.get(triggerName);
+		
+		if (!procedure) {
+			return c.json({ error: `Trigger procedure '${triggerName}' not found` }, 404);
+		}
+		
+		const metadata = procedure.contract.metadata;
+		const isTrigger = metadata?.roles?.includes('trigger') || metadata?.type === 'trigger';
+		
+		if (!isTrigger) {
+			return c.json({ error: `Procedure '${triggerName}' is not a trigger` }, 400);
+		}
+		
+		try {
+			const body = await c.req.json();
+			const result = await procedure.handler(body, { 
+				requestId: generateEventId(),
+				timestamp: new Date(),
+				metadata: {} 
+			});
+			
+			if (enableLogging) {
+				console.log(`[Webhook] Executed trigger: ${triggerName}`);
+			}
+			
+			return c.json({ result }, 200);
+		} catch (error) {
+			console.error(`[Webhook] Trigger execution error:`, error);
+			return c.json({ 
+				error: error instanceof Error ? error.message : 'Trigger execution failed' 
+			}, 500);
+		}
 	});
 
 	return app;

@@ -1,0 +1,23 @@
+{
+  "name": "task-manager-app",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "c4c serve --port 3001 --root .",
+    "start": "c4c serve --port 3001 --root .",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@c4c/core": "workspace:*",
+    "@c4c/adapters": "workspace:*",
+    "@c4c/workflow": "workspace:*",
+    "@c4c/policies": "workspace:*",
+    "@c4c/cli": "workspace:*",
+    "@hey-api/client-fetch": "^0.13.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "typescript": "^5.9.3"
+  }
+}
