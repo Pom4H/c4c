@@ -6,7 +6,7 @@ Thank you for your interest in contributing to c4c!
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/c4c/c4c.git
+   git clone https://github.com/Pom4H/c4c.git
    cd c4c
    ```
 

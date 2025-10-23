@@ -5,10 +5,10 @@ export default defineConfig({
   title: 'c4c',
   description: 'TypeScript-first workflow automation framework',
   
-  // GitHub Pages base path - update this if your repo name is different
-  // For https://username.github.io/repo-name/, use '/repo-name/'
-  // For https://username.github.io/, use '/'
-  base: process.env.BASE_PATH || '/',
+  // GitHub Pages base path
+  // For https://Pom4H.github.io/c4c/, use '/c4c/'
+  // For custom domain, use '/'
+  base: process.env.BASE_PATH || '/c4c/',
   
   head: [
     ['link', { rel: 'icon', href: '/favicon.ico' }]
@@ -23,7 +23,7 @@ export default defineConfig({
       { text: 'Examples', link: '/examples/basic' },
       {
         text: 'GitHub',
-        link: 'https://github.com/c4c/c4c'
+        link: 'https://github.com/Pom4H/c4c'
       }
     ],
 

@@ -14,7 +14,7 @@ hero:
       link: /guide/introduction
     - theme: alt
       text: View on GitHub
-      link: https://github.com/c4c/c4c
+      link: https://github.com/Pom4H/c4c
 
 features:
   - icon: ⚡

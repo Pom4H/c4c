@@ -3,8 +3,8 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue.svg)](https://www.typescriptlang.org/)
 [![Zod](https://img.shields.io/badge/Zod-Schema-green.svg)](https://zod.dev/)
 [![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-Enabled-orange.svg)](https://opentelemetry.io/)
-[![Documentation](https://img.shields.io/badge/docs-VitePress-green.svg)](https://github.com/c4c/c4c/tree/main/docs)
-[![Deploy Docs](https://github.com/c4c/c4c/actions/workflows/deploy-docs.yml/badge.svg)](https://github.com/c4c/c4c/actions/workflows/deploy-docs.yml)
+[![Documentation](https://img.shields.io/badge/docs-VitePress-green.svg)](https://github.com/Pom4H/c4c/tree/main/docs)
+[![Deploy Docs](https://github.com/Pom4H/c4c/actions/workflows/deploy-docs.yml/badge.svg)](https://github.com/Pom4H/c4c/actions/workflows/deploy-docs.yml)
 
 > **TypeScript-first workflow automation framework.**  
 > Build type-safe procedures and workflows with zero configuration. Full introspection, git versioning, and OpenTelemetry tracing out of the box.

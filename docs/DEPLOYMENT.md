@@ -14,18 +14,15 @@ This guide explains how to deploy the c4c documentation to GitHub Pages.
 
 ### 2. Configure Base Path
 
-If your repository is:
-- `https://github.com/username/c4c` → docs will be at `https://username.github.io/c4c/`
+The repository is configured for:
+- Repository: `https://github.com/Pom4H/c4c`
+- Documentation URL: `https://Pom4H.github.io/c4c/`
+- Base path is already set to: `base: '/c4c/'`
+
+If you're using a custom domain:
 - Update `docs/.vitepress/config.ts`:
   ```typescript
-  base: '/c4c/',  // Change 'c4c' to your repo name
-  ```
-
-If your repository is:
-- `https://github.com/username/username.github.io` → docs will be at `https://username.github.io/`
-- Keep the default:
-  ```typescript
-  base: '/',
+  base: '/',  // For custom domain, use root
   ```
 
 ### 3. Deploy
@@ -42,8 +39,7 @@ Or manually trigger:
 ### 4. Access Documentation
 
 After successful deployment (usually 1-2 minutes):
-- Visit your GitHub Pages URL
-- Format: `https://username.github.io/repo-name/`
+- Visit: `https://Pom4H.github.io/c4c/`
 
 ## Workflow Details
 
@@ -78,7 +74,7 @@ To use a custom domain:
    ```
 
 2. **Configure DNS:**
-   - Add CNAME record pointing to `username.github.io`
+   - Add CNAME record pointing to `Pom4H.github.io`
    - Or A records pointing to GitHub Pages IPs
 
 3. **Update GitHub Settings:**

@@ -95,15 +95,14 @@ pnpm docs:preview
 
 ### Step 2: Configure Base Path
 
-Update `docs/.vitepress/config.ts` if needed:
+Base path is already configured for:
 
 ```typescript
-// For https://username.github.io/repo-name/
-base: '/repo-name/',
-
-// For https://username.github.io/
-base: '/',
+// For https://Pom4H.github.io/c4c/
+base: '/c4c/',
 ```
+
+No changes needed unless using a custom domain.
 
 ### Step 3: Deploy
 
@@ -119,7 +118,7 @@ base: '/',
 ### Step 4: Access Docs
 
 After deployment (1-2 minutes):
-- Visit: `https://username.github.io/repo-name/`
+- Visit: `https://Pom4H.github.io/c4c/`
 
 ## Features
 
