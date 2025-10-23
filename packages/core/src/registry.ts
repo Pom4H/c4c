@@ -2,7 +2,17 @@ import { readdir } from "node:fs/promises";
 import { extname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { AuthRequirements, Procedure, ProcedureRole, Registry } from "./types.js";
-import type { WorkflowDefinition } from "@c4c/workflow";
+
+// Minimal WorkflowDefinition interface to avoid circular dependency
+interface WorkflowDefinition {
+	id: string;
+	name: string;
+	description?: string;
+	version: string;
+	nodes: unknown[];
+	startNode: string;
+	isTriggered?: boolean;
+}
 
 let tsLoaderReady: Promise<void> | null = null;
 const COLOR_RESET = "\u001B[0m";
@@ -202,7 +212,7 @@ export async function loadArtifactsFromModule(
 }
 
 const ALLOWED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
-const IGNORED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build"]);
+const IGNORED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", "scripts", "generated", ".next", ".c4c"]);
 const TEST_FILE_PATTERN = /\.(test|spec)\.[^.]+$/i;
 
 export function isSupportedHandlerFile(filePath: string): boolean {

@@ -256,7 +256,8 @@ function extractTags(contract: Contract): string[] {
 	if (contract.metadata?.tags && Array.isArray(contract.metadata.tags)) {
 		return contract.metadata.tags as string[];
 	}
-	const parts = contract.name.split(".");
+	const name = contract.name || "unknown";
+	const parts = name.split(".");
 	return parts.length > 1 ? [parts[0] || ""] : ["default"];
 }
 

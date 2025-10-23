@@ -149,7 +149,7 @@ export function formatProceduresLabel(proceduresPath: string): string {
 export function logWorkflowChange(
 	action: string,
 	workflowId: string,
-	workflow: WorkflowDefinition | undefined,
+	workflow: any | undefined,
 	sourcePath: string,
 	projectRoot: string
 ) {

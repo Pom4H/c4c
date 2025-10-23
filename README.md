@@ -318,9 +318,11 @@ Available policies:
 cd examples/basic
 pnpm dev
 
-# Modules example - modular structure
+# Modules example - modular structure (users/, products/, analytics/)
 cd examples/modules
 pnpm dev
+pnpm generate:client  # Generate typed client
+pnpm test:client      # Test client API
 
 # Integrations example - Google Drive, Avito
 cd examples/integrations
