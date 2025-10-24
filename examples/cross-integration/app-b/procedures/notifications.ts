@@ -18,7 +18,7 @@ const NotificationSchema = z.object({
   channel: z.enum(['email', 'sms', 'push', 'webhook']).default('push'),
   priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
   status: z.enum(['pending', 'sent', 'failed']),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   sentAt: z.string().optional(),
   createdAt: z.string(),
 });
@@ -33,17 +33,19 @@ const subscriptions = new Map<string, string[]>(); // topic -> webhooks
 // SEND NOTIFICATION
 // ==========================================
 
+const sendNotificationInput = z.object({
+  message: z.string().min(1),
+  recipient: z.string().optional(),
+  channel: z.enum(['email', 'sms', 'push', 'webhook']).default('push'),
+  priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
 export const sendNotification: Procedure = {
   contract: {
     name: 'notifications.send',
     description: 'Send a notification',
-    input: z.object({
-      message: z.string().min(1),
-      recipient: z.string().optional(),
-      channel: z.enum(['email', 'sms', 'push', 'webhook']).default('push'),
-      priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
-      metadata: z.record(z.unknown()).optional(),
-    }),
+    input: sendNotificationInput,
     output: NotificationSchema,
     metadata: {
       exposure: 'external',
@@ -51,7 +53,7 @@ export const sendNotification: Procedure = {
       tags: ['notifications', 'send'],
     },
   },
-  handler: async (input) => {
+  handler: async (input: z.infer<typeof sendNotificationInput>) => {
     const now = new Date().toISOString();
     const id = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
@@ -84,15 +86,17 @@ export const sendNotification: Procedure = {
 // LIST NOTIFICATIONS
 // ==========================================
 
+const listNotificationsInput = z.object({
+  recipient: z.string().optional(),
+  status: z.enum(['pending', 'sent', 'failed']).optional(),
+  limit: z.number().optional(),
+});
+
 export const listNotifications: Procedure = {
   contract: {
     name: 'notifications.list',
     description: 'List all notifications',
-    input: z.object({
-      recipient: z.string().optional(),
-      status: z.enum(['pending', 'sent', 'failed']).optional(),
-      limit: z.number().optional(),
-    }),
+    input: listNotificationsInput,
     output: z.object({
       notifications: z.array(NotificationSchema),
       total: z.number(),
@@ -103,7 +107,7 @@ export const listNotifications: Procedure = {
       tags: ['notifications', 'list'],
     },
   },
-  handler: async (input) => {
+  handler: async (input: z.infer<typeof listNotificationsInput>) => {
     let filtered = Array.from(notifications.values());
     
     if (input.recipient) {
@@ -129,14 +133,16 @@ export const listNotifications: Procedure = {
 // SUBSCRIBE TO NOTIFICATIONS
 // ==========================================
 
+const subscribeNotificationsInput = z.object({
+  topic: z.string(),
+  webhookUrl: z.string().url(),
+});
+
 export const subscribeNotifications: Procedure = {
   contract: {
     name: 'notifications.subscribe',
     description: 'Subscribe to notifications on a topic',
-    input: z.object({
-      topic: z.string(),
-      webhookUrl: z.string().url(),
-    }),
+    input: subscribeNotificationsInput,
     output: z.object({
       success: z.boolean(),
       subscriptionId: z.string(),
@@ -148,7 +154,7 @@ export const subscribeNotifications: Procedure = {
       tags: ['notifications', 'subscribe'],
     },
   },
-  handler: async (input) => {
+  handler: async (input: z.infer<typeof subscribeNotificationsInput>) => {
     const existing = subscriptions.get(input.topic) || [];
     
     if (!existing.includes(input.webhookUrl)) {
@@ -193,12 +199,12 @@ export const notificationSentTrigger: Procedure = {
     metadata: {
       exposure: 'external',
       type: 'trigger',
-      roles: ['webhook'],
+      roles: ['trigger'],
       trigger: {
-        kind: 'webhook',
-        provider: 'notifications',
-        event: 'sent',
+        type: 'webhook',
+        eventTypes: ['sent'],
       },
+      provider: 'notifications',
       tags: ['notifications', 'webhook', 'trigger'],
     },
   },

@@ -50,22 +50,35 @@ export async function integrateCommand(
         console.log(`[c4c] Generating procedures...`);
         const proceduresOutput = resolve(rootDir, 'procedures', 'integrations', integrationName);
         
+        // Load OpenAPI spec for schema extraction
+        const fs = await import('node:fs/promises');
+        const openApiSpecPath = path.join(outputBase, 'openapi.json');
+        let openApiSpec = null;
+        try {
+            const specContent = await fs.readFile(openApiSpecPath, 'utf-8');
+            openApiSpec = JSON.parse(specContent);
+        } catch {
+            console.warn('[c4c] Could not load OpenAPI spec for schema extraction');
+        }
+        
         await generateProceduresFromTriggers({
             generatedDir: outputBase,
             outputDir: proceduresOutput,
             provider: integrationName,
-            baseUrl: baseUrl
+            baseUrl: baseUrl,
+            openApiSpec: openApiSpec
         });
         
         console.log(`[c4c] ✓ Successfully integrated ${integrationName}`);
         console.log(`[c4c]   Generated files:`);
         console.log(`[c4c]   - SDK: ${outputBase}/sdk.gen.ts`);
-        console.log(`[c4c]   - Schemas: ${outputBase}/zod.gen.ts`);
-        console.log(`[c4c]   - Procedures: ${proceduresOutput}/procedures.gen.ts`);
+        console.log(`[c4c]   - Schemas: ${outputBase}/schemas.gen.ts`);
+        console.log(`[c4c]   - Procedures: ${proceduresOutput}/procedures/`);
+        console.log(`[c4c]   - Triggers: ${proceduresOutput}/triggers/`);
         console.log();
         console.log(`[c4c] Next steps:`);
         console.log(`[c4c]   1. Import procedures in your code:`);
-        console.log(`[c4c]      import { ${capitalize(integrationName)}Procedures } from './procedures/integrations/${integrationName}/procedures.gen.js'`);
+        console.log(`[c4c]      import { ${capitalize(integrationName)}Procedures } from './procedures/integrations/${integrationName}/index.js'`);
         console.log(`[c4c]   2. Register them with your registry`);
         console.log(`[c4c]   3. Set the ${integrationName.toUpperCase()}_TOKEN environment variable`);
         

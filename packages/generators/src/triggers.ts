@@ -79,6 +79,15 @@ export async function generateTriggers(options: TriggerGeneratorOptions): Promis
   // Generate triggers metadata file
   await generateTriggersMetadata(spec, output);
   
+  // Save OpenAPI spec for procedure generation
+  if (spec) {
+    await fs.writeFile(
+      path.join(output, 'openapi.json'),
+      JSON.stringify(spec, null, 2),
+      'utf-8'
+    );
+  }
+  
   console.log(`[c4c] Generated triggers for ${integrationName} at ${output}`);
 }
 
@@ -90,8 +99,9 @@ export async function generateProceduresFromTriggers(options: {
   outputDir: string;
   provider: string;
   baseUrl?: string;
+  openApiSpec?: any;
 }): Promise<void> {
-  const { generatedDir, outputDir, provider, baseUrl = 'http://localhost:3000' } = options;
+  const { generatedDir, outputDir, provider, baseUrl = 'http://localhost:3000', openApiSpec } = options;
   
   // Check if required files exist
   const sdkPath = path.join(generatedDir, 'sdk.gen.ts');
@@ -141,6 +151,12 @@ export async function generateProceduresFromTriggers(options: {
   // Extract schema exports
   const schemaExports = extractSchemaExportsFromSource(schemaSource);
   
+  // Extract schemas from OpenAPI spec if available
+  const operationSchemas = openApiSpec ? extractSchemasFromOpenApi(openApiSpec) : {};
+  
+  // Extract webhooks from OpenAPI spec
+  const webhookOperations = openApiSpec ? extractWebhooksFromOpenApi(openApiSpec, operationSchemas) : [];
+  
   // Match operations with schemas and triggers
   const resolvedOperations = operations
     .map((op) => {
@@ -174,6 +190,9 @@ export async function generateProceduresFromTriggers(options: {
       const triggerInfo = triggerMetadata[normalizedName];
       const isTrigger = triggerInfo && triggerInfo.kind !== 'operation';
       
+      // Get schemas from OpenAPI if available
+      const opSchemas = operationSchemas[op.name] || { input: null, output: null };
+      
       return {
         ...op,
         pascalName,
@@ -183,25 +202,85 @@ export async function generateProceduresFromTriggers(options: {
         isTrigger,
         triggerKind: triggerInfo?.kind,
         triggerTransport: triggerInfo?.transport,
-        triggerMetadata: triggerInfo
+        triggerMetadata: triggerInfo,
+        inputSchema: opSchemas.input,
+        outputSchema: opSchemas.output
       };
     })
     .filter((op): op is NonNullable<typeof op> => op !== null && (op as any).hasValidSchemas);
   
-  // Generate procedure file
+  // Generate procedure files (per-file structure)
   await fs.mkdir(outputDir, { recursive: true });
-  const procedureCode = generateProcedureCode({
+  
+  // Create procedures and triggers subdirectories
+  const proceduresDir = path.join(outputDir, 'procedures');
+  const triggersDir = path.join(outputDir, 'triggers');
+  await fs.mkdir(proceduresDir, { recursive: true });
+  await fs.mkdir(triggersDir, { recursive: true });
+  
+  // Generate individual files for each operation
+  for (const op of resolvedOperations) {
+    const targetDir = op.isTrigger ? triggersDir : proceduresDir;
+    const fileName = `${toDotCase(op.name).replace(/\./g, '-')}.gen.ts`;
+    const filePath = path.join(targetDir, fileName);
+    
+    const code = generateSingleProcedureCode({
+      provider,
+      operation: op as any,
+      sdkImportPath: path.relative(path.dirname(filePath), sdkPath).replace(/\.ts$/, '.js'),
+      schemaImportPath: path.relative(path.dirname(filePath), schemaPath).replace(/\.ts$/, '.js'),
+      useSchemas: hasSchemas
+    });
+    
+    await fs.writeFile(filePath, code, 'utf8');
+  }
+  
+  // Generate webhook trigger files
+  for (const webhook of webhookOperations) {
+    const fileName = `${toDotCase(webhook.name).replace(/\./g, '-')}.gen.ts`;
+    const filePath = path.join(triggersDir, fileName);
+    
+    const code = generateWebhookTriggerCode({
+      provider,
+      webhook: webhook as any,
+    });
+    
+    await fs.writeFile(filePath, code, 'utf8');
+  }
+  
+  // Generate index files
+  const procedureIndexCode = generateIndexFile(
+    resolvedOperations.filter(op => !op.isTrigger),
     provider,
-    operations: resolvedOperations as any[],
-    sdkImportPath: path.relative(outputDir, sdkPath).replace(/\.ts$/, '.js'),
-    schemaImportPath: path.relative(outputDir, schemaPath).replace(/\.ts$/, '.js'),
-    useSchemas: hasSchemas
-  });
+    'procedures'
+  );
+  await fs.writeFile(path.join(proceduresDir, 'index.ts'), procedureIndexCode, 'utf8');
   
-  const outputPath = path.join(outputDir, 'procedures.gen.ts');
-  await fs.writeFile(outputPath, procedureCode, 'utf8');
+  // Combine subscription triggers and webhook triggers
+  const allTriggers = [
+    ...resolvedOperations.filter(op => op.isTrigger),
+    ...webhookOperations
+  ];
   
-  console.log(`[c4c] Generated procedures at ${outputPath}`);
+  const triggerIndexCode = generateIndexFile(
+    allTriggers,
+    provider,
+    'triggers'
+  );
+  await fs.writeFile(path.join(triggersDir, 'index.ts'), triggerIndexCode, 'utf8');
+  
+  // Generate main index file
+  const mainIndexCode = `// This file is auto-generated by c4c integrate command
+// Do not edit manually.
+
+export * from './procedures/index.js';
+export * from './triggers/index.js';
+`;
+  await fs.writeFile(path.join(outputDir, 'index.ts'), mainIndexCode, 'utf8');
+  
+  console.log(`[c4c] Generated procedures at ${outputDir}`);
+  console.log(`[c4c]   - Procedures: ${proceduresDir}`);
+  console.log(`[c4c]   - Triggers: ${triggersDir}`);
 }
 
 function extractNameFromUrl(url: string): string {
@@ -337,6 +416,499 @@ async function parseTriggersMetadata(source: string): Promise<Record<string, Tri
     console.warn('[c4c] Failed to parse trigger metadata:', error);
     return {};
   }
+}
+
+/**
+ * Extract schemas from OpenAPI specification (which contains Zod schemas)
+ */
+function extractSchemasFromOpenApi(spec: any): Record<string, { input: string | null; output: string | null }> {
+  const schemas: Record<string, { input: string | null; output: string | null }> = {};
+  
+  if (!spec || !spec.paths) {
+    return schemas;
+  }
+  
+  // Process each path and operation
+  for (const [pathStr, pathItem] of Object.entries(spec.paths || {})) {
+    const pathObj = pathItem as any;
+    const methods = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head', 'trace'];
+    
+    for (const method of methods) {
+      const operation = pathObj[method];
+      if (!operation || !operation.operationId) continue;
+      
+      const operationId = operation.operationId;
+      
+      // Extract input schema from requestBody
+      let inputSchema: string | null = null;
+      if (operation.requestBody?.content) {
+        const content = operation.requestBody.content;
+        const jsonContent = content['application/json'] || content['application/x-www-form-urlencoded'];
+        if (jsonContent?.schema) {
+          // Convert Zod schema object to Zod code string
+          inputSchema = zodSchemaToZodCode(jsonContent.schema);
+        }
+      } else if (operation.parameters && operation.parameters.length > 0) {
+        // Handle query/path parameters
+        const paramSchemas: string[] = [];
+        for (const param of operation.parameters) {
+          if (param.in === 'query' || param.in === 'path') {
+            const paramType = param.schema?.type || 'string';
+            const zodType = paramType === 'integer' || paramType === 'number' ? 'z.number()' : 
+                           paramType === 'boolean' ? 'z.boolean()' : 'z.string()';
+            const optional = param.required ? '' : '.optional()';
+            paramSchemas.push(`${param.name}: ${zodType}${optional}`);
+          }
+        }
+        if (paramSchemas.length > 0) {
+          inputSchema = `z.object({\n  ${paramSchemas.join(',\n  ')}\n})`;
+        }
+      }
+      
+      // Extract output schema from response
+      let outputSchema: string | null = null;
+      if (operation.responses) {
+        const successResponse = operation.responses['200'] || operation.responses['201'] || operation.responses['default'];
+        if (successResponse?.content) {
+          const content = successResponse.content;
+          const jsonContent = content['application/json'];
+          if (jsonContent?.schema) {
+            outputSchema = zodSchemaToZodCode(jsonContent.schema);
+          }
+        }
+      }
+      
+      schemas[operationId] = {
+        input: inputSchema,
+        output: outputSchema
+      };
+    }
+  }
+  
+  return schemas;
+}
+
+/**
+ * Convert Zod schema object (with _def) to Zod code string
+ */
+function zodSchemaToZodCode(schema: any): string | null {
+  if (!schema || !schema._def) {
+    return null;
+  }
+  
+  const typeName = schema._def.typeName;
+  
+  if (typeName === 'ZodObject') {
+    const shape = typeof schema._def.shape === 'function' ? schema._def.shape() : schema._def.shape;
+    if (!shape || Object.keys(shape).length === 0) {
+      return 'z.object({})';
+    }
+    
+    const properties: string[] = [];
+    for (const [key, value] of Object.entries(shape)) {
+      const propCode = zodSchemaToZodCode(value);
+      if (propCode) {
+        properties.push(`${key}: ${propCode}`);
+      }
+    }
+    
+    if (properties.length === 0) {
+      return 'z.object({})';
+    }
+    
+    return `z.object({\n  ${properties.join(',\n  ')}\n})`;
+  }
+  
+  if (typeName === 'ZodString') {
+    let code = 'z.string()';
+    const checks = schema._def.checks || [];
+    for (const check of checks) {
+      if (check.kind === 'min') {
+        code += `.min(${check.value})`;
+      } else if (check.kind === 'max') {
+        code += `.max(${check.value})`;
+      } else if (check.kind === 'email') {
+        code += '.email()';
+      } else if (check.kind === 'url') {
+        code += '.url()';
+      } else if (check.kind === 'datetime') {
+        code += '.datetime()';
+      }
+    }
+    return code;
+  }
+  
+  if (typeName === 'ZodNumber' || typeName === 'ZodBigInt') {
+    return 'z.number()';
+  }
+  
+  if (typeName === 'ZodBoolean') {
+    return 'z.boolean()';
+  }
+  
+  if (typeName === 'ZodArray') {
+    const itemsCode = zodSchemaToZodCode(schema._def.type);
+    return `z.array(${itemsCode || 'z.unknown()'})`;
+  }
+  
+  if (typeName === 'ZodEnum') {
+    const values = schema._def.values || [];
+    if (values.length === 0) return null;
+    const enumValues = values.map((v: any) => JSON.stringify(v)).join(', ');
+    return `z.enum([${enumValues}])`;
+  }
+  
+  if (typeName === 'ZodOptional') {
+    const innerCode = zodSchemaToZodCode(schema._def.innerType);
+    return `${innerCode}.optional()`;
+  }
+  
+  if (typeName === 'ZodNullable') {
+    const innerCode = zodSchemaToZodCode(schema._def.innerType);
+    return `${innerCode}.nullable()`;
+  }
+  
+  if (typeName === 'ZodDefault') {
+    const innerCode = zodSchemaToZodCode(schema._def.innerType);
+    return innerCode; // We don't include .default() in generated code
+  }
+  
+  if (typeName === 'ZodRecord') {
+    return 'z.record(z.string(), z.unknown())';
+  }
+  
+  if (typeName === 'ZodUnknown' || typeName === 'ZodAny') {
+    return 'z.unknown()';
+  }
+  
+  // Fallback
+  return 'z.unknown()';
+}
+
+/**
+ * Convert JSON Schema to Zod schema
+ */
+function jsonSchemaToZod(schema: any, components: Record<string, any> = {}): string {
+  // Handle $ref
+  if (schema.$ref) {
+    const refName = schema.$ref.split('/').pop();
+    if (refName && components[refName]) {
+      return jsonSchemaToZod(components[refName], components);
+    }
+    return 'z.any()';
+  }
+  
+  // Handle type
+  if (schema.type === 'object') {
+    if (!schema.properties || Object.keys(schema.properties).length === 0) {
+      return 'z.record(z.string(), z.unknown())';
+    }
+    
+    const properties: string[] = [];
+    for (const [key, propSchema] of Object.entries(schema.properties)) {
+      const propZod = jsonSchemaToZod(propSchema as any, components);
+      const optional = schema.required?.includes(key) ? '' : '.optional()';
+      properties.push(`${key}: ${propZod}${optional}`);
+    }
+    
+    return `z.object({\n  ${properties.join(',\n  ')}\n})`;
+  }
+  
+  if (schema.type === 'array') {
+    const itemsZod = schema.items ? jsonSchemaToZod(schema.items, components) : 'z.unknown()';
+    return `z.array(${itemsZod})`;
+  }
+  
+  return jsonSchemaToZodType(schema);
+}
+
+/**
+ * Convert simple JSON Schema type to Zod type
+ */
+function jsonSchemaToZodType(schema: any): string {
+  if (schema.enum) {
+    const values = schema.enum.map((v: any) => JSON.stringify(v)).join(', ');
+    return `z.enum([${values}])`;
+  }
+  
+  switch (schema.type) {
+    case 'string':
+      if (schema.format === 'date-time') return 'z.string().datetime()';
+      if (schema.format === 'email') return 'z.string().email()';
+      if (schema.format === 'url' || schema.format === 'uri') return 'z.string().url()';
+      if (schema.minLength !== undefined || schema.maxLength !== undefined) {
+        let str = 'z.string()';
+        if (schema.minLength !== undefined) str += `.min(${schema.minLength})`;
+        if (schema.maxLength !== undefined) str += `.max(${schema.maxLength})`;
+        return str;
+      }
+      return 'z.string()';
+    case 'number':
+    case 'integer':
+      return 'z.number()';
+    case 'boolean':
+      return 'z.boolean()';
+    case 'null':
+      return 'z.null()';
+    default:
+      return 'z.unknown()';
+  }
+}
+
+/**
+ * Generate code for a single procedure
+ */
+function generateSingleProcedureCode(options: {
+  provider: string;
+  operation: any;
+  sdkImportPath: string;
+  schemaImportPath: string;
+  useSchemas?: boolean;
+}): string {
+  const { provider, operation: op, sdkImportPath, schemaImportPath, useSchemas = true } = options;
+  
+  const header = `// This file is auto-generated by c4c integrate command
+// Do not edit manually.
+
+`;
+  
+  const envVarName = `${provider.toUpperCase().replace(/-/g, '_')}_URL`;
+  
+  const imports = `import { applyPolicies, type Procedure, type Contract } from "@c4c/core";
+import { withOAuth, getOAuthHeaders } from "@c4c/policies";
+import * as sdk from "${sdkImportPath}";
+import { z } from "zod";
+`;
+  
+  const providerPascal = toPascalCase(provider);
+  const providerEnvName = provider.toUpperCase().replace(/-/g, '_');
+  const contractName = `${providerPascal}${op.pascalName}Contract`;
+  const handlerName = `${op.name}Handler`;
+  const procedureName = `${providerPascal}${op.pascalName}Procedure`;
+  
+  const metadata: string[] = [
+    `    exposure: "external" as const,`,
+    `    roles: ["api-endpoint", "workflow-node"${op.isTrigger ? ', "trigger"' : ''}],`,
+    `    provider: "${provider}",`,
+    `    operation: "${op.name}",`,
+    `    tags: ["${provider}"],`
+  ];
+  
+  if (op.isTrigger && op.triggerMetadata) {
+    metadata.push(`    type: "trigger" as const,`);
+    metadata.push(`    trigger: {`);
+    // Map trigger kind to type
+    const triggerType = op.triggerMetadata.kind === 'webhook' ? 'webhook' : 
+                        op.triggerMetadata.kind === 'stream' ? 'stream' : 
+                        op.triggerMetadata.kind === 'subscription' ? 'subscription' : 'webhook';
+    metadata.push(`      type: "${triggerType}",`);
+    metadata.push(`    },`);
+  }
+  
+  // Use extracted schemas if available, otherwise fall back to z.any()
+  const inputSchema = op.inputSchema || 'z.any()';
+  const outputSchema = op.outputSchema || 'z.any()';
+  
+  const code = `
+export const ${contractName}: Contract = {
+  name: "${provider}.${toDotCase(op.name)}",
+  description: "${op.description || op.name}",
+  input: ${inputSchema},
+  output: ${outputSchema},
+  metadata: {
+${metadata.join('\n')}
+  },
+};
+
+const ${handlerName} = applyPolicies(
+  async (input, context) => {
+    const headers = getOAuthHeaders(context, "${provider}");
+    const request: Record<string, unknown> = { ...input };
+    if (headers) {
+      request.headers = {
+        ...((request.headers as Record<string, string> | undefined) ?? {}),
+        ...headers,
+      };
+    }
+    const result = await sdk.${op.name}(request as any);
+    if (result && typeof result === "object" && "data" in result) {
+      return (result as { data: unknown }).data;
+    }
+    return result as unknown;
+  },
+  withOAuth({
+    provider: "${provider}",
+    metadataTokenKey: "${provider}Token",
+    envVar: "${providerEnvName}_TOKEN",
+  })
+);
+
+export const ${procedureName}: Procedure = {
+  contract: ${contractName},
+  handler: ${handlerName},
+};
+`;
+  
+  return header + imports + code;
+}
+
+/**
+ * Extract webhooks from OpenAPI specification
+ */
+function extractWebhooksFromOpenApi(spec: any, operationSchemas: Record<string, { input: string | null; output: string | null }>): any[] {
+  const webhooks: any[] = [];
+  
+  if (!spec || !spec.webhooks) {
+    return webhooks;
+  }
+  
+  // Process webhooks
+  for (const [webhookName, webhookItem] of Object.entries(spec.webhooks)) {
+    const webhookObj = webhookItem as any;
+    const methods = ['post', 'get', 'put', 'patch', 'delete'];
+    
+    for (const method of methods) {
+      const operation = webhookObj[method];
+      if (!operation) continue;
+      
+      const operationId = operation.operationId || `${webhookName}Webhook`;
+      // Convert webhook name to camelCase, removing dots and underscores
+      const cleanName = operationId.replace(/[._-]/g, ' ')
+        .split(' ')
+        .map((word: string, index: number) => index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join('');
+      const camelCaseName = cleanName.charAt(0).toLowerCase() + cleanName.slice(1);
+      const pascalName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+      
+      // Extract schemas for this webhook
+      let inputSchema: string | null = null;
+      let outputSchema: string | null = null;
+      
+      // Input from requestBody (the webhook payload)
+      if (operation.requestBody?.content) {
+        const content = operation.requestBody.content;
+        const jsonContent = content['application/json'];
+        if (jsonContent?.schema) {
+          inputSchema = jsonSchemaToZod(jsonContent.schema, spec.components?.schemas || {});
+        }
+      }
+      
+      // Output is usually just acknowledgment
+      if (operation.responses) {
+        const successResponse = operation.responses['200'] || operation.responses['201'] || operation.responses['default'];
+        if (successResponse?.content) {
+          const content = successResponse.content;
+          const jsonContent = content['application/json'];
+          if (jsonContent?.schema) {
+            outputSchema = jsonSchemaToZod(jsonContent.schema, spec.components?.schemas || {});
+          }
+        }
+      }
+      
+      webhooks.push({
+        name: camelCaseName,
+        pascalName,
+        description: operation.summary || operation.description || `Webhook: ${webhookName}`,
+        inputSchema: inputSchema || 'z.object({})',
+        outputSchema: outputSchema || 'z.object({})',
+        webhookName,
+        isTrigger: true,
+        isWebhook: true
+      });
+    }
+  }
+  
+  return webhooks;
+}
+
+/**
+ * Generate code for a webhook trigger
+ */
+function generateWebhookTriggerCode(options: {
+  provider: string;
+  webhook: any;
+}): string {
+  const { provider, webhook } = options;
+  
+  const header = `// This file is auto-generated by c4c integrate command
+// Do not edit manually.
+
+`;
+  
+  const imports = `import type { Procedure, Contract } from "@c4c/core";
+import { z } from "zod";
+`;
+  
+  const providerPascal = toPascalCase(provider);
+  const contractName = `${providerPascal}${webhook.pascalName}Contract`;
+  const procedureName = `${providerPascal}${webhook.pascalName}Procedure`;
+  
+  const metadata: string[] = [
+    `    exposure: "external" as const,`,
+    `    roles: ["workflow-node"],`,
+    `    provider: "${provider}",`,
+    `    operation: "${webhook.name}",`,
+    `    tags: ["${provider}", "webhook"],`,
+    `    type: "trigger" as const,`,
+    `    trigger: {`,
+    `      type: "webhook",`,
+    `    },`
+  ];
+  
+  const code = `
+export const ${contractName}: Contract = {
+  name: "${provider}.${toDotCase(webhook.name)}",
+  description: "${webhook.description}",
+  input: ${webhook.inputSchema},
+  output: ${webhook.outputSchema},
+  metadata: {
+${metadata.join('\n')}
+  },
+};
+
+// Webhook triggers don't have a handler - they are registered as event receivers
+export const ${procedureName}: Procedure = {
+  contract: ${contractName},
+  handler: async () => {
+    throw new Error('Webhook triggers should not be called directly - they are invoked by the workflow engine');
+  },
+};
+`;
+  
+  return header + imports + code;
+}
+
+/**
+ * Generate index file for procedures or triggers
+ */
+function generateIndexFile(operations: any[], provider: string, type: 'procedures' | 'triggers'): string {
+  const header = `// This file is auto-generated by c4c integrate command
+// Do not edit manually.
+
+`;
+  
+  const providerPascal = toPascalCase(provider);
+  
+  const imports = operations.map(op => {
+    const fileName = toDotCase(op.name).replace(/\./g, '-');
+    const procedureName = `${providerPascal}${op.pascalName}Procedure`;
+    return `export { ${procedureName} } from './${fileName}.gen.js';`;
+  }).join('\n');
+  
+  const exportList = `
+import type { Procedure } from "@c4c/core";
+${operations.map(op => {
+  const fileName = toDotCase(op.name).replace(/\./g, '-');
+  const procedureName = `${providerPascal}${op.pascalName}Procedure`;
+  return `import { ${procedureName} } from './${fileName}.gen.js';`;
+}).join('\n')}
+
+export const ${providerPascal}${capitalize(type)}: Procedure[] = [
+${operations.map(op => `  ${providerPascal}${op.pascalName}Procedure`).join(',\n')}
+];
+`;
+  
+  return header + imports + '\n' + exportList;
 }
 
 function generateProcedureCode(options: {

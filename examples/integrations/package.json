@@ -9,7 +9,7 @@
     "@c4c/adapters": "workspace:*",
     "@c4c/core": "workspace:*",
     "@c4c/policies": "workspace:*",
-    "zod": "^4"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",
