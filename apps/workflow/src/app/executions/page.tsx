@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Executions List Page - как в n8n
- * Показывает историю всех выполнений workflows
+ * Executions List Page - like in n8n
+ * Shows history of all workflow executions
  */
 
 import { useState, useEffect } from "react";

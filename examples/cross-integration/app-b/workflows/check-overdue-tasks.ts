@@ -1,17 +1,17 @@
 /**
  * Workflow: Check Overdue Tasks
  * 
- * После интеграции с App A (task-manager),
- * этот workflow периодически проверяет просроченные задачи и отправляет уведомления
+ * After integration with App A (task-manager),
+ * this workflow periodically checks for overdue tasks and sends notifications
  * 
- * ПРИМЕЧАНИЕ: Это псевдокод для иллюстрации идеи.
- * Реальная реализация будет использовать @c4c/workflow API.
+ * NOTE: This is pseudocode to illustrate the idea.
+ * Real implementation will use @c4c/workflow API.
  */
 
 import { workflow, step } from '@c4c/workflow';
 import { z } from 'zod';
 
-// Шаг 1: Получить задачи из App A
+// Step 1: Get tasks from App A
 const getTasks = step({
   id: 'get-tasks',
   input: z.object({}),
@@ -28,7 +28,7 @@ const getTasks = step({
     engine.run('task-manager.tasks.list', { status: 'in_progress' }),
 });
 
-// Шаг 2: Отправить уведомление
+// Step 2: Send notification
 const sendOverdueNotification = step({
   id: 'send-notification',
   input: z.object({
@@ -52,15 +52,15 @@ export const checkOverdueTasks = workflow('check-overdue-tasks')
   .commit();
 
 /**
- * Как это работает:
+ * How it works:
  * 
- * 1. Cron trigger запускается каждый день в 9:00
- * 2. Шаг 1 вызывает task-manager.tasks.list (из App A!)
- * 3. Шаг 2 вызывает notifications.send (локальная процедура App B)
- * 4. Пользователь получает email с количеством просроченных задач
+ * 1. Cron trigger runs every day at 9:00 AM
+ * 2. Step 1 calls task-manager.tasks.list (from App A!)
+ * 3. Step 2 calls notifications.send (local procedure of App B)
+ * 4. User receives email with count of overdue tasks
  */
 
-// Альтернативный вариант (псевдокод):
+// Alternative variant (pseudocode):
 /*
 export const checkOverdueTasksV2 = {
   id: 'check-overdue-tasks-v2',
@@ -68,7 +68,7 @@ export const checkOverdueTasksV2 = {
   
   trigger: {
     type: 'schedule',
-    schedule: '0 9 * * *', // Каждый день в 9:00
+    schedule: '0 9 * * *', // Every day at 9:00 AM
   },
   
   nodes: [
@@ -81,7 +81,7 @@ export const checkOverdueTasksV2 = {
     {
       id: 'get-tasks',
       type: 'procedure',
-      procedureName: 'task-manager.tasks.list', // ← Из App A!
+      procedureName: 'task-manager.tasks.list', // ← From App A!
       next: 'send-notification',
     },
     {

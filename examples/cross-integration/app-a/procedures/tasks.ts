@@ -25,7 +25,7 @@ const TaskSchema = z.object({
 
 type Task = z.infer<typeof TaskSchema>;
 
-// In-memory storage (в production это была бы БД)
+// In-memory storage (in production this would be a database)
 const tasks = new Map<string, Task>();
 
 // ==========================================

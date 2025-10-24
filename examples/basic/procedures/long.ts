@@ -423,7 +423,7 @@ export const customExecuteSlackCommand: Procedure<
 	},
 };
 
-// Delay procedure - для создания длительных workflows
+// Delay procedure - for creating long-running workflows
 const delayInput = z.object({
 	seconds: z.number().min(0).max(300),
 	message: z.string().optional(),
@@ -468,7 +468,7 @@ export const customDelay: Procedure<z.infer<typeof delayInput>, z.infer<typeof d
 	},
 };
 
-// Heavy computation procedure - имитация тяжелых вычислений
+// Heavy computation procedure - simulates heavy computations
 const heavyComputationInput = z.object({
 	iterations: z.number().min(1).max(1000000),
 	label: z.string().optional(),

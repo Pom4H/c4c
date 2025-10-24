@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "╔══════════════════════════════════════════════════════════════════╗"
-echo "║      🎯 ПОЛНАЯ ДЕМОНСТРАЦИЯ CROSS-APP WORKFLOW                    ║"
+echo "║      🎯 COMPLETE CROSS-APP WORKFLOW DEMONSTRATION                 ║"
 echo "╚══════════════════════════════════════════════════════════════════╝"
 echo ""
 
@@ -19,7 +19,7 @@ cd "$SCRIPT_DIR"
 sleep 5
 
 echo "═══════════════════════════════════════════════════════════════════"
-echo "ТЕСТ 1: Проверка что серверы загрузили все артефакты"
+echo "TEST 1: Check that servers loaded all artifacts"
 echo "═══════════════════════════════════════════════════════════════════"
 echo ""
 
@@ -41,7 +41,7 @@ echo "   Procedures: $APP_B_PROCEDURES"
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════════"
-echo "ТЕСТ 2: Выполнение workflow с cross-app нодой"
+echo "TEST 2: Execute workflow with cross-app node"
 echo "═══════════════════════════════════════════════════════════════════"
 echo ""
 
@@ -63,7 +63,7 @@ echo "   Execution time: ${EXEC_TIME}ms"
 echo ""
 
 # Display tracing
-echo "📊 Трейсинг выполнения:"
+echo "📊 Execution tracing:"
 echo "$WF_RESULT" | jq -r '.spans[] | select(.attributes."node.id") | 
   "   " + .attributes."node.id" + 
   " (" + .attributes."node.procedure" + ")" + 
@@ -73,41 +73,41 @@ echo "$WF_RESULT" | jq -r '.spans[] | select(.attributes."node.id") |
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════════"
-echo "ТЕСТ 3: Проверка результатов выполнения"
+echo "TEST 3: Check execution results"
 echo "═══════════════════════════════════════════════════════════════════"
 echo ""
 
 # Task created
-echo "✅ Нода 1 (create-task) - результат:"
+echo "✅ Node 1 (create-task) - result:"
 echo "$WF_RESULT" | jq '.outputs."create-task" | {id, title, status, priority}'
 
 echo ""
-echo "🔥 Нода 2 (send-notification) - cross-app вызов:"
+echo "🔥 Node 2 (send-notification) - cross-app call:"
 echo "$WF_RESULT" | jq '.outputs."send-notification"'
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════════"
-echo "ИТОГОВОЕ РЕЗЮМЕ"
+echo "SUMMARY"
 echo "═══════════════════════════════════════════════════════════════════"
 echo ""
 
 if [ "$STATUS" = "completed" ]; then
-  echo "✅ Workflow выполнился со статусом: $STATUS"
-  echo "✅ Обе ноды были выполнены:"
-  echo "   - create-task (локальная процедура App A)"
-  echo "   - send-notification (cross-app процедура из App B)"
+  echo "✅ Workflow completed with status: $STATUS"
+  echo "✅ Both nodes were executed:"
+  echo "   - create-task (local procedure in App A)"
+  echo "   - send-notification (cross-app procedure from App B)"
   echo ""
-  echo "✅ Трейсинг подтверждает:"
-  echo "   - Workflow engine выполнил обе ноды"
-  echo "   - Cross-app процедура была вызвана"
-  echo "   - Вызов занял несколько миллисекунд"
+  echo "✅ Tracing confirms:"
+  echo "   - Workflow engine executed both nodes"
+  echo "   - Cross-app procedure was called"
+  echo "   - Call took several milliseconds"
   echo ""
   echo "╔══════════════════════════════════════════════════════════════════╗"
-  echo "║   ✅ ДОКАЗАНО: WORKFLOW МОЖЕТ ВЫЗЫВАТЬ ПРОЦЕДУРЫ ИЗ ДРУГОГО      ║"
-  echo "║                    СЕРВИСА ЧЕРЕЗ CROSS-APP НОДЫ! ✅               ║"
+  echo "║   ✅ PROVED: WORKFLOW CAN CALL PROCEDURES FROM ANOTHER           ║"
+  echo "║              SERVICE VIA CROSS-APP NODES! ✅                      ║"
   echo "╚══════════════════════════════════════════════════════════════════╝"
 else
-  echo "❌ Workflow не выполнился"
+  echo "❌ Workflow did not complete"
 fi
 
 echo ""

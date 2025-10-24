@@ -1,6 +1,6 @@
 /**
  * API Route: GET /api/workflow/executions-stream
- * Проксирует SSE stream для updates всех executions
+ * Proxies SSE stream for updates of all executions
  */
 
 import { config } from "@/lib/config";

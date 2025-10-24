@@ -1,12 +1,12 @@
 /**
- * Execution Store - хранилище истории выполнений workflows
- * Используется для UI мониторинга (как в n8n)
+ * Execution Store - storage for workflow execution history
+ * Used for UI monitoring (like in n8n)
  */
 
 import type { WorkflowExecutionResult, WorkflowDefinition } from "./types.js";
 
 /**
- * Детальная информация об execution
+ * Detailed information about execution
  */
 export interface ExecutionRecord {
 	executionId: string;
@@ -23,9 +23,9 @@ export interface ExecutionRecord {
 	};
 	outputs: Record<string, unknown>;
 	nodesExecuted: string[];
-	// Детали для каждой ноды (internal Map)
+	// Details for each node (internal Map)
 	nodeDetails: Map<string, NodeExecutionDetail>;
-	// Spans для отображения
+	// Spans for display
 	spans?: Array<{
 		spanId: string;
 		traceId: string;
@@ -40,7 +40,7 @@ export interface ExecutionRecord {
 }
 
 /**
- * Детали выполнения одной ноды
+ * Details of single node execution
  */
 export interface NodeExecutionDetail {
 	nodeId: string;
@@ -61,10 +61,10 @@ export interface NodeExecutionDetail {
  */
 export class ExecutionStore {
 	private executions = new Map<string, ExecutionRecord>();
-	private maxExecutions = 100; // Хранить последние 100 executions
+	private maxExecutions = 100; // Store last 100 executions
 
 	/**
-	 * Начать tracking нового execution
+	 * Start tracking new execution
 	 */
 	startExecution(
 		executionId: string,
@@ -87,7 +87,7 @@ export class ExecutionStore {
 	}
 
 	/**
-	 * Обновить статус ноды
+	 * Update node status
 	 */
 	updateNodeStatus(
 		executionId: string,
@@ -111,7 +111,7 @@ export class ExecutionStore {
 	}
 
 	/**
-	 * Завершить execution
+	 * Complete execution
 	 */
 	completeExecution(
 		executionId: string,
@@ -135,7 +135,7 @@ export class ExecutionStore {
 			};
 		}
 
-		// Обновить статусы всех выполненных нод
+		// Update status of all executed nodes
 		for (const nodeId of result.nodesExecuted) {
 			const detail = record.nodeDetails.get(nodeId);
 			if (detail && detail.status === "running") {
@@ -148,14 +148,14 @@ export class ExecutionStore {
 	}
 
 	/**
-	 * Получить execution
+	 * Get execution
 	 */
 	getExecution(executionId: string): ExecutionRecord | undefined {
 		return this.executions.get(executionId);
 	}
 
 	/**
-	 * Получить execution с сериализованными nodeDetails (для JSON)
+	 * Get execution with serialized nodeDetails (for JSON)
 	 */
 	getExecutionJSON(executionId: string): any {
 		const exec = this.executions.get(executionId);
@@ -168,7 +168,7 @@ export class ExecutionStore {
 	}
 
 	/**
-	 * Получить все executions
+	 * Get all executions
 	 */
 	getAllExecutions(): ExecutionRecord[] {
 		return Array.from(this.executions.values()).sort(
@@ -177,7 +177,7 @@ export class ExecutionStore {
 	}
 
 	/**
-	 * Получить все executions с сериализованными nodeDetails (для JSON)
+	 * Get all executions with serialized nodeDetails (for JSON)
 	 */
 	getAllExecutionsJSON(): any[] {
 		return this.getAllExecutions().map(exec => ({
@@ -187,7 +187,7 @@ export class ExecutionStore {
 	}
 
 	/**
-	 * Получить executions для конкретного workflow
+	 * Get executions for specific workflow
 	 */
 	getExecutionsForWorkflow(workflowId: string): ExecutionRecord[] {
 		return this.getAllExecutions().filter(
@@ -196,7 +196,7 @@ export class ExecutionStore {
 	}
 
 	/**
-	 * Получить статистику
+	 * Get statistics
 	 */
 	getStats() {
 		const all = this.getAllExecutions();
@@ -209,7 +209,7 @@ export class ExecutionStore {
 	}
 
 	/**
-	 * Очистить старые executions
+	 * Clean up old executions
 	 */
 	private cleanup(): void {
 		const all = this.getAllExecutions();
@@ -222,7 +222,7 @@ export class ExecutionStore {
 	}
 
 	/**
-	 * Очистить все
+	 * Clear all
 	 */
 	clear(): void {
 		this.executions.clear();

@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Execution Graph - показывает workflow граф с статусами нод
- * Как в n8n - цветные ноды показывают статус выполнения
+ * Execution Graph - displays workflow graph with node statuses
+ * Like in n8n - colored nodes show execution status
  */
 
 import { useCallback, useMemo, useEffect } from "react";
@@ -55,13 +55,13 @@ interface ExecutionGraphProps {
 }
 
 export default function ExecutionGraph({ workflow, execution, onNodeClick }: ExecutionGraphProps) {
-	// Создать ноды с статусами
+	// Create nodes with statuses
 	const initialNodes: Node[] = useMemo(() => {
 		return workflow.nodes.map((node, index) => {
 			const nodeDetail = execution.nodeDetails[node.id];
 			const status = nodeDetail?.status || "pending";
 			
-			// Определить цвет по статусу
+			// Determine color by status
 			const getNodeColor = (status: string) => {
 				switch (status) {
 					case "completed":
@@ -80,7 +80,7 @@ export default function ExecutionGraph({ workflow, execution, onNodeClick }: Exe
 			const colors = getNodeColor(status);
 			const isExecuted = execution.nodesExecuted.includes(node.id);
 			
-			// Иконки для типов нод
+			// Icons for node types
 			const getNodeIcon = (type: string) => {
 				switch (type) {
 					case "trigger":
@@ -138,12 +138,12 @@ export default function ExecutionGraph({ workflow, execution, onNodeClick }: Exe
 		});
 	}, [workflow, execution]);
 
-	// Создать ребра
+	// Create edges
 	const initialEdges: Edge[] = useMemo(() => {
 		const edges: Edge[] = [];
 		
 		workflow.nodes.forEach((node) => {
-			// Обработка обычных next переходов
+			// Handle regular next transitions
 			if (node.next) {
 				const nextNodes = Array.isArray(node.next) ? node.next : [node.next];
 				nextNodes.forEach((nextId) => {
@@ -169,7 +169,7 @@ export default function ExecutionGraph({ workflow, execution, onNodeClick }: Exe
 				});
 			}
 			
-			// Обработка параллельных нод - создаем ребра к branches
+			// Handle parallel nodes - create edges to branches
 			if (node.type === "parallel" && node.config?.branches) {
 				const branches = node.config.branches;
 				branches.forEach((branchId) => {
@@ -186,7 +186,7 @@ export default function ExecutionGraph({ workflow, execution, onNodeClick }: Exe
 						style: {
 							stroke: wasTraversed ? "#10b981" : "#d1d5db",
 							strokeWidth: wasTraversed ? 2 : 1,
-							strokeDasharray: "5,5", // Пунктирная линия для параллельных веток
+							strokeDasharray: "5,5", // Dashed line for parallel branches
 						},
 						markerEnd: {
 							type: MarkerType.ArrowClosed,
@@ -203,7 +203,7 @@ export default function ExecutionGraph({ workflow, execution, onNodeClick }: Exe
 	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 	const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-	// Обновлять nodes и edges когда execution меняется
+	// Update nodes and edges when execution changes
 	useEffect(() => {
 		setNodes(initialNodes);
 	}, [initialNodes, setNodes]);

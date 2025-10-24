@@ -1,19 +1,19 @@
 /**
  * Google Calendar Event Handler
  * 
- * Демонстрирует обработку событий от Google Calendar API
+ * Demonstrates handling events from Google Calendar API
  */
 
 import { defineContract, defineProcedure } from '@c4c/core';
 import { z } from 'zod';
 
 // ==========================================
-// 1. СХЕМЫ СОБЫТИЙ GOOGLE CALENDAR
+// 1. GOOGLE CALENDAR EVENT SCHEMAS
 // ==========================================
 
 /**
  * Google Calendar Notification
- * Приходит когда происходит изменение в календаре
+ * Received when a change occurs in the calendar
  */
 const GoogleCalendarNotificationSchema = z.object({
   kind: z.literal('api#channel'),
@@ -38,7 +38,7 @@ const GoogleCalendarNotificationSchema = z.object({
 
 /**
  * Google Calendar Event
- * Структура события календаря
+ * Calendar event structure
  */
 const GoogleCalendarEventSchema = z.object({
   id: z.string(),
@@ -70,7 +70,7 @@ type GoogleCalendarNotification = z.infer<typeof GoogleCalendarNotificationSchem
 type GoogleCalendarEvent = z.infer<typeof GoogleCalendarEventSchema>;
 
 // ==========================================
-// 2. ПРОЦЕДУРА ДЛЯ РОУТИНГА СОБЫТИЙ КАЛЕНДАРЯ
+// 2. PROCEDURE FOR ROUTING CALENDAR EVENTS
 // ==========================================
 
 export const routeCalendarEventContract = defineContract({
@@ -151,7 +151,7 @@ export const routeCalendarEvent = defineProcedure({
 });
 
 // ==========================================
-// 3. ОБРАБОТЧИК СОЗДАНИЯ СОБЫТИЯ
+// 3. EVENT CREATION HANDLER
 // ==========================================
 
 export const handleEventCreatedContract = defineContract({
@@ -183,7 +183,7 @@ export const handleEventCreated = defineProcedure({
     console.log(`  Start: ${event.start.dateTime || event.start.date}`);
     console.log(`  Location: ${event.location || 'N/A'}`);
     
-    // Определяем, нужно ли уведомлять
+    // Determine if notification is needed
     const shouldNotify = !!(event.attendees && event.attendees.length > 0);
     
     if (shouldNotify) {
@@ -192,9 +192,9 @@ export const handleEventCreated = defineProcedure({
       return {
         action: 'notify_attendees',
         shouldNotify: true,
-        message: `Новое событие: ${event.summary}\n` +
-                 `Начало: ${event.start.dateTime || event.start.date}\n` +
-                 `Место: ${event.location || 'Не указано'}`,
+        message: `New event: ${event.summary}\n` +
+                 `Start: ${event.start.dateTime || event.start.date}\n` +
+                 `Location: ${event.location || 'Not specified'}`,
         recipients,
       };
     }
@@ -207,7 +207,7 @@ export const handleEventCreated = defineProcedure({
 });
 
 // ==========================================
-// 4. ОБРАБОТЧИК ИЗМЕНЕНИЯ СОБЫТИЯ
+// 4. EVENT UPDATE HANDLER
 // ==========================================
 
 export const handleEventUpdatedContract = defineContract({
@@ -240,18 +240,18 @@ export const handleEventUpdated = defineProcedure({
     // Detect changes
     if (previousEvent) {
       if (event.summary !== previousEvent.summary) {
-        changes.push(`Название изменено: "${previousEvent.summary}" → "${event.summary}"`);
+        changes.push(`Title changed: "${previousEvent.summary}" → "${event.summary}"`);
       }
       
       if (event.start.dateTime !== previousEvent.start.dateTime) {
-        changes.push(`Время начала изменено`);
+        changes.push(`Start time changed`);
       }
       
       if (event.location !== previousEvent.location) {
-        changes.push(`Место изменено: ${previousEvent.location || 'N/A'} → ${event.location || 'N/A'}`);
+        changes.push(`Location changed: ${previousEvent.location || 'N/A'} → ${event.location || 'N/A'}`);
       }
     } else {
-      changes.push('Событие обновлено (детали изменений недоступны)');
+      changes.push('Event updated (change details unavailable)');
     }
     
     console.log(`[Calendar] Event updated: ${event.summary}`);
@@ -265,7 +265,7 @@ export const handleEventUpdated = defineProcedure({
       return {
         changes,
         shouldNotify: true,
-        message: `Событие "${event.summary}" изменено:\n${changes.join('\n')}`,
+        message: `Event "${event.summary}" updated:\n${changes.join('\n')}`,
       };
     }
     
@@ -277,7 +277,7 @@ export const handleEventUpdated = defineProcedure({
 });
 
 // ==========================================
-// 5. ОБРАБОТЧИК УДАЛЕНИЯ СОБЫТИЯ
+// 5. EVENT DELETION HANDLER
 // ==========================================
 
 export const handleEventDeletedContract = defineContract({
@@ -311,14 +311,14 @@ export const handleEventDeleted = defineProcedure({
       action: 'log_deletion',
       shouldNotify: !!eventSummary,
       message: eventSummary 
-        ? `Событие "${eventSummary}" было удалено`
-        : `Событие ${eventId} было удалено`,
+        ? `Event "${eventSummary}" was deleted`
+        : `Event ${eventId} was deleted`,
     };
   },
 });
 
 // ==========================================
-// 6. ЭКСПОРТ ВСЕХ ПРОЦЕДУР
+// 6. EXPORT ALL PROCEDURES
 // ==========================================
 
 export const GoogleCalendarHandlers = [

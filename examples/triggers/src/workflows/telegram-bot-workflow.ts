@@ -1,7 +1,7 @@
 /**
  * Telegram Bot Workflow
  * 
- * Полный пример workflow для обработки событий от Telegram
+ * Complete workflow example for handling Telegram events
  */
 
 import type { WorkflowDefinition } from '@c4c/workflow';
@@ -12,16 +12,16 @@ export const telegramBotWorkflow: WorkflowDefinition = {
   description: 'Handles incoming messages from Telegram bot',
   
   // ==========================================
-  // TRIGGER: Webhook от Telegram
+  // TRIGGER: Webhook from Telegram
   // ==========================================
   trigger: {
     type: 'webhook' as const,
     config: {
-      // Используем сгенерированную процедуру для получения updates
+      // Use generated procedure to get updates
       procedure: 'telegram.post.get.updates',
       provider: 'telegram',
       
-      // Или webhook endpoint
+      // Or webhook endpoint
       // procedure: 'telegram.post.set.webhook',
       // webhookUrl: 'https://your-domain.com/webhooks/telegram',
     },
@@ -29,7 +29,7 @@ export const telegramBotWorkflow: WorkflowDefinition = {
   
   steps: [
     // ==========================================
-    // ШАГ 1: Роутинг события
+    // STEP 1: Event routing
     // ==========================================
     {
       id: 'route-event',
@@ -41,7 +41,7 @@ export const telegramBotWorkflow: WorkflowDefinition = {
     },
     
     // ==========================================
-    // ШАГ 2: Обработка текстового сообщения
+    // STEP 2: Handle text message
     // ==========================================
     {
       id: 'handle-message',
@@ -54,7 +54,7 @@ export const telegramBotWorkflow: WorkflowDefinition = {
     },
     
     // ==========================================
-    // ШАГ 3: Отправка ответа
+    // STEP 3: Send reply
     // ==========================================
     {
       id: 'send-reply',
@@ -69,7 +69,7 @@ export const telegramBotWorkflow: WorkflowDefinition = {
     },
     
     // ==========================================
-    // ШАГ 4: Обработка callback query
+    // STEP 4: Handle callback query
     // ==========================================
     {
       id: 'handle-callback',
@@ -82,7 +82,7 @@ export const telegramBotWorkflow: WorkflowDefinition = {
     },
     
     // ==========================================
-    // ШАГ 5: Ответ на callback query
+    // STEP 5: Answer callback query
     // ==========================================
     {
       id: 'answer-callback',
@@ -97,7 +97,7 @@ export const telegramBotWorkflow: WorkflowDefinition = {
     },
     
     // ==========================================
-    // ШАГ 6: Логирование
+    // STEP 6: Logging
     // ==========================================
     {
       id: 'log-event',
