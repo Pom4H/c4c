@@ -53,7 +53,7 @@ export const getUserV2: Procedure = {
       name: z.string(),
       email: z.string(),
       createdAt: z.string(),
-      metadata: z.record(z.unknown()),
+      metadata: z.record(z.string(), z.unknown()),
     }),
     metadata: {
       exposure: "external",

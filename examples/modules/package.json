@@ -14,7 +14,7 @@
     "@c4c/adapters": "workspace:*",
     "@c4c/policies": "workspace:*",
     "@c4c/generators": "workspace:*",
-    "zod": "^4.1.12"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@c4c/cli": "workspace:*",

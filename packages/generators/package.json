@@ -28,7 +28,7 @@
     "@c4c/workflow": "workspace:*",
     "@hey-api/client-fetch": "^0.13.1",
     "@hey-api/openapi-ts": "^0.62.3",
-    "zod": "^4.1.12",
+    "zod": "catalog:",
     "zod-openapi": "^5.4.3"
   },
   "devDependencies": {

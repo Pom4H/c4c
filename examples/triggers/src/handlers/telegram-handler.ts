@@ -242,7 +242,7 @@ export const routeTelegramEventContract = defineContract({
       'unknown',
     ]),
     shouldProcess: z.boolean(),
-    metadata: z.record(z.unknown()).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
   }),
   metadata: {
     exposure: 'internal' as const,
