@@ -8,7 +8,7 @@ export const NotificationServiceNotificationsTriggerSentWebhookContract: Contrac
   name: "notification-service.notifications.trigger.sent.webhook",
   description: "Webhook trigger that fires when a notification is sent",
   input: z.unknown(),
-  output: z.record(z.unknown()),
+  output: z.string(),
   metadata: {
     exposure: "external" as const,
     roles: ["workflow-node"],

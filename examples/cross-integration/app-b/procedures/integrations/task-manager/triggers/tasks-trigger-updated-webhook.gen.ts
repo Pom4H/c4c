@@ -8,7 +8,7 @@ export const TaskManagerTasksTriggerUpdatedWebhookContract: Contract = {
   name: "task-manager.tasks.trigger.updated.webhook",
   description: "Webhook fired when a task is updated",
   input: z.unknown(),
-  output: z.record(z.unknown()),
+  output: z.string(),
   metadata: {
     exposure: "external" as const,
     roles: ["workflow-node"],
