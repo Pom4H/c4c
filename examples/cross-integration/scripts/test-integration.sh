@@ -24,7 +24,7 @@ TASK_RESPONSE=$(curl -s -X POST "$BASE_URL_A/rpc/tasks.create" \
     "dueDate": "2025-11-01T10:00:00Z"
   }')
 
-TASK_ID=$(echo $TASK_RESPONSE | jq -r '.id')
+TASK_ID=$(echo $TASK_RESPONSE | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
 echo "✅ Task created with ID: $TASK_ID"
 echo ""
 
@@ -34,7 +34,7 @@ TASKS_LIST=$(curl -s -X POST "$BASE_URL_B/rpc/task-manager.tasks.list" \
   -H "Content-Type: application/json" \
   -d '{}')
 
-TASKS_COUNT=$(echo $TASKS_LIST | jq -r '.tasks | length')
+TASKS_COUNT=$(echo $TASKS_LIST | grep -o '"id":"[^"]*"' | wc -l)
 echo "✅ App B successfully called App A! Found $TASKS_COUNT task(s)"
 echo ""
 
@@ -52,7 +52,7 @@ NOTIFICATION_RESPONSE=$(curl -s -X POST "$BASE_URL_A/rpc/notification-service.no
     }
   }')
 
-NOTIF_ID=$(echo $NOTIFICATION_RESPONSE | jq -r '.id')
+NOTIF_ID=$(echo $NOTIFICATION_RESPONSE | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
 echo "✅ App A successfully called App B! Notification ID: $NOTIF_ID"
 echo ""
 
@@ -62,7 +62,7 @@ NOTIFS_LIST=$(curl -s -X POST "$BASE_URL_B/rpc/notifications.list" \
   -H "Content-Type: application/json" \
   -d '{}')
 
-NOTIFS_COUNT=$(echo $NOTIFS_LIST | jq -r '.notifications | length')
+NOTIFS_COUNT=$(echo $NOTIFS_LIST | grep -o '"id":"[^"]*"' | wc -l)
 echo "✅ Found $NOTIFS_COUNT notification(s) in App B"
 echo ""
 
@@ -87,7 +87,7 @@ TASK_DETAILS=$(curl -s -X POST "$BASE_URL_B/rpc/task-manager.tasks.get" \
     "id": "'"$TASK_ID"'"
   }')
 
-TASK_STATUS=$(echo $TASK_DETAILS | jq -r '.status')
+TASK_STATUS=$(echo $TASK_DETAILS | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
 echo "✅ App B retrieved task from App A! Status: $TASK_STATUS"
 echo ""
 

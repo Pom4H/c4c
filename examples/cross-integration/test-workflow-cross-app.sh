@@ -37,9 +37,9 @@ WF_RESULT=$(curl -s -X POST http://localhost:3001/workflow/execute \
   -H "Content-Type: application/json" \
   -d '{"workflowId": "create-task-with-notification", "input": {}}')
 
-EXEC_ID=$(echo "$WF_RESULT" | jq -r '.executionId')
-STATUS=$(echo "$WF_RESULT" | jq -r '.status')
-NODES=$(echo "$WF_RESULT" | jq -r '.nodesExecuted | join(", ")')
+EXEC_ID=$(echo "$WF_RESULT" | grep -o '"executionId":"[^"]*"' | cut -d'"' -f4)
+STATUS=$(echo "$WF_RESULT" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+NODES=$(echo "$WF_RESULT" | grep -o '"nodesExecuted":\[[^]]*\]' | sed 's/"nodesExecuted":\[//;s/\]//;s/"//g')
 
 echo "   Execution ID: $EXEC_ID"
 echo "   Status: $STATUS"
@@ -48,15 +48,23 @@ echo ""
 
 # Check task created
 echo "4. Checking created task in App A..."
-TASK_ID=$(echo "$WF_RESULT" | jq -r '.outputs."create-task".id')
-TASK_TITLE=$(echo "$WF_RESULT" | jq -r '.outputs."create-task".title')
+TASK_ID=$(echo "$WF_RESULT" | grep -o '"create-task":{[^}]*"id":"[^"]*"' | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+TASK_TITLE=$(echo "$WF_RESULT" | grep -o '"create-task":{[^}]*"title":"[^"]*"' | grep -o '"title":"[^"]*"' | cut -d'"' -f4)
 echo "   ✅ Task created: $TASK_ID"
 echo "   Title: $TASK_TITLE"
 echo ""
 
 # Check tracing
 echo "5. Node execution tracing:"
-echo "$WF_RESULT" | jq -r '.spans[] | select(.attributes."node.id") | "   " + .attributes."node.id" + " → " + .attributes."node.procedure" + " [" + .attributes."node.status" + "] " + (.duration | tostring) + "ms"'
+echo "$WF_RESULT" | grep -o '"spans":\[.*\]' | grep -o '{[^}]*"node\.id"[^}]*}' | while read -r span; do
+  NODE_ID=$(echo "$span" | grep -o '"node\.id":"[^"]*"' | cut -d'"' -f4)
+  NODE_PROC=$(echo "$span" | grep -o '"node\.procedure":"[^"]*"' | cut -d'"' -f4)
+  NODE_STATUS=$(echo "$span" | grep -o '"node\.status":"[^"]*"' | cut -d'"' -f4)
+  DURATION=$(echo "$span" | grep -o '"duration":[0-9]*' | cut -d':' -f2)
+  if [ -n "$NODE_ID" ]; then
+    echo "   $NODE_ID → $NODE_PROC [$NODE_STATUS] ${DURATION}ms"
+  fi
+done
 echo ""
 
 # Check App B logs
