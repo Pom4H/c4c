@@ -11,6 +11,21 @@ echo ""
 BASE_URL_A="http://localhost:3001"
 BASE_URL_B="http://localhost:3002"
 
+# Helper function to extract JSON field value
+extract_json_field() {
+  local json="$1"
+  local field="$2"
+  echo "$json" | grep -o "\"$field\":\"[^\"]*\"" | head -1 | sed "s/\"$field\":\"\([^\"]*\)\"/\1/"
+}
+
+# Helper function to count array items (simple heuristic)
+count_json_array() {
+  local json="$1"
+  local field="$2"
+  # Count occurrences of "id" field inside the array - rough approximation
+  echo "$json" | grep -o "\"id\":\"[^\"]*\"" | wc -l
+}
+
 # Test 1: Create a task in App A
 echo "📝 Test 1: Creating a task in App A..."
 TASK_RESPONSE=$(curl -s -X POST "$BASE_URL_A/rpc/tasks.create" \
@@ -24,7 +39,7 @@ TASK_RESPONSE=$(curl -s -X POST "$BASE_URL_A/rpc/tasks.create" \
     "dueDate": "2025-11-01T10:00:00Z"
   }')
 
-TASK_ID=$(echo $TASK_RESPONSE | jq -r '.id')
+TASK_ID=$(extract_json_field "$TASK_RESPONSE" "id")
 echo "✅ Task created with ID: $TASK_ID"
 echo ""
 
@@ -34,7 +49,7 @@ TASKS_LIST=$(curl -s -X POST "$BASE_URL_B/rpc/task-manager.tasks.list" \
   -H "Content-Type: application/json" \
   -d '{}')
 
-TASKS_COUNT=$(echo $TASKS_LIST | jq -r '.tasks | length')
+TASKS_COUNT=$(count_json_array "$TASKS_LIST" "tasks")
 echo "✅ App B successfully called App A! Found $TASKS_COUNT task(s)"
 echo ""
 
@@ -52,7 +67,7 @@ NOTIFICATION_RESPONSE=$(curl -s -X POST "$BASE_URL_A/rpc/notification-service.no
     }
   }')
 
-NOTIF_ID=$(echo $NOTIFICATION_RESPONSE | jq -r '.id')
+NOTIF_ID=$(extract_json_field "$NOTIFICATION_RESPONSE" "id")
 echo "✅ App A successfully called App B! Notification ID: $NOTIF_ID"
 echo ""
 
@@ -62,7 +77,7 @@ NOTIFS_LIST=$(curl -s -X POST "$BASE_URL_B/rpc/notifications.list" \
   -H "Content-Type: application/json" \
   -d '{}')
 
-NOTIFS_COUNT=$(echo $NOTIFS_LIST | jq -r '.notifications | length')
+NOTIFS_COUNT=$(count_json_array "$NOTIFS_LIST" "notifications")
 echo "✅ Found $NOTIFS_COUNT notification(s) in App B"
 echo ""
 
@@ -87,7 +102,7 @@ TASK_DETAILS=$(curl -s -X POST "$BASE_URL_B/rpc/task-manager.tasks.get" \
     "id": "'"$TASK_ID"'"
   }')
 
-TASK_STATUS=$(echo $TASK_DETAILS | jq -r '.status')
+TASK_STATUS=$(extract_json_field "$TASK_DETAILS" "status")
 echo "✅ App B retrieved task from App A! Status: $TASK_STATUS"
 echo ""
 
