@@ -7,8 +7,14 @@ import { z } from "zod";
 export const NotificationServiceTaskManagerTasksTriggerCreatedWebhookWebhookContract: Contract = {
   name: "notification-service.task.manager.tasks.trigger.created.webhook.webhook",
   description: "Webhook fired when a new task is created",
-  input: z.unknown(),
-  output: z.record(z.unknown()),
+  input: z.object({
+  success: z.boolean(),
+  message: z.string().optional()
+}),
+  output: z.object({
+  success: z.boolean(),
+  message: z.string().optional()
+}),
   metadata: {
     exposure: "external" as const,
     roles: ["workflow-node"],

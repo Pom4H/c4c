@@ -7,8 +7,21 @@ import { z } from "zod";
 export const NotificationServiceNotificationsTriggerSentWebhookContract: Contract = {
   name: "notification-service.notifications.trigger.sent.webhook",
   description: "Webhook trigger that fires when a notification is sent",
-  input: z.unknown(),
-  output: z.record(z.unknown()),
+  input: z.object({
+  id: z.string(),
+  message: z.string(),
+  recipient: z.string().optional(),
+  channel: z.enum(["email", "sms", "push", "webhook"]).optional(),
+  priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
+  status: z.enum(["pending", "sent", "failed"]),
+  metadata: z.record(z.unknown()).optional(),
+  sentAt: z.string().optional(),
+  createdAt: z.string()
+}),
+  output: z.object({
+  success: z.boolean(),
+  message: z.string().optional()
+}),
   metadata: {
     exposure: "external" as const,
     roles: ["workflow-node"],

@@ -185,7 +185,7 @@ function successAndErrorResponses(outputSchema: Contract["output"]) {
 			description: "Successful response",
 			content: {
 				"application/json": {
-					schema: outputSchema,
+					schema: zodToJsonSchema(outputSchema),
 				},
 			},
 		},
@@ -193,9 +193,13 @@ function successAndErrorResponses(outputSchema: Contract["output"]) {
 			description: "Validation error",
 			content: {
 				"application/json": {
-					schema: z.object({
-						error: z.string(),
-					}),
+					schema: {
+						type: "object",
+						properties: {
+							error: { type: "string" },
+						},
+						required: ["error"],
+					},
 				},
 			},
 		},
@@ -203,9 +207,13 @@ function successAndErrorResponses(outputSchema: Contract["output"]) {
 			description: "Internal server error",
 			content: {
 				"application/json": {
-					schema: z.object({
-						error: z.string(),
-					}),
+					schema: {
+						type: "object",
+						properties: {
+							error: { type: "string" },
+						},
+						required: ["error"],
+					},
 				},
 			},
 		},
@@ -313,7 +321,7 @@ function buildWebhookOperation(contract: Contract, name: string) {
 				description: 'Webhook payload',
 				content: {
 					'application/json': {
-						schema: contract.output, // Output schema = what trigger emits
+						schema: zodToJsonSchema(contract.output), // Output schema = what trigger emits
 					},
 				},
 			},
@@ -322,10 +330,14 @@ function buildWebhookOperation(contract: Contract, name: string) {
 					description: 'Webhook received successfully',
 					content: {
 						'application/json': {
-							schema: z.object({
-								success: z.boolean(),
-								message: z.string().optional(),
-							}),
+							schema: {
+								type: "object",
+								properties: {
+									success: { type: "boolean" },
+									message: { type: "string" },
+								},
+								required: ["success"],
+							},
 						},
 					},
 				},
@@ -351,4 +363,149 @@ export function generateOpenAPIJSON(registry: Registry, options = {}): string {
 export function generateOpenAPIYAML(registry: Registry, options = {}): string {
 	const spec = generateOpenAPISpec(registry, options);
 	return JSON.stringify(spec, null, 2);
+}
+
+/**
+ * Convert Zod schema to JSON Schema for OpenAPI
+ */
+function zodToJsonSchema(schema: any): any {
+	if (!schema || !schema._def) {
+		return { type: "object" };
+	}
+
+	const def = schema._def as any;
+	const typeName = def.typeName;
+
+	switch (typeName) {
+		case "ZodString":
+			return buildStringSchema(def);
+		case "ZodNumber":
+		case "ZodBigInt":
+			return { type: "number" };
+		case "ZodBoolean":
+			return { type: "boolean" };
+		case "ZodNull":
+			return { type: "null" };
+		case "ZodArray":
+			return {
+				type: "array",
+				items: def.type ? zodToJsonSchema(def.type) : { type: "object" },
+			};
+		case "ZodObject":
+			return buildObjectSchema(def);
+		case "ZodEnum":
+			return {
+				type: "string",
+				enum: def.values || [],
+			};
+		case "ZodUnion":
+		case "ZodDiscriminatedUnion":
+			return buildUnionSchema(def);
+		case "ZodOptional":
+			return zodToJsonSchema(def.innerType);
+		case "ZodNullable":
+			return {
+				oneOf: [zodToJsonSchema(def.innerType), { type: "null" }],
+			};
+		case "ZodDefault":
+			const baseSchema = zodToJsonSchema(def.innerType);
+			baseSchema.default = def.defaultValue?.();
+			return baseSchema;
+		case "ZodLiteral":
+			return {
+				type: typeof def.value,
+				enum: [def.value],
+			};
+		case "ZodRecord":
+			return {
+				type: "object",
+				additionalProperties: def.valueType ? zodToJsonSchema(def.valueType) : true,
+			};
+		case "ZodAny":
+		case "ZodUnknown":
+			return {};
+		default:
+			return { type: "object" };
+	}
+}
+
+function buildStringSchema(def: any): any {
+	const schema: any = { type: "string" };
+	const checks = def.checks || [];
+
+	for (const check of checks) {
+		switch (check.kind) {
+			case "min":
+				schema.minLength = check.value;
+				break;
+			case "max":
+				schema.maxLength = check.value;
+				break;
+			case "email":
+				schema.format = "email";
+				break;
+			case "url":
+				schema.format = "uri";
+				break;
+			case "uuid":
+				schema.format = "uuid";
+				break;
+			case "datetime":
+				schema.format = "date-time";
+				break;
+			case "regex":
+				schema.pattern = check.regex?.source;
+				break;
+		}
+	}
+
+	return schema;
+}
+
+function buildObjectSchema(def: any): any {
+	const shape = typeof def.shape === "function" ? def.shape() : def.shape;
+	
+	if (!shape || Object.keys(shape).length === 0) {
+		return { type: "object" };
+	}
+
+	const properties: Record<string, any> = {};
+	const required: string[] = [];
+
+	for (const [key, value] of Object.entries(shape)) {
+		const zodSchema = value as any;
+		properties[key] = zodToJsonSchema(zodSchema);
+
+		// Check if field is required (not optional, not nullable, not has default)
+		if (zodSchema._def?.typeName !== "ZodOptional" && 
+		    zodSchema._def?.typeName !== "ZodDefault") {
+			required.push(key);
+		}
+	}
+
+	const schema: any = {
+		type: "object",
+		properties,
+	};
+
+	if (required.length > 0) {
+		schema.required = required;
+	}
+
+	if (def.unknownKeys === "strip") {
+		schema.additionalProperties = false;
+	}
+
+	return schema;
+}
+
+function buildUnionSchema(def: any): any {
+	const options = def.options || [];
+	if (options.length === 0) {
+		return { type: "object" };
+	}
+
+	return {
+		oneOf: options.map((option: any) => zodToJsonSchema(option)),
+	};
 }

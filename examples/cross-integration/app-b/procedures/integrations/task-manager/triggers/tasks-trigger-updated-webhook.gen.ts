@@ -7,8 +7,21 @@ import { z } from "zod";
 export const TaskManagerTasksTriggerUpdatedWebhookContract: Contract = {
   name: "task-manager.tasks.trigger.updated.webhook",
   description: "Webhook fired when a task is updated",
-  input: z.unknown(),
-  output: z.record(z.unknown()),
+  input: z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  status: z.enum(["todo", "in_progress", "done"]),
+  priority: z.enum(["low", "medium", "high"]).optional(),
+  assignee: z.string().optional(),
+  dueDate: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string()
+}),
+  output: z.object({
+  success: z.boolean(),
+  message: z.string().optional()
+}),
   metadata: {
     exposure: "external" as const,
     roles: ["workflow-node"],
