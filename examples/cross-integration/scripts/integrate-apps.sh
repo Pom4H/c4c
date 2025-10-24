@@ -7,6 +7,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+CLI_BIN="$(cd "$ROOT_DIR/../../apps/cli" && pwd)/dist/bin.js"
 
 echo "🔄 C4C Cross-Integration Setup"
 echo "================================"
@@ -45,7 +46,7 @@ echo ""
 # Integrate App B into App A
 echo "📥 Step 1: Integrating App B (Notification Service) into App A (Task Manager)..."
 cd "$ROOT_DIR/app-a"
-pnpm exec c4c integrate http://localhost:3002/openapi.json --name notification-service
+node "$CLI_BIN" integrate http://localhost:3002/openapi.json --name notification-service
 
 echo "✅ App A can now use notification-service procedures!"
 echo ""
@@ -53,7 +54,7 @@ echo ""
 # Integrate App A into App B
 echo "📥 Step 2: Integrating App A (Task Manager) into App B (Notification Service)..."
 cd "$ROOT_DIR/app-b"
-pnpm exec c4c integrate http://localhost:3001/openapi.json --name task-manager
+node "$CLI_BIN" integrate http://localhost:3001/openapi.json --name task-manager
 
 echo "✅ App B can now use task-manager procedures!"
 echo ""
