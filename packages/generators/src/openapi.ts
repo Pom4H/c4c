@@ -75,7 +75,10 @@ export function generateOpenAPISpec(
 			}
 		}
 
-		if (isProcedureVisible(contract, "rpc")) {
+		const isVisibleRpc = isProcedureVisible(contract, "rpc");
+		const isVisibleRest = isProcedureVisible(contract, "rest");
+
+		if (isVisibleRpc) {
 			const rpcPath = `/rpc/${name}`;
 			paths[rpcPath] = {
 				...(paths[rpcPath] ?? {}),
@@ -83,7 +86,7 @@ export function generateOpenAPISpec(
 			};
 		}
 
-		if (isProcedureVisible(contract, "rest")) {
+		if (isVisibleRest) {
 			const restEntry = buildRestOperation(contract);
 			if (restEntry) {
 				const { path, method, operation } = restEntry;

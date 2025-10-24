@@ -53,18 +53,19 @@ export const sendNotification: Procedure = {
       tags: ['notifications', 'send'],
     },
   },
-  handler: async (input: z.infer<typeof sendNotificationInput>) => {
+  handler: async (input) => {
+    const data = input as z.infer<typeof sendNotificationInput>;
     const now = new Date().toISOString();
     const id = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     const notification: Notification = {
       id,
-      message: input.message,
-      recipient: input.recipient,
-      channel: input.channel || 'push',
-      priority: input.priority || 'normal',
+      message: data.message,
+      recipient: data.recipient,
+      channel: data.channel || 'push',
+      priority: data.priority || 'normal',
       status: 'sent',
-      metadata: input.metadata,
+      metadata: data.metadata,
       sentAt: now,
       createdAt: now,
     };
@@ -75,7 +76,7 @@ export const sendNotification: Procedure = {
     console.log(`  Message: ${notification.message}`);
     console.log(`  Channel: ${notification.channel}`);
     console.log(`  Priority: ${notification.priority}`);
-    console.log(`  From: ${input.metadata?.source || 'unknown'}`);
+    console.log(`  From: ${data.metadata?.source || 'unknown'}`);
     console.log(`  Notification ID: ${id}`);
     
     return notification;
@@ -107,19 +108,20 @@ export const listNotifications: Procedure = {
       tags: ['notifications', 'list'],
     },
   },
-  handler: async (input: z.infer<typeof listNotificationsInput>) => {
+  handler: async (input) => {
+    const data = input as z.infer<typeof listNotificationsInput>;
     let filtered = Array.from(notifications.values());
     
-    if (input.recipient) {
-      filtered = filtered.filter(n => n.recipient === input.recipient);
+    if (data.recipient) {
+      filtered = filtered.filter(n => n.recipient === data.recipient);
     }
     
-    if (input.status) {
-      filtered = filtered.filter(n => n.status === input.status);
+    if (data.status) {
+      filtered = filtered.filter(n => n.status === data.status);
     }
     
-    if (input.limit) {
-      filtered = filtered.slice(0, input.limit);
+    if (data.limit) {
+      filtered = filtered.slice(0, data.limit);
     }
     
     return {
@@ -154,24 +156,25 @@ export const subscribeNotifications: Procedure = {
       tags: ['notifications', 'subscribe'],
     },
   },
-  handler: async (input: z.infer<typeof subscribeNotificationsInput>) => {
-    const existing = subscriptions.get(input.topic) || [];
+  handler: async (input) => {
+    const data = input as z.infer<typeof subscribeNotificationsInput>;
+    const existing = subscriptions.get(data.topic) || [];
     
-    if (!existing.includes(input.webhookUrl)) {
-      existing.push(input.webhookUrl);
-      subscriptions.set(input.topic, existing);
+    if (!existing.includes(data.webhookUrl)) {
+      existing.push(data.webhookUrl);
+      subscriptions.set(data.topic, existing);
     }
     
     const subscriptionId = `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     console.log(`[Notifications] New subscription:`);
-    console.log(`  Topic: ${input.topic}`);
-    console.log(`  Webhook: ${input.webhookUrl}`);
+    console.log(`  Topic: ${data.topic}`);
+    console.log(`  Webhook: ${data.webhookUrl}`);
     
     return {
       success: true,
       subscriptionId,
-      topic: input.topic,
+      topic: data.topic,
     };
   },
 };

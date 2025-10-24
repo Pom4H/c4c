@@ -783,6 +783,11 @@ ${metadata.join('\n')}
 
 const ${handlerName} = applyPolicies(
   async (input, context) => {
+    const baseUrl = process.env.${envVarName} || context.metadata?.${provider}Url as string | undefined;
+    if (!baseUrl) {
+      throw new Error(\`${envVarName} environment variable is not set\`);
+    }
+    
     const headers = getOAuthHeaders(context, "${provider}");
     const request: Record<string, unknown> = { ...input };
     if (headers) {
@@ -791,7 +796,14 @@ const ${handlerName} = applyPolicies(
         ...headers,
       };
     }
-    const result = await sdk.${op.name}(request as any);
+    
+    // Create custom client with baseURL
+    const customClient = {
+      ...sdk.client,
+      baseUrl,
+    };
+    
+    const result = await sdk.${op.name}({ ...request, client: customClient } as any);
     if (result && typeof result === "object" && "data" in result) {
       return (result as { data: unknown }).data;
     }
