@@ -25,7 +25,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "zod": "^4.1.12",
+    "zod": "catalog:",
     "tsx": "^4.19.2"
   },
   "devDependencies": {

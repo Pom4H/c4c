@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server";
-import { Hono } from "hono";
+import { OpenAPIHono } from "@hono/zod-openapi";
+import { swaggerUI } from "@hono/swagger-ui";
 import type { Registry } from "@c4c/core";
-import { generateOpenAPIJSON } from "@c4c/generators";
 import { createRestRouter, listRESTRoutes } from "./rest.js";
 import { createWorkflowRouter } from "./workflow-http.js";
 import { createRpcRouter } from "./rpc.js";
@@ -46,8 +46,21 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 		webhookRegistry = new WebhookRegistry(),
 	} = options;
 
-	const app = new Hono();
+	const app = new OpenAPIHono({
+		defaultHook: (result, c) => {
+			if (!result.success) {
+				return c.json(
+					{
+						error: "Validation Error",
+						details: result.error.flatten(),
+					},
+					400
+				);
+			}
+		},
+	});
 
+	// CORS middleware
 	app.use("*", async (c, next) => {
 		c.header("Access-Control-Allow-Origin", "*");
 		c.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
@@ -60,8 +73,10 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 		await next();
 	});
 
+	// Health check endpoint
 	app.get("/health", (c) => c.json({ status: "ok" }, 200));
 
+	// Procedures list endpoint
 	app.get("/procedures", (c) => {
 		const procedures = Array.from(registry.entries()).map(([name, proc]) => ({
 			name,
@@ -72,43 +87,24 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 	});
 
 	if (enableDocs) {
-		app.get("/openapi.json", (c) => {
-			const spec = generateOpenAPIJSON(registry, {
+		// Serve OpenAPI spec at /openapi endpoint using @hono/zod-openapi
+		app.doc("/openapi.json", {
+			openapi: "3.1.0",
+			info: {
 				title: "c4c API",
 				version: "1.0.0",
-				description: "Auto-generated API from c4c contracts",
-				servers: [{ url: `http://localhost:${port}`, description: "Development server" }],
-			});
-
-			return c.json(JSON.parse(spec), 200);
-		});
-
-		app.get("/docs", (c) => {
-			const html = `
-<!DOCTYPE html>
-<html>
-<head>
-	<title>c4c API Documentation</title>
-	<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
-</head>
-<body>
-	<div id="swagger-ui"></div>
-	<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-	<script>
-		SwaggerUIBundle({
-			url: '/openapi.json',
-			dom_id: '#swagger-ui',
-			presets: [
-				SwaggerUIBundle.presets.apis,
-				SwaggerUIBundle.SwaggerUIStandalonePreset
+				description: "Auto-generated API from c4c contracts with Zod schemas",
+			},
+			servers: [
+				{
+					url: `http://localhost:${port}`,
+					description: "Development server",
+				},
 			],
 		});
-	</script>
-</body>
-</html>`;
 
-    return c.html(html);
-		});
+		// Serve Swagger UI using @hono/swagger-ui
+		app.get("/docs", swaggerUI({ url: "/openapi.json" }));
 	}
 
 	if (enableRest) {

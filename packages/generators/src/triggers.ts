@@ -574,7 +574,7 @@ function zodSchemaToZodCode(schema: any): string | null {
   }
   
   if (typeName === 'ZodRecord') {
-    return 'z.record(z.unknown())';
+    return 'z.record(z.string(), z.unknown())';
   }
   
   if (typeName === 'ZodUnknown' || typeName === 'ZodAny') {
@@ -601,7 +601,7 @@ function jsonSchemaToZod(schema: any, components: Record<string, any> = {}): str
   // Handle type
   if (schema.type === 'object') {
     if (!schema.properties || Object.keys(schema.properties).length === 0) {
-      return 'z.record(z.unknown())';
+      return 'z.record(z.string(), z.unknown())';
     }
     
     const properties: string[] = [];
