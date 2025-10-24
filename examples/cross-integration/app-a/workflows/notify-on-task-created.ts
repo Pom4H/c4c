@@ -1,17 +1,17 @@
 /**
  * Workflow: Notify on Task Created
  * 
- * После интеграции с App B (notification-service),
- * этот workflow автоматически отправляет уведомление при создании задачи
+ * After integration with App B (notification-service),
+ * this workflow automatically sends a notification when a task is created
  * 
- * ПРИМЕЧАНИЕ: Это псевдокод для иллюстрации идеи.
- * Реальная реализация будет использовать @c4c/workflow API.
+ * NOTE: This is pseudocode to illustrate the idea.
+ * Real implementation will use @c4c/workflow API.
  */
 
 import { workflow, step } from '@c4c/workflow';
 import { z } from 'zod';
 
-// Шаг 1: Получить детали задачи
+// Step 1: Get task details
 const getTaskDetails = step({
   id: 'get-task',
   input: z.object({ taskId: z.string() }),
@@ -24,7 +24,7 @@ const getTaskDetails = step({
     engine.run('tasks.get', { id: inputData.taskId }),
 });
 
-// Шаг 2: Отправить уведомление через App B (после интеграции!)
+// Step 2: Send notification via App B (after integration!)
 const sendNotification = step({
   id: 'send-notification',
   input: z.object({
@@ -43,23 +43,23 @@ const sendNotification = step({
     }),
 });
 
-// Собираем workflow
+// Assemble workflow
 export const notifyOnTaskCreated = workflow('notify-on-task-created')
   .step(getTaskDetails)
   .step(sendNotification)
   .commit();
 
 /**
- * Как это работает:
+ * How it works:
  * 
- * 1. Триггер tasks.trigger.created срабатывает при создании задачи
- * 2. Workflow получает taskId из trigger data
- * 3. Шаг 1 вызывает tasks.get (локальная процедура App A)
- * 4. Шаг 2 вызывает notification-service.notifications.send (из App B!)
- * 5. App B получает запрос и отправляет уведомление
+ * 1. The tasks.trigger.created trigger fires when a task is created
+ * 2. Workflow receives taskId from trigger data
+ * 3. Step 1 calls tasks.get (local procedure of App A)
+ * 4. Step 2 calls notification-service.notifications.send (from App B!)
+ * 5. App B receives the request and sends notification
  */
 
-// Альтернативный вариант (псевдокод):
+// Alternative variant (pseudocode):
 /*
 export const notifyOnTaskCreatedV2 = {
   id: 'notify-on-task-created-v2',
@@ -87,7 +87,7 @@ export const notifyOnTaskCreatedV2 = {
     {
       id: 'send-notification',
       type: 'procedure',
-      procedureName: 'notification-service.notifications.send', // ← Из App B!
+      procedureName: 'notification-service.notifications.send', // ← From App B!
       next: 'end',
     },
     {

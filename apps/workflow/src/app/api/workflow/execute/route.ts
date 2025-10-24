@@ -1,6 +1,6 @@
 /**
  * API Route: POST /api/workflow/execute
- * Проксирует запрос на backend server
+ * Proxies request to backend server
  */
 
 import { NextResponse } from "next/server";

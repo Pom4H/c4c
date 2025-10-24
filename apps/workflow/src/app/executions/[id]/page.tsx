@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Execution Detail Page - как в n8n
- * Показывает детали выполнения с графом и статусами нод
+ * Execution Detail Page - like in n8n
+ * Shows execution details with graph and node statuses
  */
 
 import { useState, useEffect } from "react";

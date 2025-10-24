@@ -1,14 +1,14 @@
 /**
  * Server with Trigger Handlers
  * 
- * Демонстрирует полную настройку сервера с триггерами и обработчиками
+ * Demonstrates complete server setup with triggers and handlers
  */
 
 import { createRegistry } from '@c4c/core';
 import { createHttpServer, WebhookRegistry } from '@c4c/adapters';
 
 // ==========================================
-// ИМПОРТ СГЕНЕРИРОВАННЫХ ПРОЦЕДУР
+// IMPORT GENERATED PROCEDURES
 // ==========================================
 
 // Telegram procedures (auto-generated)
@@ -18,26 +18,26 @@ import { TelegramProcedures } from '../../procedures/integrations/telegram/proce
 import { GoogleCalendarProcedures } from '../../procedures/integrations/google-calendar/procedures.gen.js';
 
 // ==========================================
-// ИМПОРТ НАШИХ ОБРАБОТЧИКОВ
+// IMPORT OUR HANDLERS
 // ==========================================
 
 import { TelegramHandlers } from './handlers/telegram-handler.js';
 import { GoogleCalendarHandlers } from './handlers/google-calendar-handler.js';
 
 // ==========================================
-// ИМПОРТ WORKFLOWS
+// IMPORT WORKFLOWS
 // ==========================================
 
 import { telegramBotWorkflow } from './workflows/telegram-bot-workflow.js';
 import { googleCalendarWorkflow } from './workflows/google-calendar-workflow.js';
 
 // ==========================================
-// НАСТРОЙКА REGISTRY
+// SETUP REGISTRY
 // ==========================================
 
 const registry = createRegistry();
 
-// Регистрируем сгенерированные процедуры (триггеры)
+// Register generated procedures (triggers)
 console.log('📦 Registering generated procedures...');
 
 for (const procedure of TelegramProcedures) {
@@ -50,7 +50,7 @@ for (const procedure of GoogleCalendarProcedures) {
   console.log(`  ✓ ${procedure.contract.name}`);
 }
 
-// Регистрируем наши обработчики
+// Register our handlers
 console.log('\n🔧 Registering event handlers...');
 
 for (const handler of TelegramHandlers) {
@@ -64,32 +64,32 @@ for (const handler of GoogleCalendarHandlers) {
 }
 
 // ==========================================
-// НАСТРОЙКА WEBHOOK REGISTRY
+// SETUP WEBHOOK REGISTRY
 // ==========================================
 
 const webhookRegistry = new WebhookRegistry();
 
-// Регистрируем обработчик для Telegram
+// Register handler for Telegram
 webhookRegistry.registerHandler('telegram', async (event) => {
   console.log(`\n📨 [Telegram] Received webhook event:`);
   console.log(`   Update ID: ${(event.payload as any)?.update_id}`);
   console.log(`   Event Type: ${event.eventType || 'unknown'}`);
   
-  // Здесь можно запустить workflow или обработать напрямую
-  // Workflow engine автоматически вызовет зарегистрированные обработчики
+  // Here you can start a workflow or process directly
+  // Workflow engine will automatically call registered handlers
 });
 
-// Регистрируем обработчик для Google Calendar
+// Register handler for Google Calendar
 webhookRegistry.registerHandler('google-calendar', async (event) => {
   console.log(`\n📅 [Google Calendar] Received webhook event:`);
   console.log(`   Resource State: ${event.headers['x-goog-resource-state']}`);
   console.log(`   Channel ID: ${event.headers['x-goog-channel-id']}`);
   
-  // Workflow engine обработает событие автоматически
+  // Workflow engine will process the event automatically
 });
 
 // ==========================================
-// ЗАПУСК СЕРВЕРА
+// START SERVER
 // ==========================================
 
 const PORT = Number(process.env.PORT) || 3000;

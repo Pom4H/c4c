@@ -1,27 +1,27 @@
 /**
  * Telegram Bot Event Handler
  * 
- * Демонстрирует как обрабатывать события от Telegram используя
- * типы из сгенерированных процедур
+ * Demonstrates how to handle Telegram events using
+ * types from generated procedures
  */
 
 import { defineContract, defineProcedure } from '@c4c/core';
 import { z } from 'zod';
 
 // ==========================================
-// 1. ИМПОРТИРУЕМ ТИПЫ ИЗ СГЕНЕРИРОВАННЫХ ПРОЦЕДУР
+// 1. IMPORT TYPES FROM GENERATED PROCEDURES
 // ==========================================
 
-// Импортируем схемы из generated/telegram/schemas.gen.ts
+// Import schemas from generated/telegram/schemas.gen.ts
 import * as TelegramSchemas from '../../../generated/telegram/schemas.gen.js';
 
 // ==========================================
-// 2. ОПРЕДЕЛЯЕМ СХЕМЫ СОБЫТИЙ
+// 2. DEFINE EVENT SCHEMAS
 // ==========================================
 
 /**
- * Telegram Update - основная схема события от Telegram
- * Используем JSON Schema из сгенерированного файла
+ * Telegram Update - main event schema from Telegram
+ * Using JSON Schema from generated file
  */
 const TelegramUpdateSchema = z.object({
   update_id: z.number(),
@@ -57,13 +57,13 @@ const TelegramUpdateSchema = z.object({
   }).optional(),
 });
 
-// TypeScript типы из схем
+// TypeScript types from schemas
 type TelegramUpdate = z.infer<typeof TelegramUpdateSchema>;
 type TelegramMessage = NonNullable<TelegramUpdate['message']>;
 type TelegramCallbackQuery = NonNullable<TelegramUpdate['callback_query']>;
 
 // ==========================================
-// 3. ПРОЦЕДУРА ДЛЯ ОБРАБОТКИ ТЕКСТОВЫХ СООБЩЕНИЙ
+// 3. PROCEDURE FOR HANDLING TEXT MESSAGES
 // ==========================================
 
 export const handleTelegramMessageContract = defineContract({
@@ -89,7 +89,7 @@ export const handleTelegramMessage = defineProcedure({
   handler: async (input, context) => {
     const { update } = input;
     
-    // Проверяем, что это текстовое сообщение
+    // Check if this is a text message
     if (!update.message?.text) {
       return {
         reply: '',
@@ -102,10 +102,10 @@ export const handleTelegramMessage = defineProcedure({
     
     console.log(`[Telegram] Received message from ${message.from.first_name}: ${message.text}`);
     
-    // Обработка команд
+    // Handle commands
     if (text.startsWith('/start')) {
       return {
-        reply: `Привет, ${message.from.first_name}! 👋\n\nЯ бот на c4c framework.\nИспользуй /help для списка команд.`,
+        reply: `Hello, ${message.from.first_name}! 👋\n\nI'm a bot built with c4c framework.\nUse /help to see available commands.`,
         shouldReply: true,
         actions: ['log_user', 'send_welcome'],
       };
@@ -113,33 +113,33 @@ export const handleTelegramMessage = defineProcedure({
     
     if (text.startsWith('/help')) {
       return {
-        reply: `📚 Доступные команды:\n\n` +
-               `/start - Начать работу\n` +
-               `/help - Эта справка\n` +
-               `/status - Проверить статус\n` +
-               `/subscribe - Подписаться на уведомления`,
+        reply: `📚 Available commands:\n\n` +
+               `/start - Start using the bot\n` +
+               `/help - Show this help\n` +
+               `/status - Check bot status\n` +
+               `/subscribe - Subscribe to notifications`,
         shouldReply: true,
       };
     }
     
     if (text.startsWith('/status')) {
       return {
-        reply: `✅ Бот работает нормально!\n\nВремя: ${new Date().toISOString()}`,
+        reply: `✅ Bot is running!\n\nTime: ${new Date().toISOString()}`,
         shouldReply: true,
       };
     }
     
-    // Обработка обычного текста
-    if (text.includes('привет') || text.includes('hello')) {
+    // Handle regular text
+    if (text.includes('hello') || text.includes('hi')) {
       return {
-        reply: `Привет! Как дела?`,
+        reply: `Hello! How are you?`,
         shouldReply: true,
       };
     }
     
-    // Эхо для остального
+    // Echo for everything else
     return {
-      reply: `Вы сказали: "${message.text}"`,
+      reply: `You said: "${message.text}"`,
       shouldReply: true,
       actions: ['echo'],
     };
@@ -147,7 +147,7 @@ export const handleTelegramMessage = defineProcedure({
 });
 
 // ==========================================
-// 4. ПРОЦЕДУРА ДЛЯ ОБРАБОТКИ CALLBACK QUERY
+// 4. PROCEDURE FOR HANDLING CALLBACK QUERY
 // ==========================================
 
 export const handleTelegramCallbackContract = defineContract({
@@ -187,36 +187,36 @@ export const handleTelegramCallback = defineProcedure({
     
     console.log(`[Telegram] Callback query: ${data} from user ${callback.from.id}`);
     
-    // Обработка разных callback data
+    // Handle different callback data
     if (data === 'subscribe') {
       return {
-        answer: 'Вы подписаны на уведомления! ✅',
+        answer: 'You are subscribed to notifications! ✅',
         showAlert: true,
         editMessage: true,
-        newText: 'Подписка активирована! Вы будете получать уведомления.',
+        newText: 'Subscription activated! You will receive notifications.',
       };
     }
     
     if (data === 'unsubscribe') {
       return {
-        answer: 'Подписка отменена',
+        answer: 'Subscription cancelled',
         showAlert: false,
         editMessage: true,
-        newText: 'Подписка отменена. Вы больше не будете получать уведомления.',
+        newText: 'Subscription cancelled. You will no longer receive notifications.',
       };
     }
     
     if (data.startsWith('action_')) {
       const action = data.replace('action_', '');
       return {
-        answer: `Выполнено: ${action}`,
+        answer: `Executed: ${action}`,
         showAlert: false,
         editMessage: false,
       };
     }
     
     return {
-      answer: 'Команда обработана',
+      answer: 'Command processed',
       showAlert: false,
       editMessage: false,
     };
@@ -224,7 +224,7 @@ export const handleTelegramCallback = defineProcedure({
 });
 
 // ==========================================
-// 5. РОУТЕР СОБЫТИЙ - ОПРЕДЕЛЯЕТ ТИП СОБЫТИЯ
+// 5. EVENT ROUTER - DETERMINES EVENT TYPE
 // ==========================================
 
 export const routeTelegramEventContract = defineContract({
@@ -256,7 +256,7 @@ export const routeTelegramEvent = defineProcedure({
   handler: async (input, context) => {
     const { update } = input;
     
-    // Определяем тип события
+    // Determine event type
     if (update.message) {
       return {
         eventType: 'message',
@@ -294,7 +294,7 @@ export const routeTelegramEvent = defineProcedure({
     if (update.channel_post) {
       return {
         eventType: 'channel_post',
-        shouldProcess: false, // Не обрабатываем посты в каналах
+        shouldProcess: false, // Don't process channel posts
       };
     }
     
@@ -306,7 +306,7 @@ export const routeTelegramEvent = defineProcedure({
 });
 
 // ==========================================
-// 6. ЭКСПОРТ ВСЕХ ПРОЦЕДУР
+// 6. EXPORT ALL PROCEDURES
 // ==========================================
 
 export const TelegramHandlers = [

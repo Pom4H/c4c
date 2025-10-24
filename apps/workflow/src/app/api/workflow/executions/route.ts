@@ -1,6 +1,6 @@
 /**
  * API Route: GET /api/workflow/executions
- * Проксирует запрос на backend server
+ * Proxies request to backend server
  */
 
 import { NextResponse } from "next/server";

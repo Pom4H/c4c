@@ -1,7 +1,7 @@
 /**
  * Google Calendar Workflow
  * 
- * Обрабатывает изменения в Google Calendar и отправляет уведомления
+ * Handles changes in Google Calendar and sends notifications
  */
 
 import type { WorkflowDefinition } from '@c4c/workflow';
@@ -12,16 +12,16 @@ export const googleCalendarWorkflow: WorkflowDefinition = {
   description: 'Syncs calendar events and sends notifications',
   
   // ==========================================
-  // TRIGGER: Watch от Google Calendar
+  // TRIGGER: Watch from Google Calendar
   // ==========================================
   trigger: {
     type: 'webhook' as const,
     config: {
-      // Используем сгенерированную процедуру для watch
+      // Use generated procedure for watch
       procedure: 'google-calendar.calendar.events.watch',
       provider: 'google-calendar',
       
-      // Параметры для регистрации watch
+      // Parameters for watch registration
       initialSetup: {
         calendarId: 'primary',
         channel: {
@@ -36,7 +36,7 @@ export const googleCalendarWorkflow: WorkflowDefinition = {
   
   steps: [
     // ==========================================
-    // ШАГ 1: Определение типа события
+    // STEP 1: Determine event type
     // ==========================================
     {
       id: 'route-event',
@@ -48,7 +48,7 @@ export const googleCalendarWorkflow: WorkflowDefinition = {
     },
     
     // ==========================================
-    // ШАГ 2: Получение деталей события (если нужно)
+    // STEP 2: Fetch event details (if needed)
     // ==========================================
     {
       id: 'fetch-event-details',
@@ -62,7 +62,7 @@ export const googleCalendarWorkflow: WorkflowDefinition = {
     },
     
     // ==========================================
-    // ШАГ 3: Обработка создания события
+    // STEP 3: Handle event creation
     // ==========================================
     {
       id: 'handle-created',
@@ -76,7 +76,7 @@ export const googleCalendarWorkflow: WorkflowDefinition = {
     },
     
     // ==========================================
-    // ШАГ 4: Обработка обновления события
+    // STEP 4: Handle event update
     // ==========================================
     {
       id: 'handle-updated',
@@ -86,12 +86,12 @@ export const googleCalendarWorkflow: WorkflowDefinition = {
       input: {
         event: "{{ steps['fetch-event-details'].output }}",
         calendarId: 'primary',
-        // previousEvent можно получить из кэша/БД
+        // previousEvent can be retrieved from cache/DB
       },
     },
     
     // ==========================================
-    // ШАГ 5: Обработка удаления события
+    // STEP 5: Handle event deletion
     // ==========================================
     {
       id: 'handle-deleted',
@@ -105,7 +105,7 @@ export const googleCalendarWorkflow: WorkflowDefinition = {
     },
     
     // ==========================================
-    // ШАГ 6: Отправка уведомления в Telegram (если нужно)
+    // STEP 6: Send Telegram notification (if needed)
     // ==========================================
     {
       id: 'notify-telegram',
@@ -120,7 +120,7 @@ export const googleCalendarWorkflow: WorkflowDefinition = {
     },
     
     // ==========================================
-    // ШАГ 7: Логирование
+    // STEP 7: Logging
     // ==========================================
     {
       id: 'log-event',

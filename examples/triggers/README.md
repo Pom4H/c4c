@@ -1,52 +1,52 @@
-# Примеры использования триггеров
+# Trigger Examples
 
-Этот пример демонстрирует, как использовать сгенерированные процедуры/триггеры для обработки событий в workflow.
+This example demonstrates how to use generated procedures/triggers to handle events in workflows.
 
-## Структура
+## Structure
 
 ```
 src/
 ├── handlers/
-│   ├── telegram-handler.ts        # Обработчики событий Telegram
-│   └── google-calendar-handler.ts # Обработчики событий Google Calendar
+│   ├── telegram-handler.ts        # Telegram event handlers
+│   └── google-calendar-handler.ts # Google Calendar event handlers
 ├── workflows/
-│   ├── telegram-bot-workflow.ts   # Workflow для Telegram бота
-│   └── google-calendar-workflow.ts # Workflow для Google Calendar
-└── server.ts                       # Настройка и запуск сервера
+│   ├── telegram-bot-workflow.ts   # Workflow for Telegram bot
+│   └── google-calendar-workflow.ts # Workflow for Google Calendar
+└── server.ts                       # Server setup and startup
 ```
 
-## Ключевые концепции
+## Key Concepts
 
-### 1. Импорт схем из сгенерированных файлов
+### 1. Importing schemas from generated files
 
 ```typescript
-// Импортируем JSON схемы из generated/telegram/schemas.gen.ts
+// Import JSON schemas from generated/telegram/schemas.gen.ts
 import * as TelegramSchemas from '../../generated/telegram/schemas.gen.js';
 
-// Используем для создания Zod схем
+// Use them to create Zod schemas
 const TelegramUpdateSchema = z.object({
   update_id: z.number(),
   message: z.object({...}),
   // ...
 });
 
-// Получаем TypeScript типы
+// Get TypeScript types
 type TelegramUpdate = z.infer<typeof TelegramUpdateSchema>;
 ```
 
-### 2. Создание обработчиков событий
+### 2. Creating event handlers
 
 ```typescript
-// Обработчик принимает событие и возвращает результат
+// Handler receives event and returns result
 export const handleTelegramMessage = defineProcedure({
   contract: handleTelegramMessageContract,
   handler: async (input, context) => {
     const { update } = input;
     
-    // Обработка разных типов сообщений
+    // Handle different message types
     if (update.message?.text.startsWith('/start')) {
       return {
-        reply: 'Привет! 👋',
+        reply: 'Hello! 👋',
         shouldReply: true,
       };
     }
@@ -56,10 +56,10 @@ export const handleTelegramMessage = defineProcedure({
 });
 ```
 
-### 3. Роутер событий
+### 3. Event Router
 
 ```typescript
-// Определяет тип события для дальнейшей обработки
+// Determines event type for further processing
 export const routeTelegramEvent = defineProcedure({
   contract: routeTelegramEventContract,
   handler: async (input, context) => {
@@ -74,28 +74,28 @@ export const routeTelegramEvent = defineProcedure({
 });
 ```
 
-### 4. Workflow с триггером
+### 4. Workflow with Trigger
 
 ```typescript
 export const telegramBotWorkflow: WorkflowDefinition = {
   trigger: {
     type: 'webhook',
     config: {
-      procedure: 'telegram.post.get.updates', // Сгенерированный триггер
+      procedure: 'telegram.post.get.updates', // Generated trigger
       provider: 'telegram',
     },
   },
   steps: [
     {
       id: 'route-event',
-      procedure: 'telegram.route.event', // Наш роутер
+      procedure: 'telegram.route.event', // Our router
       input: {
-        update: '{{ trigger.data }}', // Данные от триггера
+        update: '{{ trigger.data }}', // Data from trigger
       },
     },
     {
       id: 'handle-message',
-      procedure: 'telegram.handle.message', // Наш обработчик
+      procedure: 'telegram.handle.message', // Our handler
       condition: "{{ steps['route-event'].output.eventType === 'message' }}",
       input: {
         update: '{{ trigger.data }}',
@@ -103,7 +103,7 @@ export const telegramBotWorkflow: WorkflowDefinition = {
     },
     {
       id: 'send-reply',
-      procedure: 'telegram.post.send.message', // Сгенерированная процедура
+      procedure: 'telegram.post.send.message', // Generated procedure
       condition: "{{ steps['handle-message'].output.shouldReply === true }}",
       input: {
         chat_id: '{{ trigger.data.message.chat.id }}',
@@ -114,15 +114,15 @@ export const telegramBotWorkflow: WorkflowDefinition = {
 };
 ```
 
-## Запуск
+## Running
 
-### 1. Установка зависимостей
+### 1. Install dependencies
 
 ```bash
 pnpm install
 ```
 
-### 2. Сгенерируйте процедуры для API
+### 2. Generate procedures for APIs
 
 ```bash
 # Telegram
@@ -132,7 +132,7 @@ c4c integrate https://api.apis.guru/v2/specs/telegram.org/5.0.0/openapi.json --n
 c4c integrate https://raw.githubusercontent.com/Pom4H/openapi-ts/main/examples/openapi-ts-trigger/google-calendar-api.json --name google-calendar
 ```
 
-### 3. Настройте переменные окружения
+### 3. Configure environment variables
 
 ```bash
 export TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
@@ -140,36 +140,36 @@ export GOOGLE_CALENDAR_TOKEN="your_google_token"
 export TELEGRAM_ADMIN_CHAT_ID="your_chat_id"
 ```
 
-### 4. Запустите сервер
+### 4. Start the server
 
 ```bash
 pnpm start
-# или для разработки с hot reload
+# or for development with hot reload
 pnpm dev
 ```
 
-## Тестирование
+## Testing
 
-### Получить список триггеров
+### Get list of triggers
 
 ```bash
 curl http://localhost:3000/webhooks/triggers | jq
 ```
 
-### Вызвать триггер напрямую (для тестирования)
+### Call trigger directly (for testing)
 
 ```bash
-# Отправить тестовое сообщение в Telegram бот
+# Send test message to Telegram bot
 curl -X POST http://localhost:3000/webhooks/triggers/telegram.post.send.message \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TELEGRAM_BOT_TOKEN" \
   -d '{
     "chat_id": 123456789,
-    "text": "Тестовое сообщение от c4c!"
+    "text": "Test message from c4c!"
   }'
 ```
 
-### Симуляция webhook от Telegram
+### Simulate webhook from Telegram
 
 ```bash
 curl -X POST http://localhost:3000/webhooks/telegram \
@@ -195,7 +195,7 @@ curl -X POST http://localhost:3000/webhooks/telegram \
   }'
 ```
 
-### Симуляция webhook от Google Calendar
+### Simulate webhook from Google Calendar
 
 ```bash
 curl -X POST http://localhost:3000/webhooks/google-calendar \
@@ -212,7 +212,7 @@ curl -X POST http://localhost:3000/webhooks/google-calendar \
   }'
 ```
 
-## Архитектура
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -228,9 +228,9 @@ curl -X POST http://localhost:3000/webhooks/google-calendar \
 ┌─────────────────────────────────────────────────┐
 │              Workflow Engine                    │
 │  ┌──────────────────────────────────────────┐  │
-│  │  1. Route Event (определить тип)        │  │
-│  │  2. Handle Event (обработать)           │  │
-│  │  3. Execute Action (выполнить действие) │  │
+│  │  1. Route Event (determine type)         │  │
+│  │  2. Handle Event (process)               │  │
+│  │  3. Execute Action (perform action)      │  │
 │  └──────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────┘
                       ↓
@@ -241,20 +241,20 @@ curl -X POST http://localhost:3000/webhooks/google-calendar \
 └─────────────────────────────────────────────────┘
 ```
 
-## Преимущества подхода
+## Benefits of this Approach
 
-1. **Полная типизация** - TypeScript типы из схем
-2. **Переиспользуемость** - обработчики можно использовать в разных workflows
-3. **Тестируемость** - каждый обработчик можно тестировать отдельно
-4. **Расширяемость** - легко добавить новые типы событий
-5. **Композиция** - комбинировать разные API в одном workflow
+1. **Full type safety** - TypeScript types from schemas
+2. **Reusability** - handlers can be used in different workflows
+3. **Testability** - each handler can be tested separately
+4. **Extensibility** - easy to add new event types
+5. **Composition** - combine different APIs in one workflow
 
-## Примеры сценариев
+## Example Scenarios
 
 ### Telegram → Google Calendar
 
 ```typescript
-// Создание события в календаре из Telegram команды
+// Create calendar event from Telegram command
 steps: [
   {
     id: 'parse-command',
@@ -276,7 +276,7 @@ steps: [
     procedure: 'telegram.post.send.message',
     input: {
       chat_id: '{{ trigger.data.message.chat.id }}',
-      text: 'Событие создано! ✅',
+      text: 'Event created! ✅',
     },
   },
 ]
@@ -285,7 +285,7 @@ steps: [
 ### Google Calendar → Telegram Notification
 
 ```typescript
-// Уведомление в Telegram о новом событии
+// Notify in Telegram about new event
 steps: [
   {
     id: 'fetch-event',
@@ -297,7 +297,7 @@ steps: [
     procedure: 'telegram.post.send.message',
     input: {
       chat_id: '{{ env.ADMIN_CHAT_ID }}',
-      text: 'Новое событие: {{ steps.fetch-event.output.summary }}',
+      text: 'New event: {{ steps.fetch-event.output.summary }}',
     },
   },
 ]
