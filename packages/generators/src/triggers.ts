@@ -672,8 +672,13 @@ function extractWebhooksFromOpenApi(spec: any, operationSchemas: Record<string, 
       if (!operation) continue;
       
       const operationId = operation.operationId || `${webhookName}Webhook`;
-      const camelCaseName = operationId.charAt(0).toLowerCase() + operationId.slice(1);
-      const pascalName = operationId.charAt(0).toUpperCase() + operationId.slice(1);
+      // Convert webhook name to camelCase, removing dots and underscores
+      const cleanName = operationId.replace(/[._-]/g, ' ')
+        .split(' ')
+        .map((word: string, index: number) => index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join('');
+      const camelCaseName = cleanName.charAt(0).toLowerCase() + cleanName.slice(1);
+      const pascalName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
       
       // Extract schemas for this webhook
       let inputSchema: string | null = null;
