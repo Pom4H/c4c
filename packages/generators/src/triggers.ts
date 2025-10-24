@@ -428,6 +428,9 @@ function extractSchemasFromOpenApi(spec: any): Record<string, { input: string | 
     return schemas;
   }
   
+  // Get components for $ref resolution
+  const components = spec.components?.schemas || {};
+  
   // Process each path and operation
   for (const [pathStr, pathItem] of Object.entries(spec.paths || {})) {
     const pathObj = pathItem as any;
@@ -445,8 +448,8 @@ function extractSchemasFromOpenApi(spec: any): Record<string, { input: string | 
         const content = operation.requestBody.content;
         const jsonContent = content['application/json'] || content['application/x-www-form-urlencoded'];
         if (jsonContent?.schema) {
-          // Convert Zod schema object to Zod code string
-          inputSchema = zodSchemaToZodCode(jsonContent.schema);
+          // Convert JSON Schema to Zod code string
+          inputSchema = jsonSchemaToZod(jsonContent.schema, components);
         }
       } else if (operation.parameters && operation.parameters.length > 0) {
         // Handle query/path parameters
@@ -473,7 +476,8 @@ function extractSchemasFromOpenApi(spec: any): Record<string, { input: string | 
           const content = successResponse.content;
           const jsonContent = content['application/json'];
           if (jsonContent?.schema) {
-            outputSchema = zodSchemaToZodCode(jsonContent.schema);
+            // Convert JSON Schema to Zod code string
+            outputSchema = jsonSchemaToZod(jsonContent.schema, components);
           }
         }
       }
@@ -595,20 +599,46 @@ function jsonSchemaToZod(schema: any, components: Record<string, any> = {}): str
     if (refName && components[refName]) {
       return jsonSchemaToZod(components[refName], components);
     }
-    return 'z.any()';
+    return 'z.unknown()';
+  }
+  
+  // Handle oneOf (union)
+  if (schema.oneOf && Array.isArray(schema.oneOf) && schema.oneOf.length > 0) {
+    const variants = schema.oneOf.map((s: any) => jsonSchemaToZod(s, components));
+    return `z.union([${variants.join(', ')}])`;
+  }
+  
+  // Handle anyOf (union)
+  if (schema.anyOf && Array.isArray(schema.anyOf) && schema.anyOf.length > 0) {
+    const variants = schema.anyOf.map((s: any) => jsonSchemaToZod(s, components));
+    return `z.union([${variants.join(', ')}])`;
+  }
+  
+  // Handle allOf (intersection)
+  if (schema.allOf && Array.isArray(schema.allOf) && schema.allOf.length > 0) {
+    const variants = schema.allOf.map((s: any) => jsonSchemaToZod(s, components));
+    return variants.join('.and(');
   }
   
   // Handle type
   if (schema.type === 'object') {
     if (!schema.properties || Object.keys(schema.properties).length === 0) {
+      // Check for additionalProperties
+      if (schema.additionalProperties === false) {
+        return 'z.object({})';
+      }
       return 'z.record(z.string(), z.unknown())';
     }
     
     const properties: string[] = [];
+    const required = schema.required || [];
+    
     for (const [key, propSchema] of Object.entries(schema.properties)) {
       const propZod = jsonSchemaToZod(propSchema as any, components);
-      const optional = schema.required?.includes(key) ? '' : '.optional()';
-      properties.push(`${key}: ${propZod}${optional}`);
+      const isRequired = required.includes(key);
+      const optional = isRequired ? '' : '.optional()';
+      const safeKey = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key) ? key : `"${key}"`;
+      properties.push(`${safeKey}: ${propZod}${optional}`);
     }
     
     return `z.object({\n  ${properties.join(',\n  ')}\n})`;
@@ -619,6 +649,12 @@ function jsonSchemaToZod(schema: any, components: Record<string, any> = {}): str
     return `z.array(${itemsZod})`;
   }
   
+  // Handle nullable
+  if (schema.nullable === true) {
+    const baseType = jsonSchemaToZodType(schema);
+    return `${baseType}.nullable()`;
+  }
+  
   return jsonSchemaToZodType(schema);
 }
 
@@ -626,26 +662,51 @@ function jsonSchemaToZod(schema: any, components: Record<string, any> = {}): str
  * Convert simple JSON Schema type to Zod type
  */
 function jsonSchemaToZodType(schema: any): string {
-  if (schema.enum) {
+  if (schema.enum && Array.isArray(schema.enum) && schema.enum.length > 0) {
     const values = schema.enum.map((v: any) => JSON.stringify(v)).join(', ');
     return `z.enum([${values}])`;
   }
   
+  // Handle const
+  if (schema.const !== undefined) {
+    return `z.literal(${JSON.stringify(schema.const)})`;
+  }
+  
   switch (schema.type) {
-    case 'string':
-      if (schema.format === 'date-time') return 'z.string().datetime()';
-      if (schema.format === 'email') return 'z.string().email()';
-      if (schema.format === 'url' || schema.format === 'uri') return 'z.string().url()';
-      if (schema.minLength !== undefined || schema.maxLength !== undefined) {
-        let str = 'z.string()';
-        if (schema.minLength !== undefined) str += `.min(${schema.minLength})`;
-        if (schema.maxLength !== undefined) str += `.max(${schema.maxLength})`;
-        return str;
+    case 'string': {
+      let str = 'z.string()';
+      
+      // Format validations
+      if (schema.format === 'date-time') str += '.datetime()';
+      else if (schema.format === 'email') str += '.email()';
+      else if (schema.format === 'url' || schema.format === 'uri') str += '.url()';
+      else if (schema.format === 'uuid') str += '.uuid()';
+      // Note: Zod doesn't have a built-in .date() method, dates are handled as strings
+      
+      // Length validations
+      if (schema.minLength !== undefined) str += `.min(${schema.minLength})`;
+      if (schema.maxLength !== undefined) str += `.max(${schema.maxLength})`;
+      
+      // Pattern validation
+      if (schema.pattern) {
+        const escapedPattern = schema.pattern.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        str += `.regex(new RegExp('${escapedPattern}'))`;
       }
-      return 'z.string()';
+      
+      return str;
+    }
     case 'number':
-    case 'integer':
-      return 'z.number()';
+    case 'integer': {
+      let num = 'z.number()';
+      
+      if (schema.type === 'integer') num += '.int()';
+      if (schema.minimum !== undefined) num += `.min(${schema.minimum})`;
+      if (schema.maximum !== undefined) num += `.max(${schema.maximum})`;
+      if (schema.exclusiveMinimum !== undefined) num += `.gt(${schema.exclusiveMinimum})`;
+      if (schema.exclusiveMaximum !== undefined) num += `.lt(${schema.exclusiveMaximum})`;
+      
+      return num;
+    }
     case 'boolean':
       return 'z.boolean()';
     case 'null':
