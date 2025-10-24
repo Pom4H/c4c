@@ -419,7 +419,7 @@ async function parseTriggersMetadata(source: string): Promise<Record<string, Tri
 }
 
 /**
- * Extract schemas from OpenAPI specification
+ * Extract schemas from OpenAPI specification (which contains Zod schemas)
  */
 function extractSchemasFromOpenApi(spec: any): Record<string, { input: string | null; output: string | null }> {
   const schemas: Record<string, { input: string | null; output: string | null }> = {};
@@ -445,16 +445,19 @@ function extractSchemasFromOpenApi(spec: any): Record<string, { input: string | 
         const content = operation.requestBody.content;
         const jsonContent = content['application/json'] || content['application/x-www-form-urlencoded'];
         if (jsonContent?.schema) {
-          inputSchema = jsonSchemaToZod(jsonContent.schema, spec.components?.schemas || {});
+          // Convert Zod schema object to Zod code string
+          inputSchema = zodSchemaToZodCode(jsonContent.schema);
         }
       } else if (operation.parameters && operation.parameters.length > 0) {
         // Handle query/path parameters
         const paramSchemas: string[] = [];
         for (const param of operation.parameters) {
           if (param.in === 'query' || param.in === 'path') {
-            const paramType = jsonSchemaToZodType(param.schema || { type: 'string' });
+            const paramType = param.schema?.type || 'string';
+            const zodType = paramType === 'integer' || paramType === 'number' ? 'z.number()' : 
+                           paramType === 'boolean' ? 'z.boolean()' : 'z.string()';
             const optional = param.required ? '' : '.optional()';
-            paramSchemas.push(`${param.name}: ${paramType}${optional}`);
+            paramSchemas.push(`${param.name}: ${zodType}${optional}`);
           }
         }
         if (paramSchemas.length > 0) {
@@ -470,7 +473,7 @@ function extractSchemasFromOpenApi(spec: any): Record<string, { input: string | 
           const content = successResponse.content;
           const jsonContent = content['application/json'];
           if (jsonContent?.schema) {
-            outputSchema = jsonSchemaToZod(jsonContent.schema, spec.components?.schemas || {});
+            outputSchema = zodSchemaToZodCode(jsonContent.schema);
           }
         }
       }
@@ -483,6 +486,103 @@ function extractSchemasFromOpenApi(spec: any): Record<string, { input: string | 
   }
   
   return schemas;
+}
+
+/**
+ * Convert Zod schema object (with _def) to Zod code string
+ */
+function zodSchemaToZodCode(schema: any): string | null {
+  if (!schema || !schema._def) {
+    return null;
+  }
+  
+  const typeName = schema._def.typeName;
+  
+  if (typeName === 'ZodObject') {
+    const shape = typeof schema._def.shape === 'function' ? schema._def.shape() : schema._def.shape;
+    if (!shape || Object.keys(shape).length === 0) {
+      return 'z.object({})';
+    }
+    
+    const properties: string[] = [];
+    for (const [key, value] of Object.entries(shape)) {
+      const propCode = zodSchemaToZodCode(value);
+      if (propCode) {
+        properties.push(`${key}: ${propCode}`);
+      }
+    }
+    
+    if (properties.length === 0) {
+      return 'z.object({})';
+    }
+    
+    return `z.object({\n  ${properties.join(',\n  ')}\n})`;
+  }
+  
+  if (typeName === 'ZodString') {
+    let code = 'z.string()';
+    const checks = schema._def.checks || [];
+    for (const check of checks) {
+      if (check.kind === 'min') {
+        code += `.min(${check.value})`;
+      } else if (check.kind === 'max') {
+        code += `.max(${check.value})`;
+      } else if (check.kind === 'email') {
+        code += '.email()';
+      } else if (check.kind === 'url') {
+        code += '.url()';
+      } else if (check.kind === 'datetime') {
+        code += '.datetime()';
+      }
+    }
+    return code;
+  }
+  
+  if (typeName === 'ZodNumber' || typeName === 'ZodBigInt') {
+    return 'z.number()';
+  }
+  
+  if (typeName === 'ZodBoolean') {
+    return 'z.boolean()';
+  }
+  
+  if (typeName === 'ZodArray') {
+    const itemsCode = zodSchemaToZodCode(schema._def.type);
+    return `z.array(${itemsCode || 'z.unknown()'})`;
+  }
+  
+  if (typeName === 'ZodEnum') {
+    const values = schema._def.values || [];
+    if (values.length === 0) return null;
+    const enumValues = values.map((v: any) => JSON.stringify(v)).join(', ');
+    return `z.enum([${enumValues}])`;
+  }
+  
+  if (typeName === 'ZodOptional') {
+    const innerCode = zodSchemaToZodCode(schema._def.innerType);
+    return `${innerCode}.optional()`;
+  }
+  
+  if (typeName === 'ZodNullable') {
+    const innerCode = zodSchemaToZodCode(schema._def.innerType);
+    return `${innerCode}.nullable()`;
+  }
+  
+  if (typeName === 'ZodDefault') {
+    const innerCode = zodSchemaToZodCode(schema._def.innerType);
+    return innerCode; // We don't include .default() in generated code
+  }
+  
+  if (typeName === 'ZodRecord') {
+    return 'z.record(z.unknown())';
+  }
+  
+  if (typeName === 'ZodUnknown' || typeName === 'ZodAny') {
+    return 'z.unknown()';
+  }
+  
+  // Fallback
+  return 'z.unknown()';
 }
 
 /**
