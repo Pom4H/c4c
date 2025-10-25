@@ -766,9 +766,10 @@ import { z } from "zod";
     metadata.push(`    },`);
   }
   
-  // Use extracted schemas if available, otherwise fall back to z.any()
-  const inputSchema = op.inputSchema || 'z.any()';
-  const outputSchema = op.outputSchema || 'z.any()';
+  // Use extracted schemas if available, otherwise use z.unknown()
+  // z.unknown() is safer than z.any() and forces type checking
+  const inputSchema = op.inputSchema || 'z.unknown()';
+  const outputSchema = op.outputSchema || 'z.unknown()';
   
   const code = `
 export const ${contractName}: Contract = {
@@ -1048,10 +1049,10 @@ ${sdkConfigCode}`;
       metadata.push(`    },`);
     }
     
-    // For @hey-api/schemas, we need to wrap JSON schemas in z.any() for now
-    // In the future, we could convert JSON schemas to Zod or use json-schema-to-zod
-    const inputSchema = 'z.any()';
-    const outputSchema = 'z.any()';
+    // For @hey-api/schemas, we need to use z.unknown() when schemas are not available
+    // z.unknown() is safer than z.any() and forces type checking
+    const inputSchema = 'z.unknown()';
+    const outputSchema = 'z.unknown()';
     
     return `
 export const ${contractName}: Contract = {

@@ -9,8 +9,15 @@ import { z } from "zod";
 export const NotificationServiceNotificationsSubscribeContract: Contract = {
   name: "notification-service.notifications.subscribe",
   description: "Subscribe to notifications on a topic",
-  input: z.any(),
-  output: z.any(),
+  input: z.object({
+    topic: z.string(),
+    webhookUrl: z.string().url(),
+  }),
+  output: z.object({
+    success: z.boolean(),
+    subscriptionId: z.string(),
+    topic: z.string(),
+  }),
   metadata: {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],

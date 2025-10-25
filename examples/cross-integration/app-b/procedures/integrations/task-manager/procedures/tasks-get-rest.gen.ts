@@ -6,11 +6,25 @@ import { withOAuth, getOAuthHeaders } from "@c4c/policies";
 import * as sdk from "../../../../generated/task-manager/sdk.gen.js";
 import { z } from "zod";
 
+const TaskSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  status: z.enum(['todo', 'in_progress', 'done']),
+  priority: z.enum(['low', 'medium', 'high']).optional(),
+  assignee: z.string().optional(),
+  dueDate: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 export const TaskManagerTasksGetRestContract: Contract = {
   name: "task-manager.tasks.get.rest",
   description: "Get a task by ID",
-  input: z.any(),
-  output: z.any(),
+  input: z.object({
+    id: z.string(),
+  }),
+  output: TaskSchema,
   metadata: {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],
