@@ -6,21 +6,40 @@ import { withOAuth, getOAuthHeaders } from "@c4c/policies";
 import * as sdk from "../../../../generated/task-manager/sdk.gen.js";
 import { z } from "zod";
 
-export const TaskManagerTasksListContract: Contract = {
-  name: "task-manager.tasks.list",
+const TaskSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  status: z.enum(['todo', 'in_progress', 'done']),
+  priority: z.enum(['low', 'medium', 'high']).optional(),
+  assignee: z.string().optional(),
+  dueDate: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const TaskManagerTasksListRestContract: Contract = {
+  name: "task-manager.tasks.list.rest",
   description: "List all tasks with optional filters",
-  input: z.any(),
-  output: z.any(),
+  input: z.object({
+    status: z.enum(['todo', 'in_progress', 'done']).optional(),
+    assignee: z.string().optional(),
+    limit: z.number().optional(),
+  }),
+  output: z.object({
+    tasks: z.array(TaskSchema),
+    total: z.number(),
+  }),
   metadata: {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],
     provider: "task-manager",
-    operation: "tasksList",
+    operation: "tasksListRest",
     tags: ["task-manager"],
   },
 };
 
-const tasksListHandler = applyPolicies(
+const tasksListRestHandler = applyPolicies(
   async (input, context) => {
     const headers = getOAuthHeaders(context, "task-manager");
     const request: Record<string, unknown> = { ...input };
@@ -30,7 +49,7 @@ const tasksListHandler = applyPolicies(
         ...headers,
       };
     }
-    const result = await sdk.tasksList(request as any);
+    const result = await sdk.tasksListRest(request as any);
     if (result && typeof result === "object" && "data" in result) {
       return (result as { data: unknown }).data;
     }
@@ -43,7 +62,7 @@ const tasksListHandler = applyPolicies(
   })
 );
 
-export const TaskManagerTasksListProcedure: Procedure = {
-  contract: TaskManagerTasksListContract,
-  handler: tasksListHandler,
+export const TaskManagerTasksListRestProcedure: Procedure = {
+  contract: TaskManagerTasksListRestContract,
+  handler: tasksListRestHandler,
 };

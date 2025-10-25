@@ -6,21 +6,26 @@ import { withOAuth, getOAuthHeaders } from "@c4c/policies";
 import * as sdk from "../../../../generated/task-manager/sdk.gen.js";
 import { z } from "zod";
 
-export const TaskManagerTasksUpdateContract: Contract = {
-  name: "task-manager.tasks.update",
-  description: "Update a task",
-  input: z.any(),
-  output: z.any(),
+export const TaskManagerTasksDeleteRestContract: Contract = {
+  name: "task-manager.tasks.delete.rest",
+  description: "Delete a task",
+  input: z.object({
+    id: z.string(),
+  }),
+  output: z.object({
+    success: z.boolean(),
+    id: z.string(),
+  }),
   metadata: {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],
     provider: "task-manager",
-    operation: "tasksUpdate",
+    operation: "tasksDeleteRest",
     tags: ["task-manager"],
   },
 };
 
-const tasksUpdateHandler = applyPolicies(
+const tasksDeleteRestHandler = applyPolicies(
   async (input, context) => {
     const headers = getOAuthHeaders(context, "task-manager");
     const request: Record<string, unknown> = { ...input };
@@ -30,7 +35,7 @@ const tasksUpdateHandler = applyPolicies(
         ...headers,
       };
     }
-    const result = await sdk.tasksUpdate(request as any);
+    const result = await sdk.tasksDeleteRest(request as any);
     if (result && typeof result === "object" && "data" in result) {
       return (result as { data: unknown }).data;
     }
@@ -43,7 +48,7 @@ const tasksUpdateHandler = applyPolicies(
   })
 );
 
-export const TaskManagerTasksUpdateProcedure: Procedure = {
-  contract: TaskManagerTasksUpdateContract,
-  handler: tasksUpdateHandler,
+export const TaskManagerTasksDeleteRestProcedure: Procedure = {
+  contract: TaskManagerTasksDeleteRestContract,
+  handler: tasksDeleteRestHandler,
 };

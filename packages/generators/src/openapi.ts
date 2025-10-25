@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { createDocument } from "zod-openapi";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { isProcedureVisible, type Contract, type Registry } from "@c4c/core";
 
 export interface OpenAPISpec {
@@ -128,22 +127,8 @@ export function generateOpenAPISpec(
 function buildRpcOperation(contract: Contract) {
 	const name = contract.name || "unknown";
 	
-	// Debug: check what type contract.input is
-	if (process.env.DEBUG_OPENAPI === '1') {
-		console.log(`[OpenAPI Debug] ${name} input type:`, typeof contract.input);
-		console.log(`[OpenAPI Debug] ${name} input._def:`, contract.input?._def ? 'exists' : 'missing');
-	}
-	
-	// Convert Zod schema to JSON Schema for OpenAPI compatibility
-	const inputJsonSchema = zodToJsonSchema(contract.input, { 
-		target: 'openApi3', 
-		$refStrategy: 'none',
-		name: `${name}Input`
-	});
-	
-	if (process.env.DEBUG_OPENAPI === '1') {
-		console.log(`[OpenAPI Debug] ${name} inputJsonSchema:`, JSON.stringify(inputJsonSchema).slice(0, 200));
-	}
+	// zod-openapi will handle the schema serialization
+	const inputJsonSchema = contract.input;
 	
 	return {
 		summary: contract.description || name,
@@ -188,7 +173,7 @@ function buildRestOperation(
 		operation.requestBody = {
 			content: {
 				"application/json": {
-					schema: zodToJsonSchema(contract.input, { target: 'openApi3', $refStrategy: 'none' }),
+					schema: contract.input,
 				},
 			},
 		};
@@ -202,12 +187,8 @@ function buildRestOperation(
 }
 
 function successAndErrorResponses(outputSchema: Contract["output"], name?: string) {
-	// Convert Zod schema to JSON Schema for OpenAPI compatibility
-	const outputJsonSchema = zodToJsonSchema(outputSchema, { 
-		target: 'openApi3', 
-		$refStrategy: 'none',
-		name: name ? `${name}Output` : undefined
-	});
+	// zod-openapi will handle the schema serialization
+	const outputJsonSchema = outputSchema;
 	
 	return {
 		"200": {

@@ -6,21 +6,40 @@ import { withOAuth, getOAuthHeaders } from "@c4c/policies";
 import * as sdk from "../../../../generated/task-manager/sdk.gen.js";
 import { z } from "zod";
 
-export const TaskManagerTasksDeleteContract: Contract = {
-  name: "task-manager.tasks.delete",
-  description: "Delete a task",
-  input: z.any(),
-  output: z.any(),
+const TaskSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  status: z.enum(['todo', 'in_progress', 'done']),
+  priority: z.enum(['low', 'medium', 'high']).optional(),
+  assignee: z.string().optional(),
+  dueDate: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const TaskManagerTasksCreateContract: Contract = {
+  name: "task-manager.tasks.create",
+  description: "Create a new task",
+  input: z.object({
+    title: z.string().min(1),
+    description: z.string().optional(),
+    status: z.enum(['todo', 'in_progress', 'done']).default('todo'),
+    priority: z.enum(['low', 'medium', 'high']).optional(),
+    assignee: z.string().optional(),
+    dueDate: z.string().optional(),
+  }),
+  output: TaskSchema,
   metadata: {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],
     provider: "task-manager",
-    operation: "tasksDelete",
+    operation: "tasksCreate",
     tags: ["task-manager"],
   },
 };
 
-const tasksDeleteHandler = applyPolicies(
+const tasksCreateHandler = applyPolicies(
   async (input, context) => {
     const headers = getOAuthHeaders(context, "task-manager");
     const request: Record<string, unknown> = { ...input };
@@ -30,7 +49,7 @@ const tasksDeleteHandler = applyPolicies(
         ...headers,
       };
     }
-    const result = await sdk.tasksDelete(request as any);
+    const result = await sdk.tasksCreate(request as any);
     if (result && typeof result === "object" && "data" in result) {
       return (result as { data: unknown }).data;
     }
@@ -43,7 +62,7 @@ const tasksDeleteHandler = applyPolicies(
   })
 );
 
-export const TaskManagerTasksDeleteProcedure: Procedure = {
-  contract: TaskManagerTasksDeleteContract,
-  handler: tasksDeleteHandler,
+export const TaskManagerTasksCreateProcedure: Procedure = {
+  contract: TaskManagerTasksCreateContract,
+  handler: tasksCreateHandler,
 };

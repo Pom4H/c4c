@@ -6,11 +6,29 @@ import { withOAuth, getOAuthHeaders } from "@c4c/policies";
 import * as sdk from "../../../../generated/notification-service/sdk.gen.js";
 import { z } from "zod";
 
+const NotificationSchema = z.object({
+  id: z.string(),
+  message: z.string(),
+  recipient: z.string().optional(),
+  channel: z.enum(['email', 'sms', 'push', 'webhook']),
+  priority: z.enum(['low', 'normal', 'high', 'urgent']),
+  status: z.enum(['pending', 'sent', 'failed']),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  sentAt: z.string().optional(),
+  createdAt: z.string(),
+});
+
 export const NotificationServiceNotificationsSendContract: Contract = {
   name: "notification-service.notifications.send",
   description: "Send a notification",
-  input: z.any(),
-  output: z.any(),
+  input: z.object({
+    message: z.string().min(1),
+    recipient: z.string().optional(),
+    channel: z.enum(['email', 'sms', 'push', 'webhook']).default('push'),
+    priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  }),
+  output: NotificationSchema,
   metadata: {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],

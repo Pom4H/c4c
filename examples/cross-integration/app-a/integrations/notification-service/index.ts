@@ -18,3 +18,6 @@ export const NotificationServiceProcedures: Procedure[] = [
   NotificationServiceNotificationsSendProcedure,
   NotificationServiceNotificationsSubscribeProcedure
 ];
+
+// Re-export triggers
+export * from './triggers/index.js';

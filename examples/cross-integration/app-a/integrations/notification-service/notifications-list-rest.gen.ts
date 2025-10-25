@@ -6,21 +6,40 @@ import { withOAuth, getOAuthHeaders } from "@c4c/policies";
 import * as sdk from "../../../../generated/notification-service/sdk.gen.js";
 import { z } from "zod";
 
-export const NotificationServiceNotificationsListContract: Contract = {
-  name: "notification-service.notifications.list",
+const NotificationSchema = z.object({
+  id: z.string(),
+  message: z.string(),
+  recipient: z.string().optional(),
+  channel: z.enum(['email', 'sms', 'push', 'webhook']),
+  priority: z.enum(['low', 'normal', 'high', 'urgent']),
+  status: z.enum(['pending', 'sent', 'failed']),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  sentAt: z.string().optional(),
+  createdAt: z.string(),
+});
+
+export const NotificationServiceNotificationsListRestContract: Contract = {
+  name: "notification-service.notifications.list.rest",
   description: "List all notifications",
-  input: z.any(),
-  output: z.any(),
+  input: z.object({
+    recipient: z.string().optional(),
+    status: z.enum(['pending', 'sent', 'failed']).optional(),
+    limit: z.number().optional(),
+  }),
+  output: z.object({
+    notifications: z.array(NotificationSchema),
+    total: z.number(),
+  }),
   metadata: {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],
     provider: "notification-service",
-    operation: "notificationsList",
+    operation: "notificationsListRest",
     tags: ["notification-service"],
   },
 };
 
-const notificationsListHandler = applyPolicies(
+const notificationsListRestHandler = applyPolicies(
   async (input, context) => {
     const headers = getOAuthHeaders(context, "notification-service");
     const request: Record<string, unknown> = { ...input };
@@ -30,7 +49,7 @@ const notificationsListHandler = applyPolicies(
         ...headers,
       };
     }
-    const result = await sdk.notificationsList(request as any);
+    const result = await sdk.notificationsListRest(request as any);
     if (result && typeof result === "object" && "data" in result) {
       return (result as { data: unknown }).data;
     }
@@ -43,7 +62,7 @@ const notificationsListHandler = applyPolicies(
   })
 );
 
-export const NotificationServiceNotificationsListProcedure: Procedure = {
-  contract: NotificationServiceNotificationsListContract,
-  handler: notificationsListHandler,
+export const NotificationServiceNotificationsListRestProcedure: Procedure = {
+  contract: NotificationServiceNotificationsListRestContract,
+  handler: notificationsListRestHandler,
 };
