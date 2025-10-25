@@ -160,7 +160,12 @@ export async function generateProceduresFromTriggers(options: {
   // Match operations with schemas and triggers
   const resolvedOperations = operations
     .map((op) => {
-      const pascalName = capitalize(op.name);
+      // Simplify PascalCase name by removing redundant prefix
+      // e.g., "tasksList" -> "List", "notificationsSend" -> "Send"
+      // Match pattern: lowercase letters followed by uppercase (camelCase boundary)
+      const match = op.name.match(/^[a-z]+([A-Z].*)$/);
+      const simplifiedName = match ? match[1] : op.name;
+      const pascalName = simplifiedName.charAt(0).toUpperCase() + simplifiedName.slice(1);
       
       // For @hey-api/schemas, the naming convention is typically {OperationName}Data and {OperationName}Response
       // Convert operation name to PascalCase for matching
@@ -758,9 +763,11 @@ import { z } from "zod";
   
   const providerPascal = toPascalCase(provider);
   const providerEnvName = provider.toUpperCase().replace(/-/g, '_');
-  const contractName = `${providerPascal}${op.pascalName}Contract`;
+  
+  // Simplify names: just use PascalCase of operation without provider prefix
+  const contractName = `${op.pascalName}Contract`;
   const handlerName = `${op.name}Handler`;
-  const procedureName = `${providerPascal}${op.pascalName}Procedure`;
+  const procedureName = `${op.pascalName}Procedure`;
   
   const metadata: string[] = [
     `    exposure: "external" as const,`,
@@ -856,13 +863,20 @@ function extractWebhooksFromOpenApi(spec: any, operationSchemas: Record<string, 
       if (!operation) continue;
       
       const operationId = operation.operationId || `${webhookName}Webhook`;
-      // Convert webhook name to camelCase, removing dots and underscores
-      const cleanName = operationId.replace(/[._-]/g, ' ')
+      // Convert webhook name to camelCase, removing dots, underscores and redundant "webhook" suffix
+      let cleanName = operationId.replace(/[._-]/g, ' ')
         .split(' ')
         .map((word: string, index: number) => index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
         .join('');
+      
+      // Remove redundant "Webhook" suffix if it appears
+      cleanName = cleanName.replace(/Webhook+$/i, '');
+      
       const camelCaseName = cleanName.charAt(0).toLowerCase() + cleanName.slice(1);
-      const pascalName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+      // Simplify PascalCase by removing first lowercase prefix (like in procedures)
+      const match = camelCaseName.match(/^[a-z]+([A-Z].*)$/);
+      const simplifiedName = match ? match[1] : camelCaseName;
+      const pascalName = simplifiedName.charAt(0).toUpperCase() + simplifiedName.slice(1);
       
       // Extract schemas for this webhook
       let inputSchema: string | null = null;
@@ -924,8 +938,9 @@ import { z } from "zod";
 `;
   
   const providerPascal = toPascalCase(provider);
-  const contractName = `${providerPascal}${webhook.pascalName}Contract`;
-  const procedureName = `${providerPascal}${webhook.pascalName}Procedure`;
+  // Simplify names: just use PascalCase of webhook without provider prefix
+  const contractName = `${webhook.pascalName}Contract`;
+  const procedureName = `${webhook.pascalName}Procedure`;
   
   const metadata: string[] = [
     `    exposure: "external" as const,`,
@@ -975,7 +990,7 @@ function generateIndexFile(operations: any[], provider: string, type: 'procedure
   
   const imports = operations.map(op => {
     const simpleName = toDotCase(op.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
-    const procedureName = `${providerPascal}${op.pascalName}Procedure`;
+    const procedureName = `${op.pascalName}Procedure`;
     return `export { ${procedureName} } from './${simpleName}.js';`;
   }).join('\n');
   
@@ -983,12 +998,12 @@ function generateIndexFile(operations: any[], provider: string, type: 'procedure
 import type { Procedure } from "@c4c/core";
 ${operations.map(op => {
   const simpleName = toDotCase(op.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
-  const procedureName = `${providerPascal}${op.pascalName}Procedure`;
+  const procedureName = `${op.pascalName}Procedure`;
   return `import { ${procedureName} } from './${simpleName}.js';`;
 }).join('\n')}
 
 export const ${providerPascal}${capitalize(type)}: Procedure[] = [
-${operations.map(op => `  ${providerPascal}${op.pascalName}Procedure`).join(',\n')}
+${operations.map(op => `  ${op.pascalName}Procedure`).join(',\n')}
 ];
 `;
   
@@ -1009,14 +1024,14 @@ function generateMainIndexFile(procedures: any[], triggers: any[], provider: str
   // Export individual procedures
   const procedureExports = procedures.map(op => {
     const simpleName = toDotCase(op.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
-    const procedureName = `${providerPascal}${op.pascalName}Procedure`;
+    const procedureName = `${op.pascalName}Procedure`;
     return `export { ${procedureName} } from './${simpleName}.js';`;
   }).join('\n');
   
   // Import procedures for the array
   const procedureImports = procedures.map(op => {
     const simpleName = toDotCase(op.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
-    const procedureName = `${providerPascal}${op.pascalName}Procedure`;
+    const procedureName = `${op.pascalName}Procedure`;
     return `import { ${procedureName} } from './${simpleName}.js';`;
   }).join('\n');
   
@@ -1026,7 +1041,7 @@ import type { Procedure } from "@c4c/core";
 ${procedureImports}
 
 export const ${providerPascal}Procedures: Procedure[] = [
-${procedures.map(op => `  ${providerPascal}${op.pascalName}Procedure`).join(',\n')}
+${procedures.map(op => `  ${op.pascalName}Procedure`).join(',\n')}
 ];
 `;
   
@@ -1080,9 +1095,9 @@ ${sdkConfigCode}`;
   const procedures = operations.map((op) => {
     const providerPascal = toPascalCase(provider);
     const providerEnvName = provider.toUpperCase().replace(/-/g, '_');
-    const contractName = `${providerPascal}${op.pascalName}Contract`;
+    const contractName = `${op.pascalName}Contract`;
     const handlerName = `${op.name}Handler`;
-    const procedureName = `${providerPascal}${op.pascalName}Procedure`;
+    const procedureName = `${op.pascalName}Procedure`;
     
     const metadata: string[] = [
       `    exposure: "external" as const,`,
@@ -1152,7 +1167,7 @@ export const ${procedureName}: Procedure = {
   const providerPascal = toPascalCase(provider);
   const exportList = `
 export const ${providerPascal}Procedures: Procedure[] = [
-${operations.map((op) => `  ${providerPascal}${op.pascalName}Procedure`).join(',\n')}
+${operations.map((op) => `  ${op.pascalName}Procedure`).join(',\n')}
 ];
 `;
   

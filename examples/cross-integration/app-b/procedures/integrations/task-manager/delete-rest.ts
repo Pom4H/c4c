@@ -7,7 +7,7 @@ import * as sdk from "../../../generated/task-manager/sdk.gen.js";
 import { createClient, createConfig } from "@hey-api/client-fetch";
 import { z } from "zod";
 
-export const TaskManagerTasksDeleteRestContract: Contract = {
+export const DeleteRestContract: Contract = {
   name: "task-manager.tasks.delete.rest",
   description: "Delete a task",
   input: z.unknown(),
@@ -51,7 +51,7 @@ const tasksDeleteRestHandler = applyPolicies(
   })
 );
 
-export const TaskManagerTasksDeleteRestProcedure: Procedure = {
-  contract: TaskManagerTasksDeleteRestContract,
+export const DeleteRestProcedure: Procedure = {
+  contract: DeleteRestContract,
   handler: tasksDeleteRestHandler,
 };

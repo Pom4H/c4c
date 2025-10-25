@@ -7,7 +7,7 @@ import * as sdk from "../../../generated/task-manager/sdk.gen.js";
 import { createClient, createConfig } from "@hey-api/client-fetch";
 import { z } from "zod";
 
-export const TaskManagerTasksCreateRestContract: Contract = {
+export const CreateRestContract: Contract = {
   name: "task-manager.tasks.create.rest",
   description: "Create a new task",
   input: z.unknown(),
@@ -51,7 +51,7 @@ const tasksCreateRestHandler = applyPolicies(
   })
 );
 
-export const TaskManagerTasksCreateRestProcedure: Procedure = {
-  contract: TaskManagerTasksCreateRestContract,
+export const CreateRestProcedure: Procedure = {
+  contract: CreateRestContract,
   handler: tasksCreateRestHandler,
 };

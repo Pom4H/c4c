@@ -7,7 +7,7 @@ import * as sdk from "../../../generated/notification-service/sdk.gen.js";
 import { createClient, createConfig } from "@hey-api/client-fetch";
 import { z } from "zod";
 
-export const NotificationServiceNotificationsListContract: Contract = {
+export const ListContract: Contract = {
   name: "notification-service.notifications.list",
   description: "List all notifications",
   input: z.object({
@@ -68,7 +68,7 @@ const notificationsListHandler = applyPolicies(
   })
 );
 
-export const NotificationServiceNotificationsListProcedure: Procedure = {
-  contract: NotificationServiceNotificationsListContract,
+export const ListProcedure: Procedure = {
+  contract: ListContract,
   handler: notificationsListHandler,
 };
