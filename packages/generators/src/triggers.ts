@@ -227,7 +227,9 @@ export async function generateProceduresFromTriggers(options: {
   
   // Generate individual procedure files in root outputDir
   for (const op of procedures) {
-    const fileName = `${toDotCase(op.name).replace(/\./g, '-')}.gen.ts`;
+    // Use simplified names - remove provider prefix since it's already in the folder name
+    const simpleName = toDotCase(op.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
+    const fileName = `${simpleName}.ts`;
     const filePath = path.join(outputDir, fileName);
     
     const code = generateSingleProcedureCode({
@@ -243,7 +245,8 @@ export async function generateProceduresFromTriggers(options: {
   
   // Generate individual trigger files in triggers subdirectory
   for (const op of triggers) {
-    const fileName = `${toDotCase(op.name).replace(/\./g, '-')}.gen.ts`;
+    const simpleName = toDotCase(op.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
+    const fileName = `${simpleName}.ts`;
     const filePath = path.join(triggersDir, fileName);
     
     const code = generateSingleProcedureCode({
@@ -259,7 +262,8 @@ export async function generateProceduresFromTriggers(options: {
   
   // Generate webhook trigger files
   for (const webhook of webhookOperations) {
-    const fileName = `${toDotCase(webhook.name).replace(/\./g, '-')}.gen.ts`;
+    const simpleName = toDotCase(webhook.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
+    const fileName = `${simpleName}.ts`;
     const filePath = path.join(triggersDir, fileName);
     
     const code = generateWebhookTriggerCode({
@@ -970,17 +974,17 @@ function generateIndexFile(operations: any[], provider: string, type: 'procedure
   const providerPascal = toPascalCase(provider);
   
   const imports = operations.map(op => {
-    const fileName = toDotCase(op.name).replace(/\./g, '-');
+    const simpleName = toDotCase(op.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
     const procedureName = `${providerPascal}${op.pascalName}Procedure`;
-    return `export { ${procedureName} } from './${fileName}.gen.js';`;
+    return `export { ${procedureName} } from './${simpleName}.js';`;
   }).join('\n');
   
   const exportList = `
 import type { Procedure } from "@c4c/core";
 ${operations.map(op => {
-  const fileName = toDotCase(op.name).replace(/\./g, '-');
+  const simpleName = toDotCase(op.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
   const procedureName = `${providerPascal}${op.pascalName}Procedure`;
-  return `import { ${procedureName} } from './${fileName}.gen.js';`;
+  return `import { ${procedureName} } from './${simpleName}.js';`;
 }).join('\n')}
 
 export const ${providerPascal}${capitalize(type)}: Procedure[] = [
@@ -1004,16 +1008,16 @@ function generateMainIndexFile(procedures: any[], triggers: any[], provider: str
   
   // Export individual procedures
   const procedureExports = procedures.map(op => {
-    const fileName = toDotCase(op.name).replace(/\./g, '-');
+    const simpleName = toDotCase(op.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
     const procedureName = `${providerPascal}${op.pascalName}Procedure`;
-    return `export { ${procedureName} } from './${fileName}.gen.js';`;
+    return `export { ${procedureName} } from './${simpleName}.js';`;
   }).join('\n');
   
   // Import procedures for the array
   const procedureImports = procedures.map(op => {
-    const fileName = toDotCase(op.name).replace(/\./g, '-');
+    const simpleName = toDotCase(op.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
     const procedureName = `${providerPascal}${op.pascalName}Procedure`;
-    return `import { ${procedureName} } from './${fileName}.gen.js';`;
+    return `import { ${procedureName} } from './${simpleName}.js';`;
   }).join('\n');
   
   // Create procedures array
