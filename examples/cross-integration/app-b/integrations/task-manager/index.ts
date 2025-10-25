@@ -36,3 +36,6 @@ export const TaskManagerProcedures: Procedure[] = [
   TaskManagerTasksListProcedure,
   TaskManagerTasksUpdateProcedure
 ];
+
+// Re-export triggers
+export * from './triggers/index.js';
