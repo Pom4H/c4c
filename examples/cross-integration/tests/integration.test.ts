@@ -33,7 +33,8 @@ async function rpcCall(baseUrl: string, procedure: string, input: any = {}): Pro
   const data = await response.json();
   
   if (!response.ok || data.error) {
-    throw new Error(data.error || `RPC call failed: ${procedure}`);
+    const errorMsg = typeof data.error === 'object' ? JSON.stringify(data.error) : data.error;
+    throw new Error(errorMsg || `RPC call failed: ${procedure}`);
   }
   
   return data;

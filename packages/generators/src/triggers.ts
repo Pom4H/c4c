@@ -151,7 +151,7 @@ export async function generateProceduresFromTriggers(options: {
   // Extract schema exports
   const schemaExports = extractSchemaExportsFromSource(schemaSource);
   
-  // Extract schemas from OpenAPI spec if available
+  // Extract schemas from OpenAPI spec if available - using both camelCase and dot notation
   const operationSchemas = openApiSpec ? extractSchemasFromOpenApi(openApiSpec) : {};
   
   // Extract webhooks from OpenAPI spec
@@ -160,7 +160,8 @@ export async function generateProceduresFromTriggers(options: {
   // Match operations with schemas and triggers
   const resolvedOperations = operations
     .map((op) => {
-      const pascalName = capitalize(op.name);
+      // Keep entity context in name: "tasksList" -> "TasksList"
+      const pascalName = op.name.charAt(0).toUpperCase() + op.name.slice(1);
       
       // For @hey-api/schemas, the naming convention is typically {OperationName}Data and {OperationName}Response
       // Convert operation name to PascalCase for matching
@@ -190,8 +191,13 @@ export async function generateProceduresFromTriggers(options: {
       const triggerInfo = triggerMetadata[normalizedName];
       const isTrigger = triggerInfo && triggerInfo.kind !== 'operation';
       
-      // Get schemas from OpenAPI if available
-      const opSchemas = operationSchemas[op.name] || { input: null, output: null };
+      // Get schemas from OpenAPI if available - try both camelCase name and dot notation
+      let opSchemas = operationSchemas[op.name];
+      if (!opSchemas || !opSchemas.input) {
+        // Try converting camelCase to dot notation (e.g., tasksList -> tasks.list)
+        const dotNotation = toDotCase(op.name);
+        opSchemas = operationSchemas[dotNotation] || { input: null, output: null };
+      }
       
       return {
         ...op,
@@ -222,6 +228,7 @@ export async function generateProceduresFromTriggers(options: {
   
   // Generate individual procedure files in root outputDir
   for (const op of procedures) {
+    // Keep entity context but simplify - e.g. "tasksList" -> "tasks-list"
     const fileName = `${toDotCase(op.name).replace(/\./g, '-')}.gen.ts`;
     const filePath = path.join(outputDir, fileName);
     
@@ -743,14 +750,17 @@ function generateSingleProcedureCode(options: {
   const imports = `import { applyPolicies, type Procedure, type Contract } from "@c4c/core";
 import { withOAuth, getOAuthHeaders } from "@c4c/policies";
 import * as sdk from "${sdkImportPath}";
+import { createClient, createConfig } from "@hey-api/client-fetch";
 import { z } from "zod";
 `;
   
   const providerPascal = toPascalCase(provider);
   const providerEnvName = provider.toUpperCase().replace(/-/g, '_');
-  const contractName = `${providerPascal}${op.pascalName}Contract`;
+  
+  // Simplify names: just use PascalCase of operation without provider prefix
+  const contractName = `${op.pascalName}Contract`;
   const handlerName = `${op.name}Handler`;
-  const procedureName = `${providerPascal}${op.pascalName}Procedure`;
+  const procedureName = `${op.pascalName}Procedure`;
   
   const metadata: string[] = [
     `    exposure: "external" as const,`,
@@ -789,27 +799,22 @@ ${metadata.join('\n')}
 
 const ${handlerName} = applyPolicies(
   async (input, context) => {
-    const baseUrl = process.env.${envVarName} || context.metadata?.${provider}Url as string | undefined;
+    const baseUrl = process.env.${envVarName} || context.metadata?.['${provider}Url'] as string | undefined;
     if (!baseUrl) {
       throw new Error(\`${envVarName} environment variable is not set\`);
     }
     
     const headers = getOAuthHeaders(context, "${provider}");
-    const request: Record<string, unknown> = { ...input };
-    if (headers) {
-      request.headers = {
-        ...((request.headers as Record<string, string> | undefined) ?? {}),
-        ...headers,
-      };
-    }
     
-    // Create custom client with baseURL
-    const customClient = {
-      ...sdk.client,
-      baseUrl,
-    };
+    // Create custom client with proper baseURL configuration
+    const customClient = createClient(createConfig({ baseUrl }));
     
-    const result = await sdk.${op.name}({ ...request, client: customClient } as any);
+    const result = await sdk.${op.name}({ 
+      body: input,
+      headers,
+      client: customClient 
+    } as any);
+    
     if (result && typeof result === "object" && "data" in result) {
       return (result as { data: unknown }).data;
     }
@@ -851,13 +856,18 @@ function extractWebhooksFromOpenApi(spec: any, operationSchemas: Record<string, 
       if (!operation) continue;
       
       const operationId = operation.operationId || `${webhookName}Webhook`;
-      // Convert webhook name to camelCase, removing dots and underscores
-      const cleanName = operationId.replace(/[._-]/g, ' ')
+      // Convert webhook name to camelCase, removing dots, underscores and redundant "webhook" suffix
+      let cleanName = operationId.replace(/[._-]/g, ' ')
         .split(' ')
         .map((word: string, index: number) => index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
         .join('');
+      
+      // Remove redundant "Webhook" suffix if it appears
+      cleanName = cleanName.replace(/Webhook+$/i, '');
+      
       const camelCaseName = cleanName.charAt(0).toLowerCase() + cleanName.slice(1);
-      const pascalName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+      // Keep full name for context: "tasksTriggerCreated" -> "TasksTriggerCreated"
+      const pascalName = camelCaseName.charAt(0).toUpperCase() + camelCaseName.slice(1);
       
       // Extract schemas for this webhook
       let inputSchema: string | null = null;
@@ -919,8 +929,9 @@ import { z } from "zod";
 `;
   
   const providerPascal = toPascalCase(provider);
-  const contractName = `${providerPascal}${webhook.pascalName}Contract`;
-  const procedureName = `${providerPascal}${webhook.pascalName}Procedure`;
+  // Simplify names: just use PascalCase of webhook without provider prefix
+  const contractName = `${webhook.pascalName}Contract`;
+  const procedureName = `${webhook.pascalName}Procedure`;
   
   const metadata: string[] = [
     `    exposure: "external" as const,`,
@@ -970,7 +981,7 @@ function generateIndexFile(operations: any[], provider: string, type: 'procedure
   
   const imports = operations.map(op => {
     const fileName = toDotCase(op.name).replace(/\./g, '-');
-    const procedureName = `${providerPascal}${op.pascalName}Procedure`;
+    const procedureName = `${op.pascalName}Procedure`;
     return `export { ${procedureName} } from './${fileName}.gen.js';`;
   }).join('\n');
   
@@ -978,12 +989,12 @@ function generateIndexFile(operations: any[], provider: string, type: 'procedure
 import type { Procedure } from "@c4c/core";
 ${operations.map(op => {
   const fileName = toDotCase(op.name).replace(/\./g, '-');
-  const procedureName = `${providerPascal}${op.pascalName}Procedure`;
+  const procedureName = `${op.pascalName}Procedure`;
   return `import { ${procedureName} } from './${fileName}.gen.js';`;
 }).join('\n')}
 
 export const ${providerPascal}${capitalize(type)}: Procedure[] = [
-${operations.map(op => `  ${providerPascal}${op.pascalName}Procedure`).join(',\n')}
+${operations.map(op => `  ${op.pascalName}Procedure`).join(',\n')}
 ];
 `;
   
@@ -1004,14 +1015,14 @@ function generateMainIndexFile(procedures: any[], triggers: any[], provider: str
   // Export individual procedures
   const procedureExports = procedures.map(op => {
     const fileName = toDotCase(op.name).replace(/\./g, '-');
-    const procedureName = `${providerPascal}${op.pascalName}Procedure`;
+    const procedureName = `${op.pascalName}Procedure`;
     return `export { ${procedureName} } from './${fileName}.gen.js';`;
   }).join('\n');
   
   // Import procedures for the array
   const procedureImports = procedures.map(op => {
     const fileName = toDotCase(op.name).replace(/\./g, '-');
-    const procedureName = `${providerPascal}${op.pascalName}Procedure`;
+    const procedureName = `${op.pascalName}Procedure`;
     return `import { ${procedureName} } from './${fileName}.gen.js';`;
   }).join('\n');
   
@@ -1021,7 +1032,7 @@ import type { Procedure } from "@c4c/core";
 ${procedureImports}
 
 export const ${providerPascal}Procedures: Procedure[] = [
-${procedures.map(op => `  ${providerPascal}${op.pascalName}Procedure`).join(',\n')}
+${procedures.map(op => `  ${op.pascalName}Procedure`).join(',\n')}
 ];
 `;
   
@@ -1075,9 +1086,11 @@ ${sdkConfigCode}`;
   const procedures = operations.map((op) => {
     const providerPascal = toPascalCase(provider);
     const providerEnvName = provider.toUpperCase().replace(/-/g, '_');
-    const contractName = `${providerPascal}${op.pascalName}Contract`;
+    // Keep entity context: tasksList -> TasksListContract
+    const opPascalName = op.name.charAt(0).toUpperCase() + op.name.slice(1);
+    const contractName = `${opPascalName}Contract`;
     const handlerName = `${op.name}Handler`;
-    const procedureName = `${providerPascal}${op.pascalName}Procedure`;
+    const procedureName = `${opPascalName}Procedure`;
     
     const metadata: string[] = [
       `    exposure: "external" as const,`,
@@ -1147,7 +1160,7 @@ export const ${procedureName}: Procedure = {
   const providerPascal = toPascalCase(provider);
   const exportList = `
 export const ${providerPascal}Procedures: Procedure[] = [
-${operations.map((op) => `  ${providerPascal}${op.pascalName}Procedure`).join(',\n')}
+${operations.map((op) => `  ${op.pascalName}Procedure`).join(',\n')}
 ];
 `;
   
