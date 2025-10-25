@@ -9,8 +9,13 @@ import { z } from "zod";
 export const TaskManagerTasksDeleteRestContract: Contract = {
   name: "task-manager.tasks.delete.rest",
   description: "Delete a task",
-  input: z.any(),
-  output: z.any(),
+  input: z.object({
+    id: z.string(),
+  }),
+  output: z.object({
+    success: z.boolean(),
+    id: z.string(),
+  }),
   metadata: {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],
