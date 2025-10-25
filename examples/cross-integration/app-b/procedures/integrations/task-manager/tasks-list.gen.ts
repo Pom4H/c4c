@@ -10,8 +10,25 @@ import { z } from "zod";
 export const TaskManagerTasksListContract: Contract = {
   name: "task-manager.tasks.list",
   description: "List all tasks with optional filters",
-  input: z.unknown(),
-  output: z.unknown(),
+  input: z.object({
+  status: z.enum(["todo", "in_progress", "done"]).optional(),
+  assignee: z.string().optional(),
+  limit: z.number().optional()
+}),
+  output: z.object({
+  tasks: z.array(z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  status: z.enum(["todo", "in_progress", "done"]),
+  priority: z.enum(["low", "medium", "high"]).optional(),
+  assignee: z.string().optional(),
+  dueDate: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string()
+})),
+  total: z.number()
+}),
   metadata: {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],

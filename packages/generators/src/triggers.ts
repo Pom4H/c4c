@@ -151,7 +151,7 @@ export async function generateProceduresFromTriggers(options: {
   // Extract schema exports
   const schemaExports = extractSchemaExportsFromSource(schemaSource);
   
-  // Extract schemas from OpenAPI spec if available
+  // Extract schemas from OpenAPI spec if available - using both camelCase and dot notation
   const operationSchemas = openApiSpec ? extractSchemasFromOpenApi(openApiSpec) : {};
   
   // Extract webhooks from OpenAPI spec
@@ -190,8 +190,13 @@ export async function generateProceduresFromTriggers(options: {
       const triggerInfo = triggerMetadata[normalizedName];
       const isTrigger = triggerInfo && triggerInfo.kind !== 'operation';
       
-      // Get schemas from OpenAPI if available
-      const opSchemas = operationSchemas[op.name] || { input: null, output: null };
+      // Get schemas from OpenAPI if available - try both camelCase name and dot notation
+      let opSchemas = operationSchemas[op.name];
+      if (!opSchemas || !opSchemas.input) {
+        // Try converting camelCase to dot notation (e.g., tasksList -> tasks.list)
+        const dotNotation = toDotCase(op.name);
+        opSchemas = operationSchemas[dotNotation] || { input: null, output: null };
+      }
       
       return {
         ...op,

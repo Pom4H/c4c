@@ -10,8 +10,25 @@ import { z } from "zod";
 export const NotificationServiceNotificationsListContract: Contract = {
   name: "notification-service.notifications.list",
   description: "List all notifications",
-  input: z.unknown(),
-  output: z.unknown(),
+  input: z.object({
+  recipient: z.string().optional(),
+  status: z.enum(["pending", "sent", "failed"]).optional(),
+  limit: z.number().optional()
+}),
+  output: z.object({
+  notifications: z.array(z.object({
+  id: z.string(),
+  message: z.string(),
+  recipient: z.string().optional(),
+  channel: z.enum(["email", "sms", "push", "webhook"]),
+  priority: z.enum(["low", "normal", "high", "urgent"]),
+  status: z.enum(["pending", "sent", "failed"]),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  sentAt: z.string().optional(),
+  createdAt: z.string()
+})),
+  total: z.number()
+}),
   metadata: {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],
