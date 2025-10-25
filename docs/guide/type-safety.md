@@ -1,165 +1,424 @@
-# Type Safety
+# Type Safety Guide
 
-c4c provides end-to-end type safety using TypeScript and Zod.
+This guide explains the advanced type safety features in c4c framework.
 
 ## Overview
 
-Type safety in c4c ensures:
-- Input validation at runtime
-- Output validation at runtime
-- Type checking at compile time
-- Inference from schemas
-- Type-safe generated clients
+c4c provides comprehensive compile-time and runtime type safety through:
 
-## Zod Schemas
+1. **Typed Execution Context** - Type-safe metadata in every handler
+2. **Type-safe Registry** - Preserve procedure types through get/set operations
+3. **Policy Type Transformations** - Policies can type-safely transform context
+4. **Workflow Type Validation** - Compile-time checking of workflow connections
+5. **Enhanced Type Guards** - Schema-based runtime validation
 
-c4c uses [Zod](https://zod.dev/) for runtime validation and type inference:
+## Typed Execution Context
 
-```typescript
-import { z } from "zod";
+### Basic Usage
 
-const inputSchema = z.object({
-  name: z.string().min(1),
-  email: z.string().email(),
-  age: z.number().int().positive().optional(),
-});
-
-// Infer TypeScript type from schema
-type Input = z.infer<typeof inputSchema>;
-// { name: string; email: string; age?: number }
-```
-
-## Type-Safe Procedures
-
-Procedures are fully typed:
+Every handler receives a typed execution context:
 
 ```typescript
-import type { Procedure } from "@c4c/core";
+import type { ExecutionContext, BaseMetadata } from "@c4c/core";
 
-const createUser: Procedure = {
-  contract: {
-    input: z.object({
-      name: z.string(),
-      email: z.string().email(),
-    }),
-    output: z.object({
-      id: z.string(),
-      name: z.string(),
-      email: z.string(),
-    }),
-  },
-  handler: async (input) => {
-    // input is typed as { name: string, email: string }
-    
-    return {
-      id: crypto.randomUUID(),
-      name: input.name,      // ✅ Type-safe
-      email: input.email,    // ✅ Type-safe
-      // age: 25,            // ❌ Type error - not in output schema
-    };
-  },
+// Default context with base metadata
+const handler = async (input: Input, context: ExecutionContext) => {
+  // Access basic metadata
+  const requestId = context.requestId;
+  const timestamp = context.timestamp;
+  // metadata is typed as BaseMetadata
 };
 ```
 
-## Runtime Validation
+### Custom Metadata Types
 
-All inputs and outputs are validated at runtime:
+Define your own metadata structure:
 
 ```typescript
-// Invalid input
-const result = await execute(registry, "createUser", {
-  name: "Alice",
-  email: "not-an-email"  // ❌ Fails validation
-});
-// Throws: ZodError: Invalid email
+import type { ExecutionContext, BaseMetadata } from "@c4c/core";
+
+// Extend BaseMetadata with custom fields
+interface CustomMetadata extends BaseMetadata {
+  auth: {
+    userId: string;
+    roles: string[];
+  };
+  tenantId: string;
+  locale: string;
+}
+
+// Handler with typed metadata
+const handler = async (
+  input: Input,
+  context: ExecutionContext<CustomMetadata>
+): Promise<Output> => {
+  // ✅ Type-safe access to custom metadata
+  const userId = context.metadata.auth.userId;
+  const tenantId = context.metadata.tenantId;
+  const locale = context.metadata.locale;
+  
+  // ❌ TypeScript error: Property doesn't exist
+  // const invalid = context.metadata.nonExistent;
+  
+  return { /* ... */ };
+};
 ```
 
-## Generic Type Support
+### Built-in Metadata Fields
 
-Use generics for reusable typed procedures:
+`BaseMetadata` includes common fields:
 
 ```typescript
-import type { Procedure, Handler } from "@c4c/core";
-
-function createCrudProcedure<T extends z.ZodType>(
-  name: string,
-  schema: T
-): Procedure<z.infer<T>, z.infer<T>> {
-  return {
-    contract: {
-      name,
-      input: schema,
-      output: schema,
-    },
-    handler: async (input) => {
-      return input; // Type-safe!
-    },
+interface BaseMetadata {
+  // Authentication
+  auth?: {
+    userId?: string;
+    username?: string;
+    email?: string;
+    roles?: string[];
+    permissions?: string[];
+    token?: string;
+    expiresAt?: Date | string;
   };
+  
+  // OAuth
+  oauth?: {
+    accessToken?: string;
+    refreshToken?: string;
+    provider?: string;
+    scope?: string[];
+  };
+  
+  // Tracing
+  traceId?: string;
+  spanId?: string;
+  parentSpanId?: string;
+  
+  // Custom fields
+  [key: string]: unknown;
 }
 ```
 
-## Type-Safe Generated Clients
+## Type-safe Registry
 
-Generated clients are fully typed:
+### Module Augmentation
+
+Declare your procedure types globally:
 
 ```typescript
-import { createClient } from "./client";
+// procedures/math.ts
+import type { Procedure } from "@c4c/core";
 
-const client = createClient();
+export const addProcedure: Procedure<AddInput, AddOutput> = {
+  contract: { /* ... */ },
+  handler: async ({ a, b }) => ({ result: a + b })
+};
 
-// ✅ Fully typed
-const user = await client.createUser({
-  name: "Alice",
-  email: "alice@example.com"
-});
-// user: { id: string; name: string; email: string }
-
-// ❌ Type error - missing required field
-await client.createUser({
-  name: "Alice"
-  // Error: Property 'email' is missing
-});
-
-// ❌ Type error - wrong type
-await client.createUser({
-  name: 123,  // Error: Type 'number' is not assignable to type 'string'
-  email: "alice@example.com"
-});
+// Augment ProcedureTypeMap
+declare module "@c4c/core" {
+  interface ProcedureTypeMap {
+    "math.add": typeof addProcedure;
+    "users.create": Procedure<UserInput, UserOutput>;
+  }
+}
 ```
 
-## Type Inference
-
-Let TypeScript infer types from Zod schemas:
+### Usage
 
 ```typescript
-const userSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string(),
-  email: z.string().email(),
-  role: z.enum(["admin", "user"]),
-  metadata: z.record(z.string()),
+import { createTypedRegistry, executeTyped } from "@c4c/core";
+
+const registry = createTypedRegistry();
+registry.set("math.add", addProcedure);
+
+// ✅ Full type inference
+const result = await executeTyped(
+  registry,
+  "math.add",
+  { a: 5, b: 3 } // Input type inferred
+);
+console.log(result.result); // Output type inferred
+
+// ❌ TypeScript errors:
+// await executeTyped(registry, "math.add", { a: "not a number" }); // Type error
+// await executeTyped(registry, "unknown.proc", {}); // Type error
+
+// ✅ Get with preserved types
+const proc = registry.get("math.add");
+// proc is typed as Procedure<AddInput, AddOutput>
+```
+
+### Type Inference Helpers
+
+```typescript
+import type { InferInput, InferOutput, InferContext } from "@c4c/core";
+
+// Extract types from procedure name
+type MathAddInput = InferInput<"math.add">;
+type MathAddOutput = InferOutput<"math.add">;
+type MathAddContext = InferContext<"math.add">;
+```
+
+## Policy Type Transformations
+
+Policies can transform the context type:
+
+```typescript
+import type { Policy, ExecutionContext } from "@c4c/core";
+
+// Policy that adds authentication
+const withAuth: Policy<
+  ExecutionContext<AnonymousMetadata>,    // Input context
+  ExecutionContext<AuthenticatedMetadata> // Output context
+> = (handler) => {
+  return async (input, context) => {
+    const authData = await authenticate();
+    
+    const authenticatedContext: ExecutionContext<AuthenticatedMetadata> = {
+      ...context,
+      metadata: {
+        ...context.metadata,
+        auth: authData,
+        userId: authData.userId
+      }
+    };
+    
+    return handler(input, authenticatedContext);
+  };
+};
+```
+
+### Composing Policies
+
+Policies compose left-to-right, transforming context types:
+
+```typescript
+import { applyPolicies } from "@c4c/core";
+
+// Handler expects OAuth context
+const handler = async (
+  input: Input,
+  context: ExecutionContext<OAuthMetadata>
+) => { /* ... */ };
+
+// Compose policies that progressively add context data
+const protectedHandler = applyPolicies(
+  handler,
+  withOAuth,    // Adds OAuth (requires auth)
+  withAuth,     // Adds auth (requires anonymous)
+  withLogging   // Doesn't transform context
+);
+// Final type: ExecutionContext<AnonymousMetadata> → ExecutionContext<OAuthMetadata>
+```
+
+## Workflow Type Validation
+
+### Compile-time Validation
+
+Use type helpers to validate workflows at compile-time:
+
+```typescript
+import type { ValidateStepChain } from "@c4c/workflow";
+
+// Check if two steps are compatible
+type IsValid = ValidateStepChain<Step1, Step2>;
+// Returns: { valid: true } or { valid: false; error: string }
+```
+
+### Runtime Validation
+
+Validate entire workflows:
+
+```typescript
+import { validateWorkflowTypes } from "@c4c/workflow";
+
+const validation = validateWorkflowTypes(workflowDef, procedureRegistry);
+
+if (validation.valid) {
+  console.log("✅ Workflow is type-safe!");
+} else {
+  for (const error of validation.errors) {
+    console.error(`Node ${error.nodeId}: ${error.error}`);
+  }
+}
+```
+
+### Type-safe Step Creation
+
+```typescript
+import { step, createTypedComponent } from "@c4c/workflow";
+
+const typedStep = createTypedComponent({
+  id: "getUser",
+  nodes: [/* ... */],
+  entryId: "getUser",
+  exitIds: ["getUser"],
+  input: getUserInputSchema,
+  output: getUserOutputSchema,
 });
 
-type User = z.infer<typeof userSchema>;
-// {
-//   id: string;
-//   name: string;
-//   email: string;
-//   role: "admin" | "user";
-//   metadata: Record<string, string>;
-// }
+// Access inferred types
+type StepInput = typeof typedStep.__inputType;
+type StepOutput = typeof typedStep.__outputType;
+```
+
+## Enhanced Type Guards
+
+### Schema-based Validation
+
+```typescript
+import {
+  isProcedure,
+  isContract,
+  assertProcedure,
+  validateProcedure
+} from "@c4c/core";
+
+// Type guard with runtime validation
+if (isProcedure(value)) {
+  // value is typed as Procedure
+  const result = await value.handler(input, context);
+}
+
+// Assertion
+assertProcedure(value); // Throws if invalid
+// value is now typed as Procedure
+
+// Detailed validation
+const validation = validateProcedure(value);
+if (!validation.valid) {
+  console.error("Validation errors:", validation.errors);
+}
+```
+
+### Metadata Type Guards
+
+```typescript
+import { hasProcedureMetadata, hasRole, hasExposure } from "@c4c/core";
+
+if (hasProcedureMetadata(procedure, "auth")) {
+  // procedure.contract.metadata.auth exists
+  const auth = procedure.contract.metadata.auth;
+}
+
+if (hasRole(procedure, "trigger")) {
+  // Procedure has trigger role
+}
+
+if (hasExposure(procedure, "external")) {
+  // Procedure is externally exposed
+}
 ```
 
 ## Best Practices
 
-1. **Use Zod for all schemas** - Runtime safety + type inference
-2. **Share schemas** - Define once, use everywhere
-3. **Leverage inference** - Let TypeScript infer types
-4. **Validate early** - Catch errors at boundaries
-5. **Generate clients** - Type-safe APIs for free
+### 1. Always Define Metadata Types
 
-## Next Steps
+```typescript
+// ✅ Good: Explicit metadata type
+interface MyMetadata extends BaseMetadata {
+  tenantId: string;
+  userId: string;
+}
 
-- [Learn about Procedures](/guide/procedures)
-- [Generate Clients](/guide/client-generation)
-- [Explore Zod Documentation](https://zod.dev/)
+const handler = async (
+  input: Input,
+  context: ExecutionContext<MyMetadata>
+) => { /* ... */ };
+
+// ❌ Bad: Using unknown metadata
+const handler = async (
+  input: Input,
+  context: ExecutionContext
+) => {
+  const tenantId = context.metadata.tenantId; // No type safety
+};
+```
+
+### 2. Use Module Augmentation for Registry
+
+```typescript
+// ✅ Good: Augment globally
+declare module "@c4c/core" {
+  interface ProcedureTypeMap {
+    "users.create": Procedure<UserInput, UserOutput>;
+  }
+}
+
+// ❌ Bad: Type assertions everywhere
+const proc = registry.get("users.create") as Procedure<UserInput, UserOutput>;
+```
+
+### 3. Validate Workflows
+
+```typescript
+// ✅ Good: Validate before deployment
+const validation = validateWorkflowTypes(workflow, registry);
+if (!validation.valid) {
+  throw new Error("Invalid workflow");
+}
+
+// ❌ Bad: Hope for the best at runtime
+executeWorkflow(workflow, registry, input);
+```
+
+### 4. Use Type Guards
+
+```typescript
+// ✅ Good: Validate unknown data
+if (isProcedure(exportedValue)) {
+  registry.set(name, exportedValue);
+}
+
+// ❌ Bad: Assume structure
+registry.set(name, exportedValue as Procedure);
+```
+
+## Examples
+
+See full examples in:
+- `/examples/typed-registry-example.ts`
+- `/examples/typed-workflow-example.ts`
+- `/examples/typed-policies-example.ts`
+
+## Migration Guide
+
+### From Generic Context to Typed Context
+
+Before:
+```typescript
+const handler = async (input, context: ExecutionContext) => {
+  const userId = context.metadata.userId as string; // Type assertion
+};
+```
+
+After:
+```typescript
+interface MyMetadata extends BaseMetadata {
+  userId: string;
+}
+
+const handler = async (input, context: ExecutionContext<MyMetadata>) => {
+  const userId = context.metadata.userId; // Type-safe!
+};
+```
+
+### From Map to TypedRegistry
+
+Before:
+```typescript
+const registry = new Map<string, Procedure>();
+const proc = registry.get("math.add"); // Type: Procedure | undefined
+```
+
+After:
+```typescript
+declare module "@c4c/core" {
+  interface ProcedureTypeMap {
+    "math.add": Procedure<AddInput, AddOutput>;
+  }
+}
+
+const registry = createTypedRegistry();
+const proc = registry.get("math.add"); // Type: Procedure<AddInput, AddOutput>
+```
