@@ -7,21 +7,39 @@ import * as sdk from "../../../generated/task-manager/sdk.gen.js";
 import { createClient, createConfig } from "@hey-api/client-fetch";
 import { z } from "zod";
 
-export const GetRestContract: Contract = {
-  name: "task-manager.tasks.get.rest",
-  description: "Get a task by ID",
-  input: z.unknown(),
-  output: z.unknown(),
+export const TasksUpdateContract: Contract = {
+  name: "task-manager.tasks.update",
+  description: "Update a task",
+  input: z.object({
+  id: z.string(),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  status: z.enum(["todo", "in_progress", "done"]).optional(),
+  priority: z.enum(["low", "medium", "high"]).optional(),
+  assignee: z.string().optional(),
+  dueDate: z.string().optional()
+}),
+  output: z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  status: z.enum(["todo", "in_progress", "done"]),
+  priority: z.enum(["low", "medium", "high"]).optional(),
+  assignee: z.string().optional(),
+  dueDate: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string()
+}),
   metadata: {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],
     provider: "task-manager",
-    operation: "tasksGetRest",
+    operation: "tasksUpdate",
     tags: ["task-manager"],
   },
 };
 
-const tasksGetRestHandler = applyPolicies(
+const tasksUpdateHandler = applyPolicies(
   async (input, context) => {
     const baseUrl = process.env.TASK_MANAGER_URL || context.metadata?.['task-managerUrl'] as string | undefined;
     if (!baseUrl) {
@@ -33,7 +51,7 @@ const tasksGetRestHandler = applyPolicies(
     // Create custom client with proper baseURL configuration
     const customClient = createClient(createConfig({ baseUrl }));
     
-    const result = await sdk.tasksGetRest({ 
+    const result = await sdk.tasksUpdate({ 
       body: input,
       headers,
       client: customClient 
@@ -51,7 +69,7 @@ const tasksGetRestHandler = applyPolicies(
   })
 );
 
-export const GetRestProcedure: Procedure = {
-  contract: GetRestContract,
-  handler: tasksGetRestHandler,
+export const TasksUpdateProcedure: Procedure = {
+  contract: TasksUpdateContract,
+  handler: tasksUpdateHandler,
 };

@@ -7,26 +7,38 @@ import * as sdk from "../../../generated/task-manager/sdk.gen.js";
 import { createClient, createConfig } from "@hey-api/client-fetch";
 import { z } from "zod";
 
-export const DeleteContract: Contract = {
-  name: "task-manager.tasks.delete",
-  description: "Delete a task",
+export const TasksCreateContract: Contract = {
+  name: "task-manager.tasks.create",
+  description: "Create a new task",
   input: z.object({
-  id: z.string()
+  title: z.string().min(1),
+  description: z.string().optional(),
+  status: z.enum(["todo", "in_progress", "done"]).optional(),
+  priority: z.enum(["low", "medium", "high"]).optional(),
+  assignee: z.string().optional(),
+  dueDate: z.string().optional()
 }),
   output: z.object({
-  success: z.boolean(),
-  id: z.string()
+  id: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  status: z.enum(["todo", "in_progress", "done"]),
+  priority: z.enum(["low", "medium", "high"]).optional(),
+  assignee: z.string().optional(),
+  dueDate: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string()
 }),
   metadata: {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],
     provider: "task-manager",
-    operation: "tasksDelete",
+    operation: "tasksCreate",
     tags: ["task-manager"],
   },
 };
 
-const tasksDeleteHandler = applyPolicies(
+const tasksCreateHandler = applyPolicies(
   async (input, context) => {
     const baseUrl = process.env.TASK_MANAGER_URL || context.metadata?.['task-managerUrl'] as string | undefined;
     if (!baseUrl) {
@@ -38,7 +50,7 @@ const tasksDeleteHandler = applyPolicies(
     // Create custom client with proper baseURL configuration
     const customClient = createClient(createConfig({ baseUrl }));
     
-    const result = await sdk.tasksDelete({ 
+    const result = await sdk.tasksCreate({ 
       body: input,
       headers,
       client: customClient 
@@ -56,7 +68,7 @@ const tasksDeleteHandler = applyPolicies(
   })
 );
 
-export const DeleteProcedure: Procedure = {
-  contract: DeleteContract,
-  handler: tasksDeleteHandler,
+export const TasksCreateProcedure: Procedure = {
+  contract: TasksCreateContract,
+  handler: tasksCreateHandler,
 };

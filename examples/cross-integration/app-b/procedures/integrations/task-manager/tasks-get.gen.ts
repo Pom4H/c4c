@@ -7,16 +7,11 @@ import * as sdk from "../../../generated/task-manager/sdk.gen.js";
 import { createClient, createConfig } from "@hey-api/client-fetch";
 import { z } from "zod";
 
-export const CreateContract: Contract = {
-  name: "task-manager.tasks.create",
-  description: "Create a new task",
+export const TasksGetContract: Contract = {
+  name: "task-manager.tasks.get",
+  description: "Get a task by ID",
   input: z.object({
-  title: z.string().min(1),
-  description: z.string().optional(),
-  status: z.enum(["todo", "in_progress", "done"]).optional(),
-  priority: z.enum(["low", "medium", "high"]).optional(),
-  assignee: z.string().optional(),
-  dueDate: z.string().optional()
+  id: z.string()
 }),
   output: z.object({
   id: z.string(),
@@ -33,12 +28,12 @@ export const CreateContract: Contract = {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],
     provider: "task-manager",
-    operation: "tasksCreate",
+    operation: "tasksGet",
     tags: ["task-manager"],
   },
 };
 
-const tasksCreateHandler = applyPolicies(
+const tasksGetHandler = applyPolicies(
   async (input, context) => {
     const baseUrl = process.env.TASK_MANAGER_URL || context.metadata?.['task-managerUrl'] as string | undefined;
     if (!baseUrl) {
@@ -50,7 +45,7 @@ const tasksCreateHandler = applyPolicies(
     // Create custom client with proper baseURL configuration
     const customClient = createClient(createConfig({ baseUrl }));
     
-    const result = await sdk.tasksCreate({ 
+    const result = await sdk.tasksGet({ 
       body: input,
       headers,
       client: customClient 
@@ -68,7 +63,7 @@ const tasksCreateHandler = applyPolicies(
   })
 );
 
-export const CreateProcedure: Procedure = {
-  contract: CreateContract,
-  handler: tasksCreateHandler,
+export const TasksGetProcedure: Procedure = {
+  contract: TasksGetContract,
+  handler: tasksGetHandler,
 };

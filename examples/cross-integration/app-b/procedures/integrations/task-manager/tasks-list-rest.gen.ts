@@ -7,21 +7,21 @@ import * as sdk from "../../../generated/task-manager/sdk.gen.js";
 import { createClient, createConfig } from "@hey-api/client-fetch";
 import { z } from "zod";
 
-export const DeleteRestContract: Contract = {
-  name: "task-manager.tasks.delete.rest",
-  description: "Delete a task",
+export const TasksListRestContract: Contract = {
+  name: "task-manager.tasks.list.rest",
+  description: "List all tasks with optional filters",
   input: z.unknown(),
   output: z.unknown(),
   metadata: {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],
     provider: "task-manager",
-    operation: "tasksDeleteRest",
+    operation: "tasksListRest",
     tags: ["task-manager"],
   },
 };
 
-const tasksDeleteRestHandler = applyPolicies(
+const tasksListRestHandler = applyPolicies(
   async (input, context) => {
     const baseUrl = process.env.TASK_MANAGER_URL || context.metadata?.['task-managerUrl'] as string | undefined;
     if (!baseUrl) {
@@ -33,7 +33,7 @@ const tasksDeleteRestHandler = applyPolicies(
     // Create custom client with proper baseURL configuration
     const customClient = createClient(createConfig({ baseUrl }));
     
-    const result = await sdk.tasksDeleteRest({ 
+    const result = await sdk.tasksListRest({ 
       body: input,
       headers,
       client: customClient 
@@ -51,7 +51,7 @@ const tasksDeleteRestHandler = applyPolicies(
   })
 );
 
-export const DeleteRestProcedure: Procedure = {
-  contract: DeleteRestContract,
-  handler: tasksDeleteRestHandler,
+export const TasksListRestProcedure: Procedure = {
+  contract: TasksListRestContract,
+  handler: tasksListRestHandler,
 };

@@ -7,7 +7,7 @@ import * as sdk from "../../../generated/task-manager/sdk.gen.js";
 import { createClient, createConfig } from "@hey-api/client-fetch";
 import { z } from "zod";
 
-export const ListContract: Contract = {
+export const TasksListContract: Contract = {
   name: "task-manager.tasks.list",
   description: "List all tasks with optional filters",
   input: z.object({
@@ -68,7 +68,7 @@ const tasksListHandler = applyPolicies(
   })
 );
 
-export const ListProcedure: Procedure = {
-  contract: ListContract,
+export const TasksListProcedure: Procedure = {
+  contract: TasksListContract,
   handler: tasksListHandler,
 };

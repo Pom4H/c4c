@@ -7,37 +7,28 @@ import * as sdk from "../../../generated/notification-service/sdk.gen.js";
 import { createClient, createConfig } from "@hey-api/client-fetch";
 import { z } from "zod";
 
-export const SendContract: Contract = {
-  name: "notification-service.notifications.send",
-  description: "Send a notification",
+export const NotificationsSubscribeContract: Contract = {
+  name: "notification-service.notifications.subscribe",
+  description: "Subscribe to notifications on a topic",
   input: z.object({
-  message: z.string().min(1),
-  recipient: z.string().optional(),
-  channel: z.enum(["email", "sms", "push", "webhook"]).optional(),
-  priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
-  metadata: z.record(z.string(), z.unknown()).optional()
+  topic: z.string(),
+  webhookUrl: z.string().url()
 }),
   output: z.object({
-  id: z.string(),
-  message: z.string(),
-  recipient: z.string().optional(),
-  channel: z.enum(["email", "sms", "push", "webhook"]),
-  priority: z.enum(["low", "normal", "high", "urgent"]),
-  status: z.enum(["pending", "sent", "failed"]),
-  metadata: z.record(z.string(), z.unknown()).optional(),
-  sentAt: z.string().optional(),
-  createdAt: z.string()
+  success: z.boolean(),
+  subscriptionId: z.string(),
+  topic: z.string()
 }),
   metadata: {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],
     provider: "notification-service",
-    operation: "notificationsSend",
+    operation: "notificationsSubscribe",
     tags: ["notification-service"],
   },
 };
 
-const notificationsSendHandler = applyPolicies(
+const notificationsSubscribeHandler = applyPolicies(
   async (input, context) => {
     const baseUrl = process.env.NOTIFICATION_SERVICE_URL || context.metadata?.['notification-serviceUrl'] as string | undefined;
     if (!baseUrl) {
@@ -49,7 +40,7 @@ const notificationsSendHandler = applyPolicies(
     // Create custom client with proper baseURL configuration
     const customClient = createClient(createConfig({ baseUrl }));
     
-    const result = await sdk.notificationsSend({ 
+    const result = await sdk.notificationsSubscribe({ 
       body: input,
       headers,
       client: customClient 
@@ -67,7 +58,7 @@ const notificationsSendHandler = applyPolicies(
   })
 );
 
-export const SendProcedure: Procedure = {
-  contract: SendContract,
-  handler: notificationsSendHandler,
+export const NotificationsSubscribeProcedure: Procedure = {
+  contract: NotificationsSubscribeContract,
+  handler: notificationsSubscribeHandler,
 };

@@ -7,33 +7,21 @@ import * as sdk from "../../../generated/task-manager/sdk.gen.js";
 import { createClient, createConfig } from "@hey-api/client-fetch";
 import { z } from "zod";
 
-export const GetContract: Contract = {
-  name: "task-manager.tasks.get",
-  description: "Get a task by ID",
-  input: z.object({
-  id: z.string()
-}),
-  output: z.object({
-  id: z.string(),
-  title: z.string(),
-  description: z.string().optional(),
-  status: z.enum(["todo", "in_progress", "done"]),
-  priority: z.enum(["low", "medium", "high"]).optional(),
-  assignee: z.string().optional(),
-  dueDate: z.string().optional(),
-  createdAt: z.string(),
-  updatedAt: z.string()
-}),
+export const TasksDeleteRestContract: Contract = {
+  name: "task-manager.tasks.delete.rest",
+  description: "Delete a task",
+  input: z.unknown(),
+  output: z.unknown(),
   metadata: {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],
     provider: "task-manager",
-    operation: "tasksGet",
+    operation: "tasksDeleteRest",
     tags: ["task-manager"],
   },
 };
 
-const tasksGetHandler = applyPolicies(
+const tasksDeleteRestHandler = applyPolicies(
   async (input, context) => {
     const baseUrl = process.env.TASK_MANAGER_URL || context.metadata?.['task-managerUrl'] as string | undefined;
     if (!baseUrl) {
@@ -45,7 +33,7 @@ const tasksGetHandler = applyPolicies(
     // Create custom client with proper baseURL configuration
     const customClient = createClient(createConfig({ baseUrl }));
     
-    const result = await sdk.tasksGet({ 
+    const result = await sdk.tasksDeleteRest({ 
       body: input,
       headers,
       client: customClient 
@@ -63,7 +51,7 @@ const tasksGetHandler = applyPolicies(
   })
 );
 
-export const GetProcedure: Procedure = {
-  contract: GetContract,
-  handler: tasksGetHandler,
+export const TasksDeleteRestProcedure: Procedure = {
+  contract: TasksDeleteRestContract,
+  handler: tasksDeleteRestHandler,
 };

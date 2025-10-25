@@ -7,21 +7,38 @@ import * as sdk from "../../../generated/notification-service/sdk.gen.js";
 import { createClient, createConfig } from "@hey-api/client-fetch";
 import { z } from "zod";
 
-export const ListRestContract: Contract = {
-  name: "notification-service.notifications.list.rest",
+export const NotificationsListContract: Contract = {
+  name: "notification-service.notifications.list",
   description: "List all notifications",
-  input: z.unknown(),
-  output: z.unknown(),
+  input: z.object({
+  recipient: z.string().optional(),
+  status: z.enum(["pending", "sent", "failed"]).optional(),
+  limit: z.number().optional()
+}),
+  output: z.object({
+  notifications: z.array(z.object({
+  id: z.string(),
+  message: z.string(),
+  recipient: z.string().optional(),
+  channel: z.enum(["email", "sms", "push", "webhook"]),
+  priority: z.enum(["low", "normal", "high", "urgent"]),
+  status: z.enum(["pending", "sent", "failed"]),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  sentAt: z.string().optional(),
+  createdAt: z.string()
+})),
+  total: z.number()
+}),
   metadata: {
     exposure: "external" as const,
     roles: ["api-endpoint", "workflow-node"],
     provider: "notification-service",
-    operation: "notificationsListRest",
+    operation: "notificationsList",
     tags: ["notification-service"],
   },
 };
 
-const notificationsListRestHandler = applyPolicies(
+const notificationsListHandler = applyPolicies(
   async (input, context) => {
     const baseUrl = process.env.NOTIFICATION_SERVICE_URL || context.metadata?.['notification-serviceUrl'] as string | undefined;
     if (!baseUrl) {
@@ -33,7 +50,7 @@ const notificationsListRestHandler = applyPolicies(
     // Create custom client with proper baseURL configuration
     const customClient = createClient(createConfig({ baseUrl }));
     
-    const result = await sdk.notificationsListRest({ 
+    const result = await sdk.notificationsList({ 
       body: input,
       headers,
       client: customClient 
@@ -51,7 +68,7 @@ const notificationsListRestHandler = applyPolicies(
   })
 );
 
-export const ListRestProcedure: Procedure = {
-  contract: ListRestContract,
-  handler: notificationsListRestHandler,
+export const NotificationsListProcedure: Procedure = {
+  contract: NotificationsListContract,
+  handler: notificationsListHandler,
 };

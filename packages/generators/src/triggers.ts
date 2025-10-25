@@ -160,12 +160,8 @@ export async function generateProceduresFromTriggers(options: {
   // Match operations with schemas and triggers
   const resolvedOperations = operations
     .map((op) => {
-      // Simplify PascalCase name by removing redundant prefix
-      // e.g., "tasksList" -> "List", "notificationsSend" -> "Send"
-      // Match pattern: lowercase letters followed by uppercase (camelCase boundary)
-      const match = op.name.match(/^[a-z]+([A-Z].*)$/);
-      const simplifiedName = match ? match[1] : op.name;
-      const pascalName = simplifiedName.charAt(0).toUpperCase() + simplifiedName.slice(1);
+      // Keep entity context in name: "tasksList" -> "TasksList"
+      const pascalName = op.name.charAt(0).toUpperCase() + op.name.slice(1);
       
       // For @hey-api/schemas, the naming convention is typically {OperationName}Data and {OperationName}Response
       // Convert operation name to PascalCase for matching
@@ -232,9 +228,8 @@ export async function generateProceduresFromTriggers(options: {
   
   // Generate individual procedure files in root outputDir
   for (const op of procedures) {
-    // Use simplified names - remove provider prefix since it's already in the folder name
-    const simpleName = toDotCase(op.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
-    const fileName = `${simpleName}.ts`;
+    // Keep entity context but simplify - e.g. "tasksList" -> "tasks-list"
+    const fileName = `${toDotCase(op.name).replace(/\./g, '-')}.gen.ts`;
     const filePath = path.join(outputDir, fileName);
     
     const code = generateSingleProcedureCode({
@@ -250,8 +245,7 @@ export async function generateProceduresFromTriggers(options: {
   
   // Generate individual trigger files in triggers subdirectory
   for (const op of triggers) {
-    const simpleName = toDotCase(op.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
-    const fileName = `${simpleName}.ts`;
+    const fileName = `${toDotCase(op.name).replace(/\./g, '-')}.gen.ts`;
     const filePath = path.join(triggersDir, fileName);
     
     const code = generateSingleProcedureCode({
@@ -267,8 +261,7 @@ export async function generateProceduresFromTriggers(options: {
   
   // Generate webhook trigger files
   for (const webhook of webhookOperations) {
-    const simpleName = toDotCase(webhook.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
-    const fileName = `${simpleName}.ts`;
+    const fileName = `${toDotCase(webhook.name).replace(/\./g, '-')}.gen.ts`;
     const filePath = path.join(triggersDir, fileName);
     
     const code = generateWebhookTriggerCode({
@@ -873,10 +866,8 @@ function extractWebhooksFromOpenApi(spec: any, operationSchemas: Record<string, 
       cleanName = cleanName.replace(/Webhook+$/i, '');
       
       const camelCaseName = cleanName.charAt(0).toLowerCase() + cleanName.slice(1);
-      // Simplify PascalCase by removing first lowercase prefix (like in procedures)
-      const match = camelCaseName.match(/^[a-z]+([A-Z].*)$/);
-      const simplifiedName = match ? match[1] : camelCaseName;
-      const pascalName = simplifiedName.charAt(0).toUpperCase() + simplifiedName.slice(1);
+      // Keep full name for context: "tasksTriggerCreated" -> "TasksTriggerCreated"
+      const pascalName = camelCaseName.charAt(0).toUpperCase() + camelCaseName.slice(1);
       
       // Extract schemas for this webhook
       let inputSchema: string | null = null;
@@ -989,17 +980,17 @@ function generateIndexFile(operations: any[], provider: string, type: 'procedure
   const providerPascal = toPascalCase(provider);
   
   const imports = operations.map(op => {
-    const simpleName = toDotCase(op.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
+    const fileName = toDotCase(op.name).replace(/\./g, '-');
     const procedureName = `${op.pascalName}Procedure`;
-    return `export { ${procedureName} } from './${simpleName}.js';`;
+    return `export { ${procedureName} } from './${fileName}.gen.js';`;
   }).join('\n');
   
   const exportList = `
 import type { Procedure } from "@c4c/core";
 ${operations.map(op => {
-  const simpleName = toDotCase(op.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
+  const fileName = toDotCase(op.name).replace(/\./g, '-');
   const procedureName = `${op.pascalName}Procedure`;
-  return `import { ${procedureName} } from './${simpleName}.js';`;
+  return `import { ${procedureName} } from './${fileName}.gen.js';`;
 }).join('\n')}
 
 export const ${providerPascal}${capitalize(type)}: Procedure[] = [
@@ -1023,16 +1014,16 @@ function generateMainIndexFile(procedures: any[], triggers: any[], provider: str
   
   // Export individual procedures
   const procedureExports = procedures.map(op => {
-    const simpleName = toDotCase(op.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
+    const fileName = toDotCase(op.name).replace(/\./g, '-');
     const procedureName = `${op.pascalName}Procedure`;
-    return `export { ${procedureName} } from './${simpleName}.js';`;
+    return `export { ${procedureName} } from './${fileName}.gen.js';`;
   }).join('\n');
   
   // Import procedures for the array
   const procedureImports = procedures.map(op => {
-    const simpleName = toDotCase(op.name).replace(/\./g, '-').replace(/^[^-]+-/, '');
+    const fileName = toDotCase(op.name).replace(/\./g, '-');
     const procedureName = `${op.pascalName}Procedure`;
-    return `import { ${procedureName} } from './${simpleName}.js';`;
+    return `import { ${procedureName} } from './${fileName}.gen.js';`;
   }).join('\n');
   
   // Create procedures array
@@ -1095,9 +1086,11 @@ ${sdkConfigCode}`;
   const procedures = operations.map((op) => {
     const providerPascal = toPascalCase(provider);
     const providerEnvName = provider.toUpperCase().replace(/-/g, '_');
-    const contractName = `${op.pascalName}Contract`;
+    // Keep entity context: tasksList -> TasksListContract
+    const opPascalName = op.name.charAt(0).toUpperCase() + op.name.slice(1);
+    const contractName = `${opPascalName}Contract`;
     const handlerName = `${op.name}Handler`;
-    const procedureName = `${op.pascalName}Procedure`;
+    const procedureName = `${opPascalName}Procedure`;
     
     const metadata: string[] = [
       `    exposure: "external" as const,`,
