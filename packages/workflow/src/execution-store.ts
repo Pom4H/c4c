@@ -157,7 +157,7 @@ export class ExecutionStore {
 	/**
 	 * Get execution with serialized nodeDetails (for JSON)
 	 */
-	getExecutionJSON(executionId: string): any {
+	getExecutionJSON(executionId: string): Record<string, unknown> | undefined {
 		const exec = this.executions.get(executionId);
 		if (!exec) return undefined;
 		
@@ -179,7 +179,7 @@ export class ExecutionStore {
 	/**
 	 * Get all executions with serialized nodeDetails (for JSON)
 	 */
-	getAllExecutionsJSON(): any[] {
+	getAllExecutionsJSON(): Array<Record<string, unknown>> {
 		return this.getAllExecutions().map(exec => ({
 			...exec,
 			nodeDetails: Object.fromEntries(exec.nodeDetails.entries()),

@@ -23,7 +23,7 @@ async function waitForServer(url: string, timeout = 30000): Promise<void> {
   throw new Error(`Server at ${url} did not start within ${timeout}ms`);
 }
 
-async function rpcCall(baseUrl: string, procedure: string, input: any = {}): Promise<any> {
+async function rpcCall(baseUrl: string, procedure: string, input: Record<string, unknown> = {}): Promise<unknown> {
   const response = await fetch(`${baseUrl}/rpc/${procedure}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -248,7 +248,7 @@ describe('Cross-Integration Tests', () => {
       expect(result.notifications).toBeDefined();
       expect(result.notifications.length).toBeGreaterThan(0);
       
-      const sentNotification = result.notifications.find((n: any) => n.id === notification.id);
+      const sentNotification = result.notifications.find((n: { id: string }) => n.id === notification.id);
       expect(sentNotification).toBeDefined();
       expect(sentNotification.message).toBe('Notification from App A');
     });

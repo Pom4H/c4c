@@ -1,8 +1,8 @@
 import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
-import { collectProjectArtifacts } from "@c4c/core";
+import { collectProjectArtifacts, type Procedure, type Registry } from "@c4c/core";
 import { execute } from "@c4c/core";
-import { executeWorkflow } from "@c4c/workflow";
+import { executeWorkflow, type WorkflowDefinition } from "@c4c/workflow";
 
 interface ExecOptions {
 	root?: string;
@@ -87,8 +87,8 @@ export async function execCommand(
  */
 async function executeProcedure(
 	procedureName: string,
-	procedure: any,
-	registry: any,
+	procedure: Procedure,
+	registry: Registry,
 	input: unknown,
 	options: ExecOptions
 ): Promise<void> {
@@ -131,8 +131,8 @@ async function executeProcedure(
  */
 async function executeWorkflowById(
 	workflowId: string,
-	workflow: any,
-	registry: any,
+	workflow: WorkflowDefinition,
+	registry: Registry,
 	input: unknown,
 	options: ExecOptions
 ): Promise<void> {
