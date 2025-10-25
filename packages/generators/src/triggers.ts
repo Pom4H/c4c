@@ -52,7 +52,7 @@ export async function generateTriggers(options: TriggerGeneratorOptions): Promis
   
   // Default plugins configuration
   // Note: Trigger detection is done post-generation using OpenAPI spec analysis
-  const defaultPlugins: any[] = [
+  const defaultPlugins: Array<string | Record<string, unknown>> = [
     '@hey-api/schemas',
     {
       enums: 'javascript',
@@ -70,7 +70,7 @@ export async function generateTriggers(options: TriggerGeneratorOptions): Promis
     input,
     output,
     client: '@hey-api/client-fetch',
-    plugins: defaultPlugins as any
+    plugins: defaultPlugins as Array<string | { name: string; [key: string]: unknown }>
   });
   
   // Load OpenAPI spec for trigger analysis
@@ -99,7 +99,7 @@ export async function generateProceduresFromTriggers(options: {
   outputDir: string;
   provider: string;
   baseUrl?: string;
-  openApiSpec?: any;
+  openApiSpec?: Record<string, unknown>;
 }): Promise<void> {
   const { generatedDir, outputDir, provider, baseUrl = 'http://localhost:3000', openApiSpec } = options;
   
@@ -213,7 +213,7 @@ export async function generateProceduresFromTriggers(options: {
         outputSchema: opSchemas.output
       };
     })
-    .filter((op): op is NonNullable<typeof op> => op !== null && (op as any).hasValidSchemas);
+    .filter((op): op is NonNullable<typeof op> & { hasValidSchemas: boolean } => op !== null && op.hasValidSchemas);
   
   // Generate procedure files (simplified structure)
   await fs.mkdir(outputDir, { recursive: true });
@@ -234,7 +234,7 @@ export async function generateProceduresFromTriggers(options: {
     
     const code = generateSingleProcedureCode({
       provider,
-      operation: op as any,
+      operation: op,
       sdkImportPath: path.relative(path.dirname(filePath), sdkPath).replace(/\.ts$/, '.js'),
       schemaImportPath: path.relative(path.dirname(filePath), schemaPath).replace(/\.ts$/, '.js'),
       useSchemas: hasSchemas
@@ -250,7 +250,7 @@ export async function generateProceduresFromTriggers(options: {
     
     const code = generateSingleProcedureCode({
       provider,
-      operation: op as any,
+      operation: op,
       sdkImportPath: path.relative(path.dirname(filePath), sdkPath).replace(/\.ts$/, '.js'),
       schemaImportPath: path.relative(path.dirname(filePath), schemaPath).replace(/\.ts$/, '.js'),
       useSchemas: hasSchemas
@@ -266,7 +266,7 @@ export async function generateProceduresFromTriggers(options: {
     
     const code = generateWebhookTriggerCode({
       provider,
-      webhook: webhook as any,
+      webhook: webhook,
     });
     
     await fs.writeFile(filePath, code, 'utf8');
@@ -433,7 +433,7 @@ async function parseTriggersMetadata(source: string): Promise<Record<string, Tri
 /**
  * Extract schemas from OpenAPI specification (which contains Zod schemas)
  */
-function extractSchemasFromOpenApi(spec: any): Record<string, { input: string | null; output: string | null }> {
+function extractSchemasFromOpenApi(spec: Record<string, unknown>): Record<string, { input: string | null; output: string | null }> {
   const schemas: Record<string, { input: string | null; output: string | null }> = {};
   
   if (!spec || !spec.paths) {
@@ -445,7 +445,7 @@ function extractSchemasFromOpenApi(spec: any): Record<string, { input: string | 
   
   // Process each path and operation
   for (const [pathStr, pathItem] of Object.entries(spec.paths || {})) {
-    const pathObj = pathItem as any;
+    const pathObj = pathItem as Record<string, unknown>;
     const methods = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head', 'trace'];
     
     for (const method of methods) {
@@ -507,7 +507,7 @@ function extractSchemasFromOpenApi(spec: any): Record<string, { input: string | 
 /**
  * Convert Zod schema object (with _def) to Zod code string
  */
-function zodSchemaToZodCode(schema: any): string | null {
+function zodSchemaToZodCode(schema: { _def?: { typeName?: string; shape?: unknown; type?: unknown; checks?: unknown[]; values?: unknown[]; innerType?: unknown }; [key: string]: unknown }): string | null {
   if (!schema || !schema._def) {
     return null;
   }
@@ -570,7 +570,7 @@ function zodSchemaToZodCode(schema: any): string | null {
   if (typeName === 'ZodEnum') {
     const values = schema._def.values || [];
     if (values.length === 0) return null;
-    const enumValues = values.map((v: any) => JSON.stringify(v)).join(', ');
+    const enumValues = values.map((v: unknown) => JSON.stringify(v)).join(', ');
     return `z.enum([${enumValues}])`;
   }
   
@@ -604,7 +604,7 @@ function zodSchemaToZodCode(schema: any): string | null {
 /**
  * Convert JSON Schema to Zod schema
  */
-function jsonSchemaToZod(schema: any, components: Record<string, any> = {}): string {
+function jsonSchemaToZod(schema: Record<string, unknown>, components: Record<string, unknown> = {}): string {
   // Handle $ref
   if (schema.$ref) {
     const refName = schema.$ref.split('/').pop();
@@ -616,19 +616,19 @@ function jsonSchemaToZod(schema: any, components: Record<string, any> = {}): str
   
   // Handle oneOf (union)
   if (schema.oneOf && Array.isArray(schema.oneOf) && schema.oneOf.length > 0) {
-    const variants = schema.oneOf.map((s: any) => jsonSchemaToZod(s, components));
+    const variants = schema.oneOf.map((s: Record<string, unknown>) => jsonSchemaToZod(s, components));
     return `z.union([${variants.join(', ')}])`;
   }
   
   // Handle anyOf (union)
   if (schema.anyOf && Array.isArray(schema.anyOf) && schema.anyOf.length > 0) {
-    const variants = schema.anyOf.map((s: any) => jsonSchemaToZod(s, components));
+    const variants = schema.anyOf.map((s: Record<string, unknown>) => jsonSchemaToZod(s, components));
     return `z.union([${variants.join(', ')}])`;
   }
   
   // Handle allOf (intersection)
   if (schema.allOf && Array.isArray(schema.allOf) && schema.allOf.length > 0) {
-    const variants = schema.allOf.map((s: any) => jsonSchemaToZod(s, components));
+    const variants = schema.allOf.map((s: Record<string, unknown>) => jsonSchemaToZod(s, components));
     return variants.join('.and(');
   }
   
@@ -646,7 +646,7 @@ function jsonSchemaToZod(schema: any, components: Record<string, any> = {}): str
     const required = schema.required || [];
     
     for (const [key, propSchema] of Object.entries(schema.properties)) {
-      const propZod = jsonSchemaToZod(propSchema as any, components);
+      const propZod = jsonSchemaToZod(propSchema as Record<string, unknown>, components);
       const isRequired = required.includes(key);
       const optional = isRequired ? '' : '.optional()';
       const safeKey = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key) ? key : `"${key}"`;
@@ -673,9 +673,9 @@ function jsonSchemaToZod(schema: any, components: Record<string, any> = {}): str
 /**
  * Convert simple JSON Schema type to Zod type
  */
-function jsonSchemaToZodType(schema: any): string {
+function jsonSchemaToZodType(schema: Record<string, unknown>): string {
   if (schema.enum && Array.isArray(schema.enum) && schema.enum.length > 0) {
-    const values = schema.enum.map((v: any) => JSON.stringify(v)).join(', ');
+    const values = schema.enum.map((v: unknown) => JSON.stringify(v)).join(', ');
     return `z.enum([${values}])`;
   }
   
@@ -733,7 +733,7 @@ function jsonSchemaToZodType(schema: any): string {
  */
 function generateSingleProcedureCode(options: {
   provider: string;
-  operation: any;
+  operation: { name: string; pascalName: string; description?: string; isTrigger?: boolean; triggerMetadata?: { kind?: string }; inputSchema?: string; outputSchema?: string };
   sdkImportPath: string;
   schemaImportPath: string;
   useSchemas?: boolean;
@@ -839,8 +839,8 @@ export const ${procedureName}: Procedure = {
 /**
  * Extract webhooks from OpenAPI specification
  */
-function extractWebhooksFromOpenApi(spec: any, operationSchemas: Record<string, { input: string | null; output: string | null }>): any[] {
-  const webhooks: any[] = [];
+function extractWebhooksFromOpenApi(spec: Record<string, unknown>, operationSchemas: Record<string, { input: string | null; output: string | null }>): Array<{ name: string; pascalName: string; description: string; inputSchema: string; outputSchema: string; webhookName: string; isTrigger: boolean; isWebhook: boolean }> {
+  const webhooks: Array<{ name: string; pascalName: string; description: string; inputSchema: string; outputSchema: string; webhookName: string; isTrigger: boolean; isWebhook: boolean }> = [];
   
   if (!spec || !spec.webhooks) {
     return webhooks;
@@ -848,7 +848,7 @@ function extractWebhooksFromOpenApi(spec: any, operationSchemas: Record<string, 
   
   // Process webhooks
   for (const [webhookName, webhookItem] of Object.entries(spec.webhooks)) {
-    const webhookObj = webhookItem as any;
+    const webhookObj = webhookItem as Record<string, unknown>;
     const methods = ['post', 'get', 'put', 'patch', 'delete'];
     
     for (const method of methods) {
@@ -915,7 +915,7 @@ function extractWebhooksFromOpenApi(spec: any, operationSchemas: Record<string, 
  */
 function generateWebhookTriggerCode(options: {
   provider: string;
-  webhook: any;
+  webhook: { name: string; pascalName: string; description: string; inputSchema: string; outputSchema: string };
 }): string {
   const { provider, webhook } = options;
   
@@ -971,7 +971,7 @@ export const ${procedureName}: Procedure = {
 /**
  * Generate index file for procedures or triggers
  */
-function generateIndexFile(operations: any[], provider: string, type: 'procedures' | 'triggers'): string {
+function generateIndexFile(operations: Array<{ name: string; pascalName: string }>, provider: string, type: 'procedures' | 'triggers'): string {
   const header = `// This file is auto-generated by c4c integrate command
 // Do not edit manually.
 
@@ -1004,7 +1004,7 @@ ${operations.map(op => `  ${op.pascalName}Procedure`).join(',\n')}
 /**
  * Generate main index file that exports all procedures and triggers
  */
-function generateMainIndexFile(procedures: any[], triggers: any[], provider: string): string {
+function generateMainIndexFile(procedures: Array<{ name: string; pascalName: string }>, triggers: Array<{ name: string; pascalName: string }>, provider: string): string {
   const header = `// This file is auto-generated by c4c integrate command
 // Do not edit manually.
 
@@ -1047,7 +1047,7 @@ export * from './triggers/index.js';
 
 function generateProcedureCode(options: {
   provider: string;
-  operations: Array<any>;
+  operations: Array<{ name: string; pascalName: string; description?: string; isTrigger?: boolean; triggerMetadata?: unknown; triggerType?: string }>;
   sdkImportPath: string;
   schemaImportPath: string;
   useSchemas?: boolean;
@@ -1137,7 +1137,7 @@ const ${handlerName} = applyPolicies(
         ...headers,
       };
     }
-    const result = await sdk.${op.name}(request as any);
+    const result = await sdk.${op.name}(request as Record<string, unknown>);
     if (result && typeof result === "object" && "data" in result) {
       return (result as { data: unknown }).data;
     }
@@ -1185,7 +1185,7 @@ function normalizeOperationName(name: string): string {
 /**
  * Load OpenAPI spec from URL or file
  */
-async function loadOpenAPISpec(input: string): Promise<any> {
+async function loadOpenAPISpec(input: string): Promise<Record<string, unknown> | null> {
   try {
     // Check if it's a URL
     if (input.startsWith('http://') || input.startsWith('https://')) {
@@ -1209,7 +1209,7 @@ async function loadOpenAPISpec(input: string): Promise<any> {
  * Determine trigger kind based on heuristics (from your fork's logic)
  */
 function determineTriggerKind(
-  operation: any,
+  operation: Record<string, unknown>,
   path: string,
   operationId?: string,
   isWebhook = false
@@ -1223,7 +1223,7 @@ function determineTriggerKind(
   // Check for SSE in responses
   if (operation.responses) {
     for (const response of Object.values(operation.responses)) {
-      const content = (response as any).content;
+      const content = (response as Record<string, unknown>).content;
       if (content && (content['text/event-stream'] || content['application/stream+json'])) {
         return 'stream';
       }
@@ -1265,8 +1265,8 @@ function determineTriggerKind(
   // Subscription heuristics from path and parameters
   const hasSubscribeInPath = /\/(subscribe|subscriptions|webhook)$/i.test(path); // Only at end
   const hasTopic = operation['x-topic'] || operation.extensions?.['x-topic'];
-  const hasCallbackUrl = operation.parameters?.some(
-    (p: any) => {
+  const hasCallbackUrl = (operation.parameters as Array<{ name?: string }> | undefined)?.some(
+    (p: { name?: string }) => {
       const name = p.name?.toLowerCase() || '';
       return name === 'callbackurl' || 
              name === 'callback_url' || 
@@ -1291,7 +1291,7 @@ function determineTriggerKind(
 /**
  * Determine transport type for streams
  */
-function determineTransport(operation: any): TriggerMetadata['transport'] {
+function determineTransport(operation: Record<string, unknown>): TriggerMetadata['transport'] {
   const transport = operation['x-transport'] || operation.extensions?.['x-transport'];
   if (transport) {
     return transport;
@@ -1299,7 +1299,7 @@ function determineTransport(operation: any): TriggerMetadata['transport'] {
   
   if (operation.responses) {
     for (const response of Object.values(operation.responses)) {
-      const content = (response as any).content;
+      const content = (response as Record<string, unknown>).content;
       if (content?.['text/event-stream']) {
         return 'sse';
       }
@@ -1315,7 +1315,7 @@ function determineTransport(operation: any): TriggerMetadata['transport'] {
 /**
  * Generate triggers metadata file
  */
-async function generateTriggersMetadata(spec: any, output: string): Promise<void> {
+async function generateTriggersMetadata(spec: Record<string, unknown>, output: string): Promise<void> {
   if (!spec || !spec.paths) {
     console.warn('[c4c] No OpenAPI spec available for trigger analysis');
     return;
@@ -1327,7 +1327,7 @@ async function generateTriggersMetadata(spec: any, output: string): Promise<void
   
   // Process regular operations from paths
   for (const [pathStr, pathItem] of Object.entries(spec.paths || {})) {
-    const pathObj = pathItem as any;
+    const pathObj = pathItem as Record<string, unknown>;
     const methods = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head', 'trace'];
     
     for (const method of methods) {
@@ -1355,7 +1355,7 @@ async function generateTriggersMetadata(spec: any, output: string): Promise<void
   // Process webhooks
   if (spec.webhooks) {
     for (const [name, webhookItem] of Object.entries(spec.webhooks)) {
-      const webhookObj = webhookItem as any;
+      const webhookObj = webhookItem as Record<string, unknown>;
       const methods = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head', 'trace'];
       
       for (const method of methods) {

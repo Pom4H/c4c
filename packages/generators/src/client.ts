@@ -225,7 +225,7 @@ function toCamelCase(value: string): string {
 }
 
 function toTypeScript(schema: ZodTypeAny, level = 0): string {
-	const resolved: any = strip(schema);
+	const resolved = strip(schema);
 	const def = getDef(resolved);
 	const typeName = def?.typeName as string | undefined;
 
@@ -368,7 +368,7 @@ function toTypeScript(schema: ZodTypeAny, level = 0): string {
 }
 
 function strip(schema: ZodTypeAny): ZodTypeAny {
-	let current: any = schema;
+	let current = schema;
 	while (true) {
 		const def = getDef(current);
 		const typeName = def?.typeName as string | undefined;
@@ -402,7 +402,7 @@ function strip(schema: ZodTypeAny): ZodTypeAny {
 }
 
 function unwrapField(schema: ZodTypeAny) {
-	let current: any = schema;
+	let current = schema;
 	let optional = false;
 	let nullable = false;
 
@@ -463,6 +463,6 @@ function safePropertyName(key: string): string {
 	return JSON.stringify(key);
 }
 
-function getDef(schema: any): any {
-	return schema?._def ?? schema?.def ?? {};
+function getDef(schema: ZodTypeAny): Record<string, unknown> {
+	return (schema as unknown as { _def?: Record<string, unknown>; def?: Record<string, unknown> })?._def ?? (schema as unknown as { _def?: Record<string, unknown>; def?: Record<string, unknown> })?.def ?? {};
 }

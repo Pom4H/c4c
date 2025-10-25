@@ -85,7 +85,7 @@ class CollectorSpanExporter implements SpanExporter {
           }
         }
 
-        const events: TraceSpan["events"] = (span.events || []).map((evt: any) => ({
+        const events: TraceSpan["events"] = (span.events || []).map((evt: { name: string; time: [number, number]; attributes?: Record<string, unknown> }) => ({
           name: evt.name,
           timestamp: hrTimeToMs(evt.time as [number, number]),
           attributes: evt.attributes,

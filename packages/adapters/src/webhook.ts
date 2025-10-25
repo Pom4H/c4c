@@ -225,8 +225,8 @@ export interface WebhookRouterOptions {
 /**
  * Get all trigger procedures from registry
  */
-function getTriggerProcedures(registry: Registry): Array<{ name: string; metadata: any }> {
-	const triggers: Array<{ name: string; metadata: any }> = [];
+function getTriggerProcedures(registry: Registry): Array<{ name: string; metadata: Record<string, unknown> | undefined }> {
+	const triggers: Array<{ name: string; metadata: Record<string, unknown> | undefined }> = [];
 	
 	for (const [name, procedure] of registry.entries()) {
 		const metadata = procedure.contract.metadata;

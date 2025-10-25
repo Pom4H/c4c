@@ -1,12 +1,17 @@
-import type { ExecutionContext, Handler, Procedure, Registry } from "./types.js";
+import type { BaseMetadata, ExecutionContext, Handler, Procedure, Registry } from "./types.js";
 
 /**
  * Execute a procedure with input validation and output validation
+ * Supports typed context for better type safety
  */
-export async function executeProcedure<TInput, TOutput>(
-	procedure: Procedure<TInput, TOutput>,
+export async function executeProcedure<
+	TInput,
+	TOutput,
+	TContext extends ExecutionContext = ExecutionContext,
+>(
+	procedure: Procedure<TInput, TOutput, TContext>,
 	input: unknown,
-	context: ExecutionContext
+	context: TContext
 ): Promise<TOutput> {
 	// Validate input against contract
 	const validatedInput = procedure.contract.input.parse(input);
@@ -39,15 +44,15 @@ export async function execute(
 }
 
 /**
- * Create execution context
+ * Create execution context with typed metadata
  */
-export function createExecutionContext(
-	metadata: Record<string, unknown> = {}
-): ExecutionContext {
+export function createExecutionContext<TMeta extends BaseMetadata = BaseMetadata>(
+	metadata?: Partial<TMeta>
+): ExecutionContext<TMeta> {
 	return {
 		requestId: generateRequestId(),
 		timestamp: new Date(),
-		metadata,
+		metadata: (metadata ?? {}) as TMeta,
 	};
 }
 

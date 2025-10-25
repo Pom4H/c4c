@@ -33,7 +33,9 @@ export function isProcedureVisible(contract: Contract, target: ProcedureTarget):
 		case "rpc":
 			return exposure !== "internal" && roles.includes("api-endpoint");
 		case "client":
-			return exposure !== "internal" && (roles.includes("sdk-client") || roles.includes("api-endpoint"));
+			return (
+				exposure !== "internal" && (roles.includes("sdk-client") || roles.includes("api-endpoint"))
+			);
 		case "catalog":
 		default:
 			return true;

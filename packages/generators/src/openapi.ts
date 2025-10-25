@@ -43,9 +43,9 @@ export function generateOpenAPISpec(
 		includeTriggers = true,
 	} = options;
 
-	const paths: Record<string, any> = {};
-	const webhooks: Record<string, any> = {};
-	const triggers: Record<string, any> = {};
+	const paths: Record<string, unknown> = {};
+	const webhooks: Record<string, unknown> = {};
+	const triggers: Record<string, unknown> = {};
 
 	for (const [name, procedure] of registry.entries()) {
 		const { contract } = procedure;
@@ -148,7 +148,7 @@ function buildRpcOperation(contract: Contract) {
 
 function buildRestOperation(
 	contract: Contract
-): { path: string; method: string; operation: any } | null {
+): { path: string; method: string; operation: Record<string, unknown> } | null {
 	const name = contract.name || "unknown";
 	const parts = name.split(".");
 	if (parts.length < 2) return null;
@@ -157,7 +157,7 @@ function buildRestOperation(
 	const mapping = getRestMapping(resource || "", action || "");
 	if (!mapping) return null;
 
-	const operation: any = {
+	const operation: Record<string, unknown> = {
 		summary: contract.description || name,
 		description: contract.description,
 		operationId: `${contract.name}_rest`,

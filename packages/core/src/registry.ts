@@ -21,7 +21,7 @@ const ROLE_COLOR: Record<ProcedureRole, string> = {
 	"workflow-node": "\u001B[36m", // cyan
 	"api-endpoint": "\u001B[35m", // magenta
 	"sdk-client": "\u001B[33m", // yellow
-	"trigger": "\u001B[32m", // green
+	trigger: "\u001B[32m", // green
 };
 
 const COLOR_ENABLED = () => Boolean(process.stdout?.isTTY && !process.env.NO_COLOR);
@@ -46,10 +46,9 @@ async function ensureTypeScriptLoader() {
 		tsLoaderReady = (async () => {
 			try {
 				const moduleId = "tsx/esm/api";
-				const dynamicImport = new Function(
-					"specifier",
-					"return import(specifier);"
-				) as (specifier: string) => Promise<{ register?: () => void }>;
+				const dynamicImport = new Function("specifier", "return import(specifier);") as (
+					specifier: string
+				) => Promise<{ register?: () => void }>;
 				const { register } = await dynamicImport(moduleId).catch(() => ({ register: undefined }));
 				if (typeof register === "function") {
 					register();
@@ -117,7 +116,9 @@ export async function collectProjectArtifacts(rootPath: string): Promise<Project
 	return { procedures, workflows, moduleIndex };
 }
 
-export async function collectRegistryDetailed(proceduresPath = "src/procedures"): Promise<RegistryLoadResult> {
+export async function collectRegistryDetailed(
+	proceduresPath = "src/procedures"
+): Promise<RegistryLoadResult> {
 	const registry: Registry = new Map();
 	const moduleIndex: RegistryModuleIndex = new Map();
 	const absoluteRoot = resolve(proceduresPath);
@@ -160,12 +161,12 @@ export async function loadProceduresFromModule(
 			const procedure = exportValue as Procedure;
 			// Auto-naming: use export name if contract.name is not provided
 			const procedureName = procedure.contract.name || exportName;
-			
+
 			// Ensure contract.name is set for consistency
 			if (!procedure.contract.name) {
 				procedure.contract.name = procedureName;
 			}
-			
+
 			procedures.set(procedureName, procedure);
 		}
 	}
@@ -195,12 +196,12 @@ export async function loadArtifactsFromModule(
 			const procedure = exportValue as Procedure;
 			// Auto-naming: use export name if contract.name is not provided
 			const procedureName = procedure.contract.name || exportName;
-			
+
 			// Ensure contract.name is set for consistency (generators may use it)
 			if (!procedure.contract.name) {
 				procedure.contract.name = procedureName;
 			}
-			
+
 			procedures.set(procedureName, procedure);
 		} else if (isWorkflow(exportValue)) {
 			const workflow = exportValue as WorkflowDefinition;
@@ -212,7 +213,16 @@ export async function loadArtifactsFromModule(
 }
 
 const ALLOWED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
-const IGNORED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", "scripts", "generated", ".next", ".c4c"]);
+const IGNORED_DIRECTORIES = new Set([
+	"node_modules",
+	".git",
+	"dist",
+	"build",
+	"scripts",
+	"generated",
+	".next",
+	".c4c",
+]);
 const TEST_FILE_PATTERN = /\.(test|spec)\.[^.]+$/i;
 
 export function isSupportedHandlerFile(filePath: string): boolean {
@@ -255,18 +265,7 @@ async function findAllSupportedFiles(root: string): Promise<string[]> {
 	return result;
 }
 
-/**
- * Type guard to check if an export is a valid Procedure
- */
-function isProcedure(value: unknown): value is Procedure {
-	return (
-		typeof value === "object" &&
-		value !== null &&
-		"contract" in value &&
-		"handler" in value &&
-		typeof (value as { handler: unknown }).handler === "function"
-	);
-}
+// isProcedure is now imported from type-guards.ts for consistency
 
 /**
  * Type guard to check if an export is a valid WorkflowDefinition
@@ -345,7 +344,8 @@ function logProcedureEvent(
 		parts.push(metadataLine);
 	}
 
-	const location = proceduresRoot && sourcePath ? formatProcedureLocation(proceduresRoot, sourcePath) : "";
+	const location =
+		proceduresRoot && sourcePath ? formatProcedureLocation(proceduresRoot, sourcePath) : "";
 	if (location) {
 		parts.push(location);
 	}
@@ -374,7 +374,8 @@ function logWorkflowEvent(
 		parts.push("[triggered]");
 	}
 
-	const location = projectRoot && sourcePath ? formatProcedureLocation(projectRoot, sourcePath) : "";
+	const location =
+		projectRoot && sourcePath ? formatProcedureLocation(projectRoot, sourcePath) : "";
 	if (location) {
 		parts.push(location);
 	}
@@ -410,7 +411,8 @@ function formatProcedureMetadataCompact(procedure: Procedure): string {
 	const parts: string[] = [];
 
 	if (metadata.roles?.length) {
-		const roles = metadata.roles.length === 1 && metadata.roles[0] === "workflow-node" ? [] : metadata.roles;
+		const roles =
+			metadata.roles.length === 1 && metadata.roles[0] === "workflow-node" ? [] : metadata.roles;
 		if (roles.length) {
 			const coloredRoles = roles.map((role) => colorizeRole(role)).join(",");
 			parts.push(`roles=${coloredRoles}`);
@@ -524,8 +526,8 @@ function hasAuthMetadata(auth?: AuthRequirements | null): boolean {
 	if (!auth) return false;
 	return Boolean(
 		auth.requiresAuth ||
-		auth.authScheme ||
-		(auth.requiredRoles && auth.requiredRoles.length > 0) ||
-		(auth.requiredPermissions && auth.requiredPermissions.length > 0)
+			auth.authScheme ||
+			(auth.requiredRoles && auth.requiredRoles.length > 0) ||
+			(auth.requiredPermissions && auth.requiredPermissions.length > 0)
 	);
 }

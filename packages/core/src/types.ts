@@ -81,12 +81,57 @@ export interface ContractMetadata extends Record<string, unknown> {
 }
 
 /**
- * Context passed to every handler execution
+ * Base metadata structure with common fields
  */
-export interface ExecutionContext {
+export interface BaseMetadata {
+	/**
+	 * Authentication data
+	 */
+	auth?: {
+		userId?: string;
+		username?: string;
+		email?: string;
+		roles?: string[];
+		permissions?: string[];
+		token?: string;
+		expiresAt?: Date | string;
+		[key: string]: unknown;
+	};
+	/**
+	 * User ID (extracted from auth for convenience)
+	 */
+	userId?: string;
+	/**
+	 * OAuth tokens and data
+	 */
+	oauth?: {
+		accessToken?: string;
+		refreshToken?: string;
+		expiresAt?: Date;
+		scope?: string[];
+		provider?: string;
+		[key: string]: unknown;
+	};
+	/**
+	 * Request tracing and correlation
+	 */
+	traceId?: string;
+	spanId?: string;
+	parentSpanId?: string;
+	/**
+	 * Additional custom metadata
+	 */
+	[key: string]: unknown;
+}
+
+/**
+ * Context passed to every handler execution
+ * Generic type parameter allows type-safe metadata
+ */
+export interface ExecutionContext<TMeta extends BaseMetadata = BaseMetadata> {
 	requestId: string;
 	timestamp: Date;
-	metadata: Record<string, unknown>;
+	metadata: TMeta;
 }
 
 /**
@@ -95,14 +140,14 @@ export interface ExecutionContext {
 export interface Contract<TInput = unknown, TOutput = unknown> {
 	/**
 	 * Procedure name (optional - will use export name if not provided)
-	 * 
+	 *
 	 * @example
 	 * // Auto-naming (uses export name)
 	 * export const createUser: Procedure = {
 	 *   contract: { input: ..., output: ... },  // name = "createUser"
 	 *   handler: ...
 	 * };
-	 * 
+	 *
 	 * // Explicit naming
 	 * export const createUser: Procedure = {
 	 *   contract: { name: "users.create", input: ..., output: ... },
@@ -117,19 +162,25 @@ export interface Contract<TInput = unknown, TOutput = unknown> {
 }
 
 /**
- * Handler function signature
+ * Handler function signature with typed context
  */
-export type Handler<TInput = unknown, TOutput = unknown> = (
-	input: TInput,
-	context: ExecutionContext
-) => Promise<TOutput> | TOutput;
+export type Handler<
+	TInput = unknown,
+	TOutput = unknown,
+	TContext extends ExecutionContext = ExecutionContext,
+> = (input: TInput, context: TContext) => Promise<TOutput> | TOutput;
 
 /**
  * Procedure combines contract with handler
+ * Generic context type allows type-safe metadata flow
  */
-export interface Procedure<TInput = unknown, TOutput = unknown> {
+export interface Procedure<
+	TInput = unknown,
+	TOutput = unknown,
+	TContext extends ExecutionContext = ExecutionContext,
+> {
 	contract: Contract<TInput, TOutput>;
-	handler: Handler<TInput, TOutput>;
+	handler: Handler<TInput, TOutput, TContext>;
 }
 
 /**
@@ -139,7 +190,24 @@ export type Registry = Map<string, Procedure>;
 
 /**
  * Policy function that wraps a handler
+ * Can transform context type (e.g., add auth data)
+ *
+ * @example
+ * // Policy that adds OAuth data to context
+ * const withOAuth: Policy<ExecutionContext, ExecutionContext & { oauth: OAuthData }> =
+ *   (handler) => async (input, context) => {
+ *     const oauthData = await getOAuthData();
+ *     return handler(input, { ...context, metadata: { ...context.metadata, oauth: oauthData } });
+ *   };
  */
-export type Policy = <TInput, TOutput>(
-	handler: Handler<TInput, TOutput>
-) => Handler<TInput, TOutput>;
+export type Policy<
+	TContextIn extends ExecutionContext = ExecutionContext,
+	TContextOut extends ExecutionContext = TContextIn,
+> = <TInput, TOutput>(
+	handler: Handler<TInput, TOutput, TContextOut>
+) => Handler<TInput, TOutput, TContextIn>;
+
+/**
+ * Simple policy that doesn't transform context
+ */
+export type SimplePolicy = Policy<ExecutionContext, ExecutionContext>;
