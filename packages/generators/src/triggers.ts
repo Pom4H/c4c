@@ -743,6 +743,7 @@ function generateSingleProcedureCode(options: {
   const imports = `import { applyPolicies, type Procedure, type Contract } from "@c4c/core";
 import { withOAuth, getOAuthHeaders } from "@c4c/policies";
 import * as sdk from "${sdkImportPath}";
+import { createClient, createConfig } from "@hey-api/client-fetch";
 import { z } from "zod";
 `;
   
@@ -789,27 +790,22 @@ ${metadata.join('\n')}
 
 const ${handlerName} = applyPolicies(
   async (input, context) => {
-    const baseUrl = process.env.${envVarName} || context.metadata?.${provider}Url as string | undefined;
+    const baseUrl = process.env.${envVarName} || context.metadata?.['${provider}Url'] as string | undefined;
     if (!baseUrl) {
       throw new Error(\`${envVarName} environment variable is not set\`);
     }
     
     const headers = getOAuthHeaders(context, "${provider}");
-    const request: Record<string, unknown> = { ...input };
-    if (headers) {
-      request.headers = {
-        ...((request.headers as Record<string, string> | undefined) ?? {}),
-        ...headers,
-      };
-    }
     
-    // Create custom client with baseURL
-    const customClient = {
-      ...sdk.client,
-      baseUrl,
-    };
+    // Create custom client with proper baseURL configuration
+    const customClient = createClient(createConfig({ baseUrl }));
     
-    const result = await sdk.${op.name}({ ...request, client: customClient } as any);
+    const result = await sdk.${op.name}({ 
+      body: input,
+      headers,
+      client: customClient 
+    } as any);
+    
     if (result && typeof result === "object" && "data" in result) {
       return (result as { data: unknown }).data;
     }
