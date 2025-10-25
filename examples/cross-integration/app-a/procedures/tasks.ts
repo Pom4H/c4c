@@ -52,17 +52,18 @@ export const createTask: Procedure = {
     },
   },
   handler: async (input) => {
+    const data = input as any;
     const now = new Date().toISOString();
     const id = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     const task: Task = {
       id,
-      title: input.title,
-      description: input.description,
-      status: input.status || 'todo',
-      priority: input.priority,
-      assignee: input.assignee,
-      dueDate: input.dueDate,
+      title: data.title,
+      description: data.description,
+      status: data.status || 'todo',
+      priority: data.priority,
+      assignee: data.assignee,
+      dueDate: data.dueDate,
       createdAt: now,
       updatedAt: now,
     };
@@ -99,18 +100,19 @@ export const listTasks: Procedure = {
     },
   },
   handler: async (input) => {
+    const data = input as any;
     let filtered = Array.from(tasks.values());
     
-    if (input.status) {
-      filtered = filtered.filter(t => t.status === input.status);
+    if (data.status) {
+      filtered = filtered.filter(t => t.status === data.status);
     }
     
-    if (input.assignee) {
-      filtered = filtered.filter(t => t.assignee === input.assignee);
+    if (data.assignee) {
+      filtered = filtered.filter(t => t.assignee === data.assignee);
     }
     
-    if (input.limit) {
-      filtered = filtered.slice(0, input.limit);
+    if (data.limit) {
+      filtered = filtered.slice(0, data.limit);
     }
     
     console.log(`[Tasks] Listed ${filtered.length} tasks`);
@@ -141,10 +143,11 @@ export const getTask: Procedure = {
     },
   },
   handler: async (input) => {
-    const task = tasks.get(input.id);
+    const data = input as any;
+    const task = tasks.get(data.id);
     
     if (!task) {
-      throw new Error(`Task not found: ${input.id}`);
+      throw new Error(`Task not found: ${data.id}`);
     }
     
     console.log(`[Tasks] Retrieved task: ${task.title} (${task.id})`);
@@ -178,19 +181,20 @@ export const updateTask: Procedure = {
     },
   },
   handler: async (input) => {
-    const task = tasks.get(input.id);
+    const data = input as any;
+    const task = tasks.get(data.id);
     
     if (!task) {
-      throw new Error(`Task not found: ${input.id}`);
+      throw new Error(`Task not found: ${data.id}`);
     }
     
     const updatedTask: Task = {
       ...task,
-      ...input,
+      ...data,
       updatedAt: new Date().toISOString(),
     };
     
-    tasks.set(input.id, updatedTask);
+    tasks.set(data.id, updatedTask);
     
     console.log(`[Tasks] Updated task: ${updatedTask.title} (${updatedTask.id})`);
     
@@ -220,17 +224,18 @@ export const deleteTask: Procedure = {
     },
   },
   handler: async (input) => {
-    const existed = tasks.delete(input.id);
+    const data = input as any;
+    const existed = tasks.delete(data.id);
     
     if (!existed) {
-      throw new Error(`Task not found: ${input.id}`);
+      throw new Error(`Task not found: ${data.id}`);
     }
     
-    console.log(`[Tasks] Deleted task: ${input.id}`);
+    console.log(`[Tasks] Deleted task: ${data.id}`);
     
     return {
       success: true,
-      id: input.id,
+      id: data.id,
     };
   },
 };
@@ -252,12 +257,12 @@ export const taskCreatedTrigger: Procedure = {
     metadata: {
       exposure: 'external',
       type: 'trigger',
-      roles: ['webhook'],
+      roles: ['trigger'],
       trigger: {
-        kind: 'webhook',
-        provider: 'tasks',
-        event: 'created',
+        type: 'webhook',
+        eventTypes: ['created'],
       },
+      provider: 'tasks',
       tags: ['tasks', 'webhook', 'trigger'],
     },
   },
@@ -278,12 +283,12 @@ export const taskUpdatedTrigger: Procedure = {
     metadata: {
       exposure: 'external',
       type: 'trigger',
-      roles: ['webhook'],
+      roles: ['trigger'],
       trigger: {
-        kind: 'webhook',
-        provider: 'tasks',
-        event: 'updated',
+        type: 'webhook',
+        eventTypes: ['updated'],
       },
+      provider: 'tasks',
       tags: ['tasks', 'webhook', 'trigger'],
     },
   },

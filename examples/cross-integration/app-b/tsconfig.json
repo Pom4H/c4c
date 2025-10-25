@@ -4,6 +4,6 @@
     "outDir": "./dist",
     "rootDir": "."
   },
-  "include": ["procedures/**/*", "src/**/*", "workflows/**/*"],
-  "exclude": ["node_modules", "dist", "generated"]
+  "include": ["procedures/**/*", "src/**/*", "workflows/**/*", "generated/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

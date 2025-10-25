@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createDocument } from "zod-openapi";
+import { zodToJsonSchema } from "zod-to-json-schema";
 import { isProcedureVisible, type Contract, type Registry } from "@c4c/core";
 
 export interface OpenAPISpec {
@@ -75,7 +76,10 @@ export function generateOpenAPISpec(
 			}
 		}
 
-		if (isProcedureVisible(contract, "rpc")) {
+		const isVisibleRpc = isProcedureVisible(contract, "rpc");
+		const isVisibleRest = isProcedureVisible(contract, "rest");
+
+		if (isVisibleRpc) {
 			const rpcPath = `/rpc/${name}`;
 			paths[rpcPath] = {
 				...(paths[rpcPath] ?? {}),
@@ -83,7 +87,7 @@ export function generateOpenAPISpec(
 			};
 		}
 
-		if (isProcedureVisible(contract, "rest")) {
+		if (isVisibleRest) {
 			const restEntry = buildRestOperation(contract);
 			if (restEntry) {
 				const { path, method, operation } = restEntry;
@@ -123,6 +127,24 @@ export function generateOpenAPISpec(
 
 function buildRpcOperation(contract: Contract) {
 	const name = contract.name || "unknown";
+	
+	// Debug: check what type contract.input is
+	if (process.env.DEBUG_OPENAPI === '1') {
+		console.log(`[OpenAPI Debug] ${name} input type:`, typeof contract.input);
+		console.log(`[OpenAPI Debug] ${name} input._def:`, contract.input?._def ? 'exists' : 'missing');
+	}
+	
+	// Convert Zod schema to JSON Schema for OpenAPI compatibility
+	const inputJsonSchema = zodToJsonSchema(contract.input, { 
+		target: 'openApi3', 
+		$refStrategy: 'none',
+		name: `${name}Input`
+	});
+	
+	if (process.env.DEBUG_OPENAPI === '1') {
+		console.log(`[OpenAPI Debug] ${name} inputJsonSchema:`, JSON.stringify(inputJsonSchema).slice(0, 200));
+	}
+	
 	return {
 		summary: contract.description || name,
 		description: contract.description,
@@ -131,11 +153,11 @@ function buildRpcOperation(contract: Contract) {
 		requestBody: {
 			content: {
 				"application/json": {
-					schema: contract.input,
+					schema: inputJsonSchema,
 				},
 			},
 		},
-		responses: successAndErrorResponses(contract.output),
+		responses: successAndErrorResponses(contract.output, name),
 	};
 }
 
@@ -166,7 +188,7 @@ function buildRestOperation(
 		operation.requestBody = {
 			content: {
 				"application/json": {
-					schema: contract.input,
+					schema: zodToJsonSchema(contract.input, { target: 'openApi3', $refStrategy: 'none' }),
 				},
 			},
 		};
@@ -179,13 +201,20 @@ function buildRestOperation(
 	};
 }
 
-function successAndErrorResponses(outputSchema: Contract["output"]) {
+function successAndErrorResponses(outputSchema: Contract["output"], name?: string) {
+	// Convert Zod schema to JSON Schema for OpenAPI compatibility
+	const outputJsonSchema = zodToJsonSchema(outputSchema, { 
+		target: 'openApi3', 
+		$refStrategy: 'none',
+		name: name ? `${name}Output` : undefined
+	});
+	
 	return {
 		"200": {
 			description: "Successful response",
 			content: {
 				"application/json": {
-					schema: outputSchema,
+					schema: outputJsonSchema,
 				},
 			},
 		},

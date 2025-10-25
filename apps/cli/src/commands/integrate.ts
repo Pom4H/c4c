@@ -32,7 +32,7 @@ export async function integrateCommand(
     console.log(`[c4c] Integrating ${integrationName} from ${url}`);
     console.log(`[c4c] Base URL: ${baseUrl}`);
     
-    // Determine output directory
+    // Determine output directory - for cross-integration, use generated/ in root
     const outputBase = options.output
         ? resolve(options.output)
         : resolve(rootDir, 'generated', integrationName);
@@ -48,6 +48,7 @@ export async function integrateCommand(
         
         // Step 2: Generate procedures from the generated files
         console.log(`[c4c] Generating procedures...`);
+        // Generate procedures in procedures/integrations/ so they're auto-discovered
         const proceduresOutput = resolve(rootDir, 'procedures', 'integrations', integrationName);
         
         // Load OpenAPI spec for schema extraction
@@ -73,14 +74,13 @@ export async function integrateCommand(
         console.log(`[c4c]   Generated files:`);
         console.log(`[c4c]   - SDK: ${outputBase}/sdk.gen.ts`);
         console.log(`[c4c]   - Schemas: ${outputBase}/schemas.gen.ts`);
-        console.log(`[c4c]   - Procedures: ${proceduresOutput}/procedures/`);
-        console.log(`[c4c]   - Triggers: ${proceduresOutput}/triggers/`);
+        console.log(`[c4c]   - Types: ${outputBase}/types.gen.ts`);
+        console.log(`[c4c]   - Procedures: ${proceduresOutput}/`);
         console.log();
         console.log(`[c4c] Next steps:`);
-        console.log(`[c4c]   1. Import procedures in your code:`);
-        console.log(`[c4c]      import { ${capitalize(integrationName)}Procedures } from './procedures/integrations/${integrationName}/index.js'`);
-        console.log(`[c4c]   2. Register them with your registry`);
-        console.log(`[c4c]   3. Set the ${integrationName.toUpperCase()}_TOKEN environment variable`);
+        console.log(`[c4c]   1. Procedures are auto-discovered and prefixed with '${integrationName}.'`);
+        console.log(`[c4c]   2. Use in workflows: ${integrationName}.<procedure-name>`);
+        console.log(`[c4c]   3. Or import SDK: import { client } from './generated/${integrationName}/sdk.gen.js'`);
         
     } catch (error) {
         console.error(`[c4c] Failed to integrate ${integrationName}:`, error);

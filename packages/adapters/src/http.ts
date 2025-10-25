@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { swaggerUI } from "@hono/swagger-ui";
 import type { Registry } from "@c4c/core";
+import { generateOpenAPISpec } from "@c4c/generators";
 import { createRestRouter, listRESTRoutes } from "./rest.js";
 import { createWorkflowRouter } from "./workflow-http.js";
 import { createRpcRouter } from "./rpc.js";
@@ -87,20 +88,33 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 	});
 
 	if (enableDocs) {
-		// Serve OpenAPI spec at /openapi endpoint using @hono/zod-openapi
-		app.doc("/openapi.json", {
-			openapi: "3.1.0",
-			info: {
-				title: "c4c API",
-				version: "1.0.0",
-				description: "Auto-generated API from c4c contracts with Zod schemas",
-			},
+		// Generate OpenAPI spec from registry contracts
+		const openapi = generateOpenAPISpec(registry, {
+			title: "c4c API",
+			version: "1.0.0",
+			description: "Auto-generated API from c4c contracts with Zod schemas",
 			servers: [
 				{
 					url: `http://localhost:${port}`,
 					description: "Development server",
 				},
 			],
+			includeWebhooks: true,
+			includeTriggers: true,
+		});
+		
+		// Serve OpenAPI spec as JSON endpoint (not using app.doc to avoid Zod schema issues)
+		app.get("/openapi.json", (c) => {
+			// Convert Zod schemas to JSON Schema using zod-openapi
+			const spec = JSON.parse(JSON.stringify(openapi, (key, value) => {
+				// Handle Zod schemas
+				if (value && typeof value === 'object' && value._def) {
+					// This is a Zod schema, it will be handled by zod-openapi in createDocument
+					return value;
+				}
+				return value;
+			}));
+			return c.json(spec);
 		});
 
 		// Serve Swagger UI using @hono/swagger-ui
