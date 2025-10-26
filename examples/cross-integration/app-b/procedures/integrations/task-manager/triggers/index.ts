@@ -2,16 +2,34 @@
 // Do not edit manually.
 
 export { NotificationServiceNotificationsTriggerSentWebhookProcedure } from './notification-service-notifications-trigger-sent-webhook.gen.js';
+export { NotificationServiceNotificationsTriggerSentProcedure } from './notification-service-notifications-trigger-sent.gen.js';
+export { NotificationServiceTaskManagerNotificationServiceNotificationsTriggerSentWebhookProcedure } from './notification-service-task-manager-notification-service-notifications-trigger-sent-webhook.gen.js';
+export { NotificationServiceTaskManagerTasksTriggerCreatedProcedure } from './notification-service-task-manager-tasks-trigger-created.gen.js';
+export { NotificationServiceTaskManagerTasksTriggerCreatedWebhookProcedure } from './notification-service-task-manager-tasks-trigger-created-webhook.gen.js';
+export { NotificationServiceTaskManagerTasksTriggerUpdatedProcedure } from './notification-service-task-manager-tasks-trigger-updated.gen.js';
+export { NotificationServiceTaskManagerTasksTriggerUpdatedWebhookProcedure } from './notification-service-task-manager-tasks-trigger-updated-webhook.gen.js';
 export { TasksTriggerCreatedProcedure } from './tasks-trigger-created.gen.js';
 export { TasksTriggerUpdatedProcedure } from './tasks-trigger-updated.gen.js';
 
 import type { Procedure } from "@c4c/core";
 import { NotificationServiceNotificationsTriggerSentWebhookProcedure } from './notification-service-notifications-trigger-sent-webhook.gen.js';
+import { NotificationServiceNotificationsTriggerSentProcedure } from './notification-service-notifications-trigger-sent.gen.js';
+import { NotificationServiceTaskManagerNotificationServiceNotificationsTriggerSentWebhookProcedure } from './notification-service-task-manager-notification-service-notifications-trigger-sent-webhook.gen.js';
+import { NotificationServiceTaskManagerTasksTriggerCreatedProcedure } from './notification-service-task-manager-tasks-trigger-created.gen.js';
+import { NotificationServiceTaskManagerTasksTriggerCreatedWebhookProcedure } from './notification-service-task-manager-tasks-trigger-created-webhook.gen.js';
+import { NotificationServiceTaskManagerTasksTriggerUpdatedProcedure } from './notification-service-task-manager-tasks-trigger-updated.gen.js';
+import { NotificationServiceTaskManagerTasksTriggerUpdatedWebhookProcedure } from './notification-service-task-manager-tasks-trigger-updated-webhook.gen.js';
 import { TasksTriggerCreatedProcedure } from './tasks-trigger-created.gen.js';
 import { TasksTriggerUpdatedProcedure } from './tasks-trigger-updated.gen.js';
 
 export const TaskManagerTriggers: Procedure[] = [
   NotificationServiceNotificationsTriggerSentWebhookProcedure,
+  NotificationServiceNotificationsTriggerSentProcedure,
+  NotificationServiceTaskManagerNotificationServiceNotificationsTriggerSentWebhookProcedure,
+  NotificationServiceTaskManagerTasksTriggerCreatedProcedure,
+  NotificationServiceTaskManagerTasksTriggerCreatedWebhookProcedure,
+  NotificationServiceTaskManagerTasksTriggerUpdatedProcedure,
+  NotificationServiceTaskManagerTasksTriggerUpdatedWebhookProcedure,
   TasksTriggerCreatedProcedure,
   TasksTriggerUpdatedProcedure
 ];

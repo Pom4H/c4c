@@ -143,6 +143,31 @@ class WorkflowBuilder {
 		return this;
 	}
 
+	/**
+	 * Set trigger configuration for event-driven workflow
+	 * 
+	 * Works for both internal and external events:
+	 * - Internal: emitTriggerEvent('tasks.trigger.created', data)
+	 * - External: POST /webhooks/tasks → calls tasks.trigger.created
+	 * 
+	 * When moving from monolith to microservices, the workflow stays the same!
+	 * Only the trigger invocation changes (internal call vs webhook).
+	 * 
+	 * @param config - Trigger configuration
+	 */
+	trigger(config: {
+		provider: string;
+		triggerProcedure: string;
+		eventType?: string;
+		subscriptionConfig?: Record<string, unknown>;
+	}): this {
+		if (!this.metadataValue) {
+			this.metadataValue = {};
+		}
+		this.metadataValue.trigger = config;
+		return this;
+	}
+
 	step<InputSchema extends AnyZod, OutputSchema extends AnyZod>(
 		component: WorkflowComponent<InputSchema, OutputSchema>
 	): this {
@@ -183,6 +208,11 @@ class WorkflowBuilder {
 				...(this.metadataValue ?? {}),
 				inputSchema: this.inputSchema,
 			};
+		}
+
+		// Set trigger config from metadata if present
+		if (this.metadataValue?.trigger) {
+			definition.trigger = this.metadataValue.trigger as any;
 		}
 
 		return definition;

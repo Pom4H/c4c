@@ -11,6 +11,7 @@ import type { Registry } from "@c4c/core";
 import { createExecutionContext } from "@c4c/core";
 import { executeWorkflow } from "./runtime.js";
 import type { WorkflowDefinition, WorkflowExecutionResult } from "./types.js";
+import { registerTriggerHandler } from "./trigger-procedure.js";
 
 /**
  * Webhook event structure
@@ -58,6 +59,7 @@ export class TriggerWorkflowManager {
 	private subscriptions = new Map<string, TriggerSubscription>();
 	private workflows = new Map<string, WorkflowDefinition>();
 	private eventHandlers = new Map<string, (event: WebhookEvent) => Promise<void>>();
+	private triggerUnsubscribers = new Map<string, () => void>();
 
 	constructor(
 		private registry: Registry,
@@ -136,10 +138,19 @@ export class TriggerWorkflowManager {
 		};
 		this.eventHandlers.set(workflow.id, handler);
 
-		// Register with webhook registry if available
+		// Register with webhook registry if available (for external webhooks)
 		if (this.webhookRegistry) {
 			this.webhookRegistry.registerHandler(workflow.trigger.provider, handler);
 		}
+		
+		// Register workflow with trigger procedure (for both internal and external)
+		// This is the unified mechanism!
+		const unsubscribe = registerTriggerHandler(
+			workflow.trigger.triggerProcedure,
+			workflow,
+			this.registry
+		);
+		this.triggerUnsubscribers.set(workflow.id, unsubscribe);
 
 		console.log(`[TriggerManager] ✅ Deployed workflow ${workflow.id}`, {
 			provider: workflow.trigger.provider,
@@ -163,12 +174,19 @@ export class TriggerWorkflowManager {
 
 		console.log(`[TriggerManager] Stopping workflow: ${workflowId}`);
 
-		// Unregister event handler
+		// Unregister external webhook handler
 		const handler = this.eventHandlers.get(workflowId);
 		if (handler && this.webhookRegistry) {
 			this.webhookRegistry.unregisterHandler(subscription.provider, handler);
 		}
 		this.eventHandlers.delete(workflowId);
+		
+		// Unregister from trigger procedure
+		const unsubscribe = this.triggerUnsubscribers.get(workflowId);
+		if (unsubscribe) {
+			unsubscribe();
+			this.triggerUnsubscribers.delete(workflowId);
+		}
 
 		// Call stop procedure if available
 		if (workflow.trigger) {
@@ -343,6 +361,7 @@ export class TriggerWorkflowManager {
 			workflowIds.map(id => this.stop(id))
 		);
 	}
+
 }
 
 /**

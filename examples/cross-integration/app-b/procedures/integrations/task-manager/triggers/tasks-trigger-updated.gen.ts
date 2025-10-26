@@ -6,7 +6,7 @@ import { z } from "zod";
 
 export const TasksTriggerUpdatedContract: Contract = {
   name: "task-manager.tasks.trigger.updated",
-  description: "Webhook fired when a task is updated",
+  description: "Triggered when a task is updated",
   input: z.record(z.string(), z.unknown()),
   output: z.record(z.string(), z.unknown()),
   metadata: {

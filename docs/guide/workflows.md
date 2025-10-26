@@ -2,6 +2,8 @@
 
 Workflows orchestrate multiple procedures with branching, parallel execution, and complex control flow.
 
+> **New**: [Unified Event System](/guide/unified-events) - internal and external events work the same way. Workflows stay identical when moving from monolith to microservices!
+
 ## What is a Workflow?
 
 A workflow is a series of steps that execute procedures in a specific order. Workflows support:

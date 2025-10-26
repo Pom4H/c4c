@@ -4,16 +4,16 @@
 import type { Procedure, Contract } from "@c4c/core";
 import { z } from "zod";
 
-export const TasksTriggerCreatedContract: Contract = {
-  name: "task-manager.tasks.trigger.created",
-  description: "Triggered when a new task is created",
-  input: z.record(z.string(), z.unknown()),
+export const NotificationServiceTaskManagerTasksTriggerUpdatedWebhookContract: Contract = {
+  name: "task-manager.notification.service.task.manager.tasks.trigger.updated.webhook",
+  description: "Webhook fired when a task is updated",
+  input: z.unknown(),
   output: z.record(z.string(), z.unknown()),
   metadata: {
     exposure: "external" as const,
     roles: ["workflow-node"],
     provider: "task-manager",
-    operation: "tasksTriggerCreated",
+    operation: "notificationServiceTaskManagerTasksTriggerUpdatedWebhook",
     tags: ["task-manager", "webhook"],
     type: "trigger" as const,
     trigger: {
@@ -23,8 +23,8 @@ export const TasksTriggerCreatedContract: Contract = {
 };
 
 // Webhook triggers don't have a handler - they are registered as event receivers
-export const TasksTriggerCreatedProcedure: Procedure = {
-  contract: TasksTriggerCreatedContract,
+export const NotificationServiceTaskManagerTasksTriggerUpdatedWebhookProcedure: Procedure = {
+  contract: NotificationServiceTaskManagerTasksTriggerUpdatedWebhookContract,
   handler: async () => {
     throw new Error('Webhook triggers should not be called directly - they are invoked by the workflow engine');
   },

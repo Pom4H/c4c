@@ -66,3 +66,21 @@ export type {
 	ExecutionRecord,
 	NodeExecutionDetail,
 } from "./execution-store.js";
+
+// Event Emitter for internal workflow events (deprecated - use trigger procedures)
+export {
+	WorkflowEventEmitter,
+	getWorkflowEventEmitter,
+	setWorkflowEventEmitter,
+	onWorkflowEvent,
+} from "./event-emitter.js";
+export type { EventHandler } from "./event-emitter.js";
+
+// Trigger Procedures - unified mechanism for internal and external events
+export {
+	createTriggerProcedure,
+	emitTriggerEvent,
+	registerTriggerHandler,
+	getTriggerHandlerCount,
+	clearTriggerHandlers,
+} from "./trigger-procedure.js";
