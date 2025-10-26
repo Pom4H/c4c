@@ -245,54 +245,36 @@ export const deleteTask: Procedure = {
 // ==========================================
 
 /**
- * Webhook trigger: fires when a new task is created
- * External systems can subscribe to this event
+ * Trigger procedure for task.created event
+ * 
+ * Works for BOTH:
+ * - Internal (monolith): emitTriggerEvent('tasks.trigger.created', data)
+ * - External (microservices): POST /webhooks/tasks → tasks.trigger.created
+ * 
+ * When moving to microservices, only 'exposure' changes from 'internal' to 'external'
+ * Workflows using this trigger remain IDENTICAL!
  */
-export const taskCreatedTrigger: Procedure = {
-  contract: {
-    name: 'tasks.trigger.created',
-    description: 'Webhook fired when a new task is created',
-    input: z.object({}),
-    output: TaskSchema,
-    metadata: {
-      exposure: 'external',
-      type: 'trigger',
-      roles: ['trigger'],
-      trigger: {
-        type: 'webhook',
-        eventTypes: ['created'],
-      },
-      provider: 'tasks',
-      tags: ['tasks', 'webhook', 'trigger'],
-    },
-  },
-  handler: async () => {
-    throw new Error('This is a trigger procedure - it should not be called directly');
-  },
-};
 
-/**
- * Webhook trigger: fires when a task is updated
- */
-export const taskUpdatedTrigger: Procedure = {
-  contract: {
-    name: 'tasks.trigger.updated',
-    description: 'Webhook fired when a task is updated',
-    input: z.object({}),
-    output: TaskSchema,
-    metadata: {
-      exposure: 'external',
-      type: 'trigger',
-      roles: ['trigger'],
-      trigger: {
-        type: 'webhook',
-        eventTypes: ['updated'],
-      },
-      provider: 'tasks',
-      tags: ['tasks', 'webhook', 'trigger'],
-    },
-  },
-  handler: async () => {
-    throw new Error('This is a trigger procedure - it should not be called directly');
-  },
-};
+import { createTriggerProcedure } from '@c4c/workflow';
+
+export const taskCreatedTrigger = createTriggerProcedure(
+  'tasks.trigger.created',
+  TaskSchema,
+  {
+    description: 'Triggered when a new task is created',
+    provider: 'tasks',
+    eventTypes: ['created'],
+    exposure: 'internal', // Change to 'external' for microservices!
+  }
+);
+
+export const taskUpdatedTrigger = createTriggerProcedure(
+  'tasks.trigger.updated',
+  TaskSchema,
+  {
+    description: 'Triggered when a task is updated',
+    provider: 'tasks',
+    eventTypes: ['updated'],
+    exposure: 'internal', // Change to 'external' for microservices!
+  }
+);

@@ -197,6 +197,26 @@ program
 		}
 	});
 
+const exportCmd = program
+	.command("export")
+	.description("Export workflows and procedures for migration to microservices");
+
+exportCmd
+	.command("workflow <workflow-id>")
+	.description("Export a workflow to target service")
+	.requiredOption("--to <service>", "Target service name")
+	.option("--output-dir <dir>", "Output directory", "./export")
+	.option("--include-dependencies", "Include all dependent procedures", true)
+	.option("--update-triggers", "Update trigger exposure to external", true)
+	.action(async (workflowId: string, options) => {
+		console.log("\n🚀 c4c export workflow - Coming soon!");
+		console.log(`   Workflow: ${workflowId}`);
+		console.log(`   Target: ${options.to}`);
+		console.log("\n💡 This command will help migrate workflows to microservices");
+		console.log("   with ZERO changes to workflow code!");
+		console.log("\nSee: examples/cross-integration/README-PORTABILITY.md\n");
+	});
+
 const completion = program
 	.command("completion")
 	.description("Generate shell completion scripts");
