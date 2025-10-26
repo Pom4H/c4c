@@ -66,3 +66,13 @@ export type {
 	ExecutionRecord,
 	NodeExecutionDetail,
 } from "./execution-store.js";
+
+// Event Emitter for internal workflow events
+export {
+	WorkflowEventEmitter,
+	getWorkflowEventEmitter,
+	setWorkflowEventEmitter,
+	emitWorkflowEvent,
+	onWorkflowEvent,
+} from "./event-emitter.js";
+export type { EventHandler } from "./event-emitter.js";

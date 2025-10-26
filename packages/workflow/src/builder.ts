@@ -143,6 +143,69 @@ class WorkflowBuilder {
 		return this;
 	}
 
+	/**
+	 * Register an event handler for internal or external events
+	 * @param eventName - Event name to listen for (e.g., "user.created", "telegram.message")
+	 * @param component - Workflow component to execute when event fires
+	 * @param options - Additional event handler options
+	 */
+	on<InputSchema extends AnyZod, OutputSchema extends AnyZod>(
+		eventName: string,
+		component: WorkflowComponent<InputSchema, OutputSchema>,
+		options?: {
+			/** Provider for external events (e.g., "telegram", "slack") */
+			provider?: string;
+			/** Event type filter for external events */
+			eventType?: string;
+			/** Whether this is an internal event (default: true if no provider) */
+			internal?: boolean;
+		}
+	): this {
+		// Create a trigger node for this event
+		const triggerNodeId = `trigger_${eventName.replace(/\./g, '_')}`;
+		const triggerNode: WorkflowNode = {
+			id: triggerNodeId,
+			type: "trigger",
+			procedureName: eventName,
+			config: {
+				eventName,
+				provider: options?.provider,
+				eventType: options?.eventType,
+				internal: options?.internal ?? !options?.provider,
+			},
+		};
+
+		// Add trigger node if not already exists
+		if (!this.nodeById.has(triggerNodeId)) {
+			this.nodes.push(triggerNode);
+			this.nodeById.set(triggerNodeId, triggerNode);
+		}
+
+		// Link trigger to the handler component
+		triggerNode.next = component.entryId;
+
+		// Add the component nodes
+		for (const node of component.nodes) {
+			const existing = this.nodeById.get(node.id);
+			if (existing && existing !== node) {
+				throw new Error(
+					`[workflow-builder] Duplicate node id '${node.id}' encountered within workflow '${this.id}'.`
+				);
+			}
+			if (!existing) {
+				this.nodes.push(node);
+				this.nodeById.set(node.id, node);
+			}
+		}
+
+		// Set start node to trigger if not set
+		if (!this.startNode) {
+			this.startNode = triggerNodeId;
+		}
+
+		return this;
+	}
+
 	step<InputSchema extends AnyZod, OutputSchema extends AnyZod>(
 		component: WorkflowComponent<InputSchema, OutputSchema>
 	): this {

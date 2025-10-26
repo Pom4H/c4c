@@ -2,6 +2,8 @@
 
 Workflows orchestrate multiple procedures with branching, parallel execution, and complex control flow.
 
+> **New**: [Event-driven workflows](/guide/workflow-events) with `workflow.on()` for handling internal and external events.
+
 ## What is a Workflow?
 
 A workflow is a series of steps that execute procedures in a specific order. Workflows support:

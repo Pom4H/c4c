@@ -11,6 +11,7 @@ import type { Registry } from "@c4c/core";
 import { createExecutionContext } from "@c4c/core";
 import { executeWorkflow } from "./runtime.js";
 import type { WorkflowDefinition, WorkflowExecutionResult } from "./types.js";
+import { getWorkflowEventEmitter, type EventHandler } from "./event-emitter.js";
 
 /**
  * Webhook event structure
@@ -58,6 +59,7 @@ export class TriggerWorkflowManager {
 	private subscriptions = new Map<string, TriggerSubscription>();
 	private workflows = new Map<string, WorkflowDefinition>();
 	private eventHandlers = new Map<string, (event: WebhookEvent) => Promise<void>>();
+	private internalEventUnsubscribers = new Map<string, Array<() => void>>();
 
 	constructor(
 		private registry: Registry,
@@ -136,10 +138,13 @@ export class TriggerWorkflowManager {
 		};
 		this.eventHandlers.set(workflow.id, handler);
 
-		// Register with webhook registry if available
+		// Register with webhook registry if available (for external events)
 		if (this.webhookRegistry) {
 			this.webhookRegistry.registerHandler(workflow.trigger.provider, handler);
 		}
+		
+		// Also register internal event handlers if workflow has event-triggered nodes
+		this.registerInternalEventHandlers(workflow);
 
 		console.log(`[TriggerManager] ✅ Deployed workflow ${workflow.id}`, {
 			provider: workflow.trigger.provider,
@@ -163,12 +168,21 @@ export class TriggerWorkflowManager {
 
 		console.log(`[TriggerManager] Stopping workflow: ${workflowId}`);
 
-		// Unregister event handler
+		// Unregister external event handler
 		const handler = this.eventHandlers.get(workflowId);
 		if (handler && this.webhookRegistry) {
 			this.webhookRegistry.unregisterHandler(subscription.provider, handler);
 		}
 		this.eventHandlers.delete(workflowId);
+		
+		// Unregister internal event handlers
+		const internalUnsubscribers = this.internalEventUnsubscribers.get(workflowId);
+		if (internalUnsubscribers) {
+			for (const unsubscribe of internalUnsubscribers) {
+				unsubscribe();
+			}
+			this.internalEventUnsubscribers.delete(workflowId);
+		}
 
 		// Call stop procedure if available
 		if (workflow.trigger) {
@@ -342,6 +356,53 @@ export class TriggerWorkflowManager {
 		await Promise.all(
 			workflowIds.map(id => this.stop(id))
 		);
+	}
+
+	/**
+	 * Register internal event handlers for workflow trigger nodes
+	 * @private
+	 */
+	private registerInternalEventHandlers(workflow: WorkflowDefinition): void {
+		const eventEmitter = getWorkflowEventEmitter();
+		const unsubscribers: Array<() => void> = [];
+		
+		// Find all trigger nodes in the workflow
+		for (const node of workflow.nodes) {
+			if (node.type === "trigger" && node.config) {
+				const config = node.config as Record<string, unknown>;
+				const isInternal = config.internal === true;
+				const eventName = config.eventName as string | undefined;
+				
+				if (isInternal && eventName) {
+					console.log(`[TriggerManager] Registering internal event handler: ${eventName} → ${workflow.id}`);
+					
+					// Subscribe to internal event
+					const unsubscribe = eventEmitter.on(eventName, async (payload) => {
+						console.log(`[TriggerManager] 🎯 Internal event received: ${eventName} for workflow ${workflow.id}`);
+						
+						// Create a webhook-like event structure for compatibility
+						const syntheticEvent: WebhookEvent = {
+							id: `internal_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+							provider: "internal",
+							eventType: eventName,
+							payload,
+							headers: {},
+							timestamp: new Date(),
+						};
+						
+						// Execute workflow with the event data
+						await this.handleTriggerEvent(workflow, syntheticEvent);
+					});
+					
+					unsubscribers.push(unsubscribe);
+				}
+			}
+		}
+		
+		// Store unsubscribers for cleanup
+		if (unsubscribers.length > 0) {
+			this.internalEventUnsubscribers.set(workflow.id, unsubscribers);
+		}
 	}
 }
 
