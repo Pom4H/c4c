@@ -64,7 +64,11 @@ const orderPlacedTrigger = createTriggerProcedure(
 const userOnboardingWorkflow = workflow('user-onboarding')
 	.name('User Onboarding')
 	.description('Send welcome email when user is created')
-	.on('user.trigger.created', step({
+	.trigger({
+		provider: 'users',
+		triggerProcedure: 'user.trigger.created',
+	})
+	.step(step({
 		id: 'send-welcome-email',
 		procedure: 'email.send',
 		input: z.object({
@@ -100,7 +104,11 @@ const userOnboardingWorkflow = workflow('user-onboarding')
 const orderProcessingWorkflow = workflow('order-processing')
 	.name('Order Processing')
 	.description('Process order when it is placed')
-	.on('order.trigger.placed', step({
+	.trigger({
+		provider: 'orders',
+		triggerProcedure: 'order.trigger.placed',
+	})
+	.step(step({
 		id: 'charge-payment',
 		procedure: 'payment.charge',
 		input: z.object({

@@ -144,7 +144,7 @@ class WorkflowBuilder {
 	}
 
 	/**
-	 * Register workflow to be triggered by a trigger procedure
+	 * Set trigger configuration for event-driven workflow
 	 * 
 	 * Works for both internal and external events:
 	 * - Internal: emitTriggerEvent('tasks.trigger.created', data)
@@ -153,26 +153,18 @@ class WorkflowBuilder {
 	 * When moving from monolith to microservices, the workflow stays the same!
 	 * Only the trigger invocation changes (internal call vs webhook).
 	 * 
-	 * @param triggerProcedureName - Name of trigger procedure (e.g., "tasks.trigger.created")
-	 * @param component - Workflow component to execute when trigger fires
+	 * @param config - Trigger configuration
 	 */
-	on<InputSchema extends AnyZod, OutputSchema extends AnyZod>(
-		triggerProcedureName: string,
-		component: WorkflowComponent<InputSchema, OutputSchema>
-	): this {
-		// Store trigger configuration in metadata
+	trigger(config: {
+		provider: string;
+		triggerProcedure: string;
+		eventType?: string;
+		subscriptionConfig?: Record<string, unknown>;
+	}): this {
 		if (!this.metadataValue) {
 			this.metadataValue = {};
 		}
-		
-		// Set trigger configuration
-		this.metadataValue.trigger = {
-			triggerProcedure: triggerProcedureName,
-		};
-
-		// Add the component as the workflow start
-		this.addComponent(component);
-		
+		this.metadataValue.trigger = config;
 		return this;
 	}
 

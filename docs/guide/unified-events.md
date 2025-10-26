@@ -81,14 +81,18 @@ registry.register(orderPlacedTrigger);
 
 ### 2. Create Workflows Using Triggers
 
-Workflows reference trigger procedures:
+Workflows reference trigger procedures via `.trigger()`:
 
 ```typescript
 import { workflow, step } from '@c4c/workflow';
 
 const orderProcessingWorkflow = workflow('order-processing')
   .name('Order Processing')
-  .on('order.trigger.placed', step({
+  .trigger({
+    provider: 'orders',
+    triggerProcedure: 'order.trigger.placed',
+  })
+  .step(step({
     id: 'charge-payment',
     procedure: 'payment.charge',
     input: z.object({
@@ -106,6 +110,31 @@ const orderProcessingWorkflow = workflow('order-processing')
     output: z.object({ ... }),
   }))
   .commit();
+
+// Or use declarative definition:
+const orderWorkflow: WorkflowDefinition = {
+  id: 'order-processing',
+  name: 'Order Processing',
+  trigger: {
+    provider: 'orders',
+    triggerProcedure: 'order.trigger.placed',
+  },
+  nodes: [
+    {
+      id: 'charge-payment',
+      type: 'procedure',
+      procedureName: 'payment.charge',
+      next: 'send-confirmation',
+    },
+    {
+      id: 'send-confirmation',
+      type: 'procedure',
+      procedureName: 'email.send',
+    },
+  ],
+  startNode: 'charge-payment',
+  version: '1.0.0',
+};
 ```
 
 ### 3. Register Workflows
@@ -187,7 +216,11 @@ export const userCreatedTrigger = createTriggerProcedure(
 
 // workflows.ts
 const workflow = workflow('user-onboarding')
-  .on('user.trigger.created', step({ ... }))
+  .trigger({
+    provider: 'users',
+    triggerProcedure: 'user.trigger.created',
+  })
+  .step(step({ ... }))
   .commit();
 
 // app.ts
@@ -207,7 +240,11 @@ export const userCreatedTrigger = createTriggerProcedure(
 
 // workflows.ts - NO CHANGES!
 const workflow = workflow('user-onboarding')
-  .on('user.trigger.created', step({ ... }))
+  .trigger({
+    provider: 'users',
+    triggerProcedure: 'user.trigger.created',
+  })
+  .step(step({ ... }))
   .commit();
 
 // Service A (user service)
@@ -334,13 +371,17 @@ createTriggerProcedure(
 ): Procedure
 ```
 
-### workflow.on()
+### workflow.trigger()
 
-Register workflow for a trigger:
+Set trigger configuration for workflow:
 
 ```typescript
 workflow(id)
-  .on(triggerProcedureName: string, step: WorkflowComponent)
+  .trigger({
+    provider: string,
+    triggerProcedure: string,
+    eventType?: string,
+  })
   .step(...)
   .commit()
 ```
@@ -469,15 +510,18 @@ const triggers = [
 
 // Workflows
 const orderWorkflow = workflow('order-processing')
-  .on('order.trigger.placed', step({ ... }))
+  .trigger({ provider: 'orders', triggerProcedure: 'order.trigger.placed' })
+  .step(step({ ... }))
   .commit();
 
 const fulfillmentWorkflow = workflow('fulfillment')
-  .on('payment.trigger.succeeded', step({ ... }))
+  .trigger({ provider: 'payments', triggerProcedure: 'payment.trigger.succeeded' })
+  .step(step({ ... }))
   .commit();
 
 const trackingWorkflow = workflow('tracking')
-  .on('shipment.trigger.dispatched', step({ ... }))
+  .trigger({ provider: 'shipments', triggerProcedure: 'shipment.trigger.dispatched' })
+  .step(step({ ... }))
   .commit();
 
 // Monolith: all internal
