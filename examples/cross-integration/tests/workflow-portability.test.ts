@@ -11,9 +11,11 @@ import {
   emitTriggerEvent, 
   registerTriggerHandler,
   executeWorkflow,
+  createTriggerProcedure,
+  workflow,
+  step,
 } from '@c4c/workflow';
-import { taskCreatedTrigger } from '../app-a/procedures/tasks.js';
-import { taskNotificationWorkflow } from '../app-a/workflows/task-notification-workflow.js';
+import { z } from 'zod';
 
 describe('Workflow Portability: Monolith → Microservices', () => {
   let monolithRegistry: ReturnType<typeof createRegistry>;
@@ -29,6 +31,48 @@ describe('Workflow Portability: Monolith → Microservices', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
   };
+
+  // Create trigger procedure for testing
+  const taskCreatedTrigger = createTriggerProcedure(
+    'tasks.trigger.created',
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      description: z.string().optional(),
+      status: z.string(),
+      priority: z.string().optional(),
+      assigneeId: z.string().optional(),
+      createdAt: z.date().optional(),
+      updatedAt: z.date().optional(),
+    }),
+    {
+      description: 'Triggered when a task is created',
+      provider: 'tasks',
+      eventTypes: ['created'],
+      exposure: 'internal',
+    }
+  );
+
+  // Create workflow for testing
+  const taskNotificationWorkflow = workflow('task-notification')
+    .name('Task Notification Workflow')
+    .trigger({
+      provider: 'tasks',
+      triggerProcedure: 'tasks.trigger.created',
+    })
+    .step(step({
+      id: 'get-task',
+      procedure: 'tasks.get',
+      input: z.object({ id: z.string() }),
+      output: z.any(),
+    }))
+    .step(step({
+      id: 'send-notification',
+      procedure: 'notifications.send',
+      input: z.object({ message: z.string(), channel: z.string() }),
+      output: z.any(),
+    }))
+    .commit();
 
   beforeEach(() => {
     monolithRegistry = createRegistry();
