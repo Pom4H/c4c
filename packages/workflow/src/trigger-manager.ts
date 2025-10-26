@@ -9,8 +9,13 @@
 
 import type { Registry } from "@c4c/core";
 import { createExecutionContext } from "@c4c/core";
-import { executeWorkflow } from "./runtime.js";
-import type { WorkflowDefinition, WorkflowExecutionResult } from "./types.js";
+import { executeWorkflow, resumeWorkflow } from "./runtime.js";
+import type { 
+	WorkflowDefinition, 
+	WorkflowExecutionResult, 
+	WorkflowPauseState,
+	WhenFilterContext 
+} from "./types.js";
 
 /**
  * Webhook event structure
@@ -58,6 +63,11 @@ export class TriggerWorkflowManager {
 	private subscriptions = new Map<string, TriggerSubscription>();
 	private workflows = new Map<string, WorkflowDefinition>();
 	private eventHandlers = new Map<string, (event: WebhookEvent) => Promise<void>>();
+	// In-memory storage for paused workflow executions
+	private pausedExecutions = new Map<string, {
+		workflow: WorkflowDefinition;
+		pauseState: WorkflowPauseState;
+	}>();
 
 	constructor(
 		private registry: Registry,
@@ -212,6 +222,7 @@ export class TriggerWorkflowManager {
 
 	/**
 	 * Handle incoming trigger event
+	 * Checks for paused executions first, then starts new workflow if needed
 	 */
 	private async handleTriggerEvent(
 		workflow: WorkflowDefinition,
@@ -221,8 +232,55 @@ export class TriggerWorkflowManager {
 			eventId: event.id,
 			provider: event.provider,
 			eventType: event.eventType,
+			triggerId: event.triggerId,
 		});
 
+		// Check if this event should resume a paused execution
+		const paused = this.findPausedExecution(event);
+		
+		if (paused) {
+			console.log(`[TriggerManager] 🔄 Resuming paused execution: ${paused.pauseState.executionId}`);
+			
+			try {
+				const result = await resumeWorkflow(
+					paused.workflow,
+					this.registry,
+					paused.pauseState,
+					event.payload
+				);
+
+				// Remove from paused executions
+				this.pausedExecutions.delete(paused.pauseState.executionId);
+
+				// If workflow paused again, save it
+				if (result.status === 'paused' && result.resumeState) {
+					const pauseState = result.resumeState as WorkflowPauseState;
+					this.pausedExecutions.set(result.executionId, {
+						workflow: paused.workflow,
+						pauseState,
+					});
+					
+					// Schedule timeout if configured
+					if (pauseState.timeoutAt) {
+						this.scheduleTimeout(result.executionId, pauseState.timeoutAt);
+					}
+				}
+
+				console.log(`[TriggerManager] ✅ Resumed workflow ${result.status}:`, {
+					executionId: result.executionId,
+					executionTime: result.executionTime,
+				});
+
+				return result;
+			} catch (error) {
+				console.error(`[TriggerManager] ❌ Resume failed:`, error);
+				// Remove from paused executions on error
+				this.pausedExecutions.delete(paused.pauseState.executionId);
+				throw error;
+			}
+		}
+
+		// No paused execution found - start new workflow
 		// Filter by event type if configured
 		if (workflow.trigger?.eventType && event.eventType !== workflow.trigger.eventType) {
 			console.log(
@@ -257,13 +315,30 @@ export class TriggerWorkflowManager {
 			},
 		};
 
-		// Execute workflow from the start (which should be a trigger node)
+		// Execute workflow from the start
 		try {
 			const result = await executeWorkflow(
 				workflow,
 				this.registry,
 				initialInput
 			);
+
+			// If workflow paused, save it for resume
+			if (result.status === 'paused' && result.resumeState) {
+				const pauseState = result.resumeState as WorkflowPauseState;
+				this.pausedExecutions.set(result.executionId, {
+					workflow,
+					pauseState,
+				});
+				
+				console.log(`[TriggerManager] 💾 Saved paused execution: ${result.executionId}`);
+				console.log(`[TriggerManager] 📢 Waiting for: ${pauseState.waitingFor.procedures.join(', ')}`);
+				
+				// Schedule timeout if configured
+				if (pauseState.timeoutAt) {
+					this.scheduleTimeout(result.executionId, pauseState.timeoutAt);
+				}
+			}
 
 			console.log(`[TriggerManager] ✅ Workflow execution ${result.status}:`, {
 				workflowId: workflow.id,
@@ -315,6 +390,119 @@ export class TriggerWorkflowManager {
 		}
 
 		return undefined;
+	}
+
+	/**
+	 * Find paused execution waiting for this event
+	 */
+	private findPausedExecution(event: WebhookEvent): {
+		workflow: WorkflowDefinition;
+		pauseState: WorkflowPauseState;
+	} | null {
+		for (const [execId, { workflow, pauseState }] of this.pausedExecutions) {
+			// Check if event matches one of the waiting procedures
+			const procedureMatch = pauseState.waitingFor.procedures.some(proc => {
+				// Match by procedure name or triggerId
+				return proc === event.triggerId || 
+					   event.triggerId?.includes(proc) ||
+					   proc.includes(event.triggerId || '');
+			});
+
+			if (!procedureMatch) {
+				continue;
+			}
+
+			// Check filter if configured
+			if (pauseState.waitingFor.filter) {
+				try {
+					const filterContext: WhenFilterContext = {
+						variables: pauseState.variables,
+						nodeOutputs: new Map(Object.entries(pauseState.nodeOutputs)),
+						executionId: pauseState.executionId,
+						workflowId: pauseState.workflowId,
+					};
+
+					const matches = pauseState.waitingFor.filter(event.payload, filterContext);
+					if (!matches) {
+						continue;
+					}
+				} catch (error) {
+					console.error(
+						`[TriggerManager] Filter evaluation failed for execution ${execId}:`,
+						error
+					);
+					continue;
+				}
+			}
+
+			// Found matching paused execution
+			return { workflow, pauseState };
+		}
+
+		return null;
+	}
+
+	/**
+	 * Schedule timeout for paused execution
+	 */
+	private scheduleTimeout(executionId: string, timeoutAt: Date): void {
+		const delay = timeoutAt.getTime() - Date.now();
+		
+		if (delay <= 0) {
+			// Already timed out
+			this.handleTimeout(executionId);
+			return;
+		}
+
+		setTimeout(() => {
+			this.handleTimeout(executionId);
+		}, delay);
+
+		console.log(
+			`[TriggerManager] ⏰ Scheduled timeout for execution ${executionId} in ${Math.round(delay / 1000)}s`
+		);
+	}
+
+	/**
+	 * Handle timeout for paused execution
+	 */
+	private async handleTimeout(executionId: string): Promise<void> {
+		const paused = this.pausedExecutions.get(executionId);
+		
+		if (!paused) {
+			// Already resumed or removed
+			return;
+		}
+
+		console.log(`[TriggerManager] ⏰ Timeout reached for execution: ${executionId}`);
+		console.log(`[TriggerManager] 🚫 Cancelling paused workflow`);
+
+		// Remove from paused executions
+		this.pausedExecutions.delete(executionId);
+
+		// TODO: In production, should trigger onTimeout handler or mark as failed
+		// For now, just log and remove
+	}
+
+	/**
+	 * Get all paused executions
+	 */
+	getPausedExecutions(): Array<{
+		executionId: string;
+		workflowId: string;
+		pausedAt: string;
+		pausedTime: Date;
+		waitingFor: string[];
+		timeoutAt?: Date;
+	}> {
+		return Array.from(this.pausedExecutions.entries()).map(([execId, { workflow, pauseState }]) => ({
+			executionId: execId,
+			workflowId: workflow.id,
+			pausedAt: pauseState.pausedAt,
+			pausedTime: pauseState.pausedTime,
+			waitingFor: pauseState.waitingFor.procedures,
+			timeoutAt: pauseState.timeoutAt,
+		}));
 	}
 
 	/**
