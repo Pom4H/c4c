@@ -3,9 +3,6 @@
  * 
  * After integration with App B (notification-service),
  * this workflow automatically sends a notification when a task is created
- * 
- * NOTE: This is pseudocode to illustrate the idea.
- * Real implementation will use @c4c/workflow API.
  */
 
 import { workflow, step } from '@c4c/workflow';
@@ -58,44 +55,3 @@ export const notifyOnTaskCreated = workflow('notify-on-task-created')
  * 4. Step 2 calls notification-service.notifications.send (from App B!)
  * 5. App B receives the request and sends notification
  */
-
-// Alternative variant (pseudocode):
-/*
-export const notifyOnTaskCreatedV2 = {
-  id: 'notify-on-task-created-v2',
-  name: 'Send notification when task is created',
-  
-  trigger: {
-    provider: 'task-manager',
-    triggerProcedure: 'tasks.trigger.created',
-    eventType: 'task.created',
-  },
-  
-  nodes: [
-    {
-      id: 'start',
-      type: 'trigger',
-      procedureName: 'tasks.trigger.created',
-      next: 'get-task',
-    },
-    {
-      id: 'get-task',
-      type: 'procedure',
-      procedureName: 'tasks.get',
-      next: 'send-notification',
-    },
-    {
-      id: 'send-notification',
-      type: 'procedure',
-      procedureName: 'notification-service.notifications.send', // ← From App B!
-      next: 'end',
-    },
-    {
-      id: 'end',
-      type: 'procedure',
-      procedureName: 'system.log',
-    },
-  ],
-  startNode: 'start',
-};
-*/

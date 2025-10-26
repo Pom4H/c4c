@@ -3,9 +3,6 @@
  * 
  * After integration with App A (task-manager),
  * this workflow periodically checks for overdue tasks and sends notifications
- * 
- * NOTE: This is pseudocode to illustrate the idea.
- * Real implementation will use @c4c/workflow API.
  */
 
 import { workflow, step } from '@c4c/workflow';
@@ -59,43 +56,3 @@ export const checkOverdueTasks = workflow('check-overdue-tasks')
  * 3. Step 2 calls notifications.send (local procedure of App B)
  * 4. User receives email with count of overdue tasks
  */
-
-// Alternative variant (pseudocode):
-/*
-export const checkOverdueTasksV2 = {
-  id: 'check-overdue-tasks-v2',
-  name: 'Check for overdue tasks and notify',
-  
-  trigger: {
-    type: 'schedule',
-    schedule: '0 9 * * *', // Every day at 9:00 AM
-  },
-  
-  nodes: [
-    {
-      id: 'start',
-      type: 'trigger',
-      procedureName: 'schedule.daily',
-      next: 'get-tasks',
-    },
-    {
-      id: 'get-tasks',
-      type: 'procedure',
-      procedureName: 'task-manager.tasks.list', // ← From App A!
-      next: 'send-notification',
-    },
-    {
-      id: 'send-notification',
-      type: 'procedure',
-      procedureName: 'notifications.send',
-      next: 'end',
-    },
-    {
-      id: 'end',
-      type: 'procedure',
-      procedureName: 'system.log',
-    },
-  ],
-  startNode: 'start',
-};
-*/
