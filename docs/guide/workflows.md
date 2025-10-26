@@ -2,7 +2,7 @@
 
 Workflows orchestrate multiple procedures with branching, parallel execution, and complex control flow.
 
-> **New**: [Event-driven workflows](/guide/workflow-events) with `workflow.on()` for handling internal and external events.
+> **New**: [Unified Event System](/guide/unified-events) - internal and external events work the same way. Workflows stay identical when moving from monolith to microservices!
 
 ## What is a Workflow?
 

@@ -219,6 +219,15 @@ export function setWorkflowEventEmitter(emitter: WorkflowEventEmitter): void {
 
 /**
  * Emit an internal event that can trigger workflows
+ * 
+ * This function looks for a trigger procedure matching the event name
+ * and invokes it, which will trigger any workflows subscribed to that event.
+ * 
+ * This way internal and external events work the same way:
+ * - Internal: emitWorkflowEvent() → trigger procedure → workflow
+ * - External: webhook → trigger procedure → workflow
+ * 
+ * When moving from monolith to microservices, workflows don't change!
  */
 export async function emitWorkflowEvent<T = unknown>(
 	eventName: string,

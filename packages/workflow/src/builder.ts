@@ -144,65 +144,35 @@ class WorkflowBuilder {
 	}
 
 	/**
-	 * Register an event handler for internal or external events
-	 * @param eventName - Event name to listen for (e.g., "user.created", "telegram.message")
-	 * @param component - Workflow component to execute when event fires
-	 * @param options - Additional event handler options
+	 * Register workflow to be triggered by a trigger procedure
+	 * 
+	 * Works for both internal and external events:
+	 * - Internal: emitTriggerEvent('tasks.trigger.created', data)
+	 * - External: POST /webhooks/tasks → calls tasks.trigger.created
+	 * 
+	 * When moving from monolith to microservices, the workflow stays the same!
+	 * Only the trigger invocation changes (internal call vs webhook).
+	 * 
+	 * @param triggerProcedureName - Name of trigger procedure (e.g., "tasks.trigger.created")
+	 * @param component - Workflow component to execute when trigger fires
 	 */
 	on<InputSchema extends AnyZod, OutputSchema extends AnyZod>(
-		eventName: string,
-		component: WorkflowComponent<InputSchema, OutputSchema>,
-		options?: {
-			/** Provider for external events (e.g., "telegram", "slack") */
-			provider?: string;
-			/** Event type filter for external events */
-			eventType?: string;
-			/** Whether this is an internal event (default: true if no provider) */
-			internal?: boolean;
-		}
+		triggerProcedureName: string,
+		component: WorkflowComponent<InputSchema, OutputSchema>
 	): this {
-		// Create a trigger node for this event
-		const triggerNodeId = `trigger_${eventName.replace(/\./g, '_')}`;
-		const triggerNode: WorkflowNode = {
-			id: triggerNodeId,
-			type: "trigger",
-			procedureName: eventName,
-			config: {
-				eventName,
-				provider: options?.provider,
-				eventType: options?.eventType,
-				internal: options?.internal ?? !options?.provider,
-			},
+		// Store trigger configuration in metadata
+		if (!this.metadataValue) {
+			this.metadataValue = {};
+		}
+		
+		// Set trigger configuration
+		this.metadataValue.trigger = {
+			triggerProcedure: triggerProcedureName,
 		};
 
-		// Add trigger node if not already exists
-		if (!this.nodeById.has(triggerNodeId)) {
-			this.nodes.push(triggerNode);
-			this.nodeById.set(triggerNodeId, triggerNode);
-		}
-
-		// Link trigger to the handler component
-		triggerNode.next = component.entryId;
-
-		// Add the component nodes
-		for (const node of component.nodes) {
-			const existing = this.nodeById.get(node.id);
-			if (existing && existing !== node) {
-				throw new Error(
-					`[workflow-builder] Duplicate node id '${node.id}' encountered within workflow '${this.id}'.`
-				);
-			}
-			if (!existing) {
-				this.nodes.push(node);
-				this.nodeById.set(node.id, node);
-			}
-		}
-
-		// Set start node to trigger if not set
-		if (!this.startNode) {
-			this.startNode = triggerNodeId;
-		}
-
+		// Add the component as the workflow start
+		this.addComponent(component);
+		
 		return this;
 	}
 
@@ -246,6 +216,11 @@ class WorkflowBuilder {
 				...(this.metadataValue ?? {}),
 				inputSchema: this.inputSchema,
 			};
+		}
+
+		// Set trigger config from metadata if present
+		if (this.metadataValue?.trigger) {
+			definition.trigger = this.metadataValue.trigger as any;
 		}
 
 		return definition;
