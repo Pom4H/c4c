@@ -1,0 +1,18 @@
+{
+  "name": "pausable-workflows-example",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Example demonstrating pausable workflows with when() helper",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@c4c/workflow": "workspace:*",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "vitest": "^2.1.8"
+  }
+}
