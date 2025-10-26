@@ -20,7 +20,9 @@ const {
 ```
 
 **Features:**
-- ✅ Auto-refresh every 5 seconds
+- ✅ **Real-time updates via SSE** (Server-Sent Events)
+- ✅ Instant notifications when workflows pause/resume
+- ✅ Auto-reconnect on connection loss
 - ✅ Type-safe API
 - ✅ Error handling
 - ✅ Resume with custom JSON data

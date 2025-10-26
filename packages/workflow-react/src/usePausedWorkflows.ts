@@ -1,11 +1,11 @@
 /**
  * React hook for managing paused workflows
- * Displays workflows waiting for external events (human approval, webhooks, etc.)
+ * Uses Server-Sent Events (SSE) for real-time updates
  */
 
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 export interface PausedWorkflow {
   executionId: string;
@@ -20,8 +20,6 @@ export interface PausedWorkflow {
 
 export interface UsePausedWorkflowsOptions {
   apiBaseUrl?: string;
-  autoRefresh?: boolean;
-  refreshInterval?: number;
 }
 
 export interface UsePausedWorkflowsReturn {
@@ -36,15 +34,12 @@ export interface UsePausedWorkflowsReturn {
 export function usePausedWorkflows(
   options: UsePausedWorkflowsOptions = {}
 ): UsePausedWorkflowsReturn {
-  const {
-    apiBaseUrl = "/api/workflow",
-    autoRefresh = true,
-    refreshInterval = 5000,
-  } = options;
+  const { apiBaseUrl = "/api/workflow" } = options;
 
   const [pausedWorkflows, setPausedWorkflows] = useState<PausedWorkflow[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
@@ -86,15 +81,14 @@ export function usePausedWorkflows(
           throw new Error(errorData.error || `HTTP ${response.status}`);
         }
 
-        // Refresh list after resume
-        await refresh();
+        // Note: SSE will automatically update the list when workflow resumes
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         setError(error);
         throw error;
       }
     },
-    [apiBaseUrl, refresh]
+    [apiBaseUrl]
   );
 
   const cancel = useCallback(
@@ -115,25 +109,82 @@ export function usePausedWorkflows(
           throw new Error(errorData.error || `HTTP ${response.status}`);
         }
 
-        // Refresh list after cancel
-        await refresh();
+        // Note: SSE will automatically update the list when workflow is cancelled
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         setError(error);
         throw error;
       }
     },
-    [apiBaseUrl, refresh]
+    [apiBaseUrl]
   );
 
-  // Auto-refresh effect
+  // Setup SSE for real-time updates
   useEffect(() => {
-    if (autoRefresh) {
-      refresh();
-      const interval = setInterval(refresh, refreshInterval);
-      return () => clearInterval(interval);
-    }
-  }, [autoRefresh, refreshInterval, refresh]);
+    // Initial fetch
+    refresh();
+
+    // Setup SSE connection
+    const eventSource = new EventSource(`${apiBaseUrl}/paused-stream`);
+
+    eventSourceRef.current = eventSource;
+
+    // Initial list of paused workflows
+    eventSource.addEventListener("paused.initial", (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        setPausedWorkflows(data.pausedWorkflows || []);
+        setIsLoading(false);
+      } catch (error) {
+        console.error("[usePausedWorkflows] Failed to process SSE initial event:", error);
+      }
+    });
+
+    // Workflow paused event
+    eventSource.addEventListener("workflow.paused", (event) => {
+      try {
+        const workflow = JSON.parse(event.data);
+        setPausedWorkflows((prev) => {
+          // Add if not already in list
+          if (prev.some((w) => w.executionId === workflow.executionId)) {
+            return prev;
+          }
+          return [...prev, workflow];
+        });
+      } catch (error) {
+        console.error("[usePausedWorkflows] Failed to process paused event:", error);
+      }
+    });
+
+    // Workflow resumed event
+    eventSource.addEventListener("workflow.resumed", (event) => {
+      try {
+        const { executionId } = JSON.parse(event.data);
+        setPausedWorkflows((prev) => prev.filter((w) => w.executionId !== executionId));
+      } catch (error) {
+        console.error("[usePausedWorkflows] Failed to process resumed event:", error);
+      }
+    });
+
+    // Workflow cancelled event
+    eventSource.addEventListener("workflow.cancelled", (event) => {
+      try {
+        const { executionId } = JSON.parse(event.data);
+        setPausedWorkflows((prev) => prev.filter((w) => w.executionId !== executionId));
+      } catch (error) {
+        console.error("[usePausedWorkflows] Failed to process cancelled event:", error);
+      }
+    });
+
+    eventSource.onerror = () => {
+      console.warn("[usePausedWorkflows] SSE connection error, will auto-reconnect");
+    };
+
+    return () => {
+      eventSource.close();
+      eventSourceRef.current = null;
+    };
+  }, [apiBaseUrl, refresh]);
 
   return {
     pausedWorkflows,

@@ -9,10 +9,7 @@ import { Badge } from "./ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 
 export function PausedWorkflows() {
-  const { pausedWorkflows, isLoading, error, refresh, resume, cancel } = usePausedWorkflows({
-    autoRefresh: true,
-    refreshInterval: 5000,
-  });
+  const { pausedWorkflows, isLoading, error, refresh, resume, cancel } = usePausedWorkflows();
 
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [resumeData, setResumeData] = useState<Record<string, string>>({});
@@ -244,6 +241,12 @@ export function PausedWorkflows() {
           <p className="mt-4">
             Click <strong>Resume</strong> to continue the workflow with custom data, or <strong>Cancel</strong> to terminate it.
           </p>
+          <div className="flex items-center gap-2 mt-4 p-3 bg-muted rounded-md">
+            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-xs">
+              Real-time updates via Server-Sent Events (SSE) - no refresh needed!
+            </span>
+          </div>
         </CardContent>
       </Card>
     </div>
