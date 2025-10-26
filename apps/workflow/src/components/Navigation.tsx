@@ -10,7 +10,6 @@ export function Navigation() {
 
   const links = [
     { href: "/executions", label: "Executions" },
-    { href: "/paused", label: "Paused" },
   ];
 
   return (
