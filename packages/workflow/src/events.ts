@@ -19,6 +19,7 @@ export type WorkflowEvent =
       type: "workflow.resumed";
       workflowId: string;
       executionId: string;
+      resumedFrom: string;
       timestamp: number;
     }
   | {
@@ -40,9 +41,11 @@ export type WorkflowEvent =
       type: "workflow.paused";
       workflowId: string;
       executionId: string;
+      pausedAt: string;
+      waitingFor: string[];
       executionTime: number;
-      nodesExecuted: string[];
-      resumeState: WorkflowResumeState;
+      nodesExecuted?: string[];
+      resumeState?: WorkflowResumeState;
     }
   | {
       type: "node.started";
