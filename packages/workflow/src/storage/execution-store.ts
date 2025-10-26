@@ -1,9 +1,10 @@
 /**
- * Execution Store - storage for workflow execution history
- * Used for UI monitoring (like in n8n)
+ * Execution Store
+ * 
+ * Storage for workflow execution history and monitoring
  */
 
-import type { WorkflowExecutionResult, WorkflowDefinition } from "./types.js";
+import type { WorkflowExecutionResult, WorkflowDefinition } from "../types/index.js";
 
 /**
  * Detailed information about execution

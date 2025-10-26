@@ -1,11 +1,16 @@
+/**
+ * Workflow Components
+ * 
+ * Provides functions to create individual workflow components (steps, conditions, etc.)
+ */
+
 import type { z } from "zod";
 import type {
-	WorkflowDefinition,
 	WorkflowNode,
 	ConditionConfig,
 	ParallelConfig,
 	ConditionPredicateContext,
-} from "./types.js";
+} from "../types/index.js";
 
 type AnyZod = z.ZodTypeAny;
 
@@ -30,20 +35,20 @@ type StepExecute<Input> = (ctx: AuthoringContext<Input>) => ProcedureInvocation 
 
 type ConditionAuthoringContext<Input> = ConditionPredicateContext;
 
-interface WorkflowFragment {
+export interface WorkflowFragment {
 	id: string;
 	nodes: WorkflowNode[];
 	entryId: string;
 	exitIds: string[];
 }
 
-interface WorkflowComponent<InputSchema extends AnyZod = AnyZod, OutputSchema extends AnyZod = AnyZod>
+export interface WorkflowComponent<InputSchema extends AnyZod = AnyZod, OutputSchema extends AnyZod = AnyZod>
 	extends WorkflowFragment {
 	input: InputSchema;
 	output: OutputSchema;
 }
 
-type NormalizedComponent = WorkflowComponent<AnyZod, AnyZod>;
+export type NormalizedComponent = WorkflowComponent<AnyZod, AnyZod>;
 
 interface StepOptions<
 	Id extends string,
@@ -94,145 +99,6 @@ interface ConditionOptions<
 interface SequenceOptions<Id extends string> {
 	id: Id;
 	metadata?: Record<string, unknown>;
-}
-
-class WorkflowBuilder {
-	private readonly id: string;
-	private nameValue: string | undefined;
-	private descriptionValue: string | undefined;
-	private versionValue: string | undefined;
-	private variablesValue: Record<string, unknown> | undefined;
-	private metadataValue: Record<string, unknown> | undefined;
-	private inputSchema: AnyZod | undefined;
-	private nodes: WorkflowNode[] = [];
-	private nodeById = new Map<string, WorkflowNode>();
-	private startNode: string | undefined;
-	private pendingExitIds: string[] = [];
-
-	constructor(id: string) {
-		this.id = id;
-	}
-
-	input<Schema extends AnyZod>(schema: Schema): this {
-		this.inputSchema = schema;
-		return this;
-	}
-
-	name(value: string): this {
-		this.nameValue = value;
-		return this;
-	}
-
-	description(value: string): this {
-		this.descriptionValue = value;
-		return this;
-	}
-
-	version(value: string): this {
-		this.versionValue = value;
-		return this;
-	}
-
-	variables(value: Record<string, unknown>): this {
-		this.variablesValue = value;
-		return this;
-	}
-
-	metadata(value: Record<string, unknown>): this {
-		this.metadataValue = value;
-		return this;
-	}
-
-	step<InputSchema extends AnyZod, OutputSchema extends AnyZod>(
-		component: WorkflowComponent<InputSchema, OutputSchema>
-	): this {
-		this.addComponent(component);
-		return this;
-	}
-
-	commit(): WorkflowDefinition {
-		if (!this.startNode) {
-			throw new Error(`[workflow-builder] Workflow '${this.id}' has no steps defined.`);
-		}
-
-		const nodes = this.nodes.map((node) => ({
-			...node,
-			config: node.config ? { ...(node.config as Record<string, unknown>) } : undefined,
-			next: Array.isArray(node.next)
-				? [...node.next]
-				: node.next !== undefined
-					? node.next
-					: undefined,
-		}));
-
-		const definition: WorkflowDefinition = {
-			id: this.id,
-			name: this.nameValue ?? this.id,
-			description: this.descriptionValue,
-			version: this.versionValue ?? "1.0.0",
-			startNode: this.startNode,
-			nodes,
-		};
-
-		if (this.variablesValue) {
-			definition.variables = { ...this.variablesValue };
-		}
-
-		if (this.metadataValue || this.inputSchema) {
-			definition.metadata = {
-				...(this.metadataValue ?? {}),
-				inputSchema: this.inputSchema,
-			};
-		}
-
-		return definition;
-	}
-
-	private addComponent(component: NormalizedComponent): void {
-		for (const node of component.nodes) {
-			const existing = this.nodeById.get(node.id);
-			if (existing && existing !== node) {
-				throw new Error(
-					`[workflow-builder] Duplicate node id '${node.id}' encountered within workflow '${this.id}'.`
-				);
-			}
-			if (!existing) {
-				this.nodes.push(node);
-				this.nodeById.set(node.id, node);
-			}
-		}
-
-		if (!this.startNode) {
-			this.startNode = component.entryId;
-		}
-
-		if (this.pendingExitIds.length > 0) {
-			for (const exitId of this.pendingExitIds) {
-				const node = this.nodeById.get(exitId);
-				if (!node) {
-					throw new Error(
-						`[workflow-builder] Unable to connect node '${exitId}' to '${component.entryId}' (node not found).`
-					);
-				}
-
-				if (node.next === undefined) {
-					node.next = component.entryId;
-				} else if (Array.isArray(node.next)) {
-					if (!node.next.includes(component.entryId)) {
-						node.next = [...node.next, component.entryId];
-					}
-				} else if (node.next !== component.entryId) {
-					node.next = [node.next, component.entryId];
-				}
-			}
-		}
-
-		this.pendingExitIds = [...component.exitIds];
-	}
-}
-
-export function workflow(id: string): WorkflowBuilder {
-	return new WorkflowBuilder(id);
 }
 
 export function step<
@@ -368,25 +234,25 @@ function resolveProcedureInvocation<
 		const placeholder = Symbol("input");
 		let recorded: ProcedureInvocation | undefined;
 
-	const engine: StepEngine = {
-		run: (procedureName, config) => {
-			const normalizedConfig =
-				typeof config === "object" && config !== null ? (config as Record<string, unknown>) : undefined;
-			recorded = {
-				type: "procedure",
-				procedureName,
-				config: normalizedConfig,
-			};
-			return recorded;
-		},
-	};
+		const engine: StepEngine = {
+			run: (procedureName, config) => {
+				const normalizedConfig =
+					typeof config === "object" && config !== null ? (config as Record<string, unknown>) : undefined;
+				recorded = {
+					type: "procedure",
+					procedureName,
+					config: normalizedConfig,
+				};
+				return recorded;
+			},
+		};
 
-	const context: AuthoringContext<z.infer<InputSchema>> = {
-		inputData: placeholder as unknown as z.infer<InputSchema>,
-		variables: {},
-		get: () => undefined,
-		engine,
-	};
+		const context: AuthoringContext<z.infer<InputSchema>> = {
+			inputData: placeholder as unknown as z.infer<InputSchema>,
+			variables: {},
+			get: () => undefined,
+			engine,
+		};
 
 		const result = options.execute(context);
 		if (!recorded && result && result.type === "procedure") {
