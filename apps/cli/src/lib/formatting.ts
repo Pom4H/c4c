@@ -1,6 +1,5 @@
 import { relative } from "node:path";
 import { formatProcedureBadges, type AuthRequirements, type Procedure } from "@c4c/core";
-import type { WorkflowDefinition } from "@c4c/workflow";
 
 const COLOR_RESET = "\u001B[0m";
 const COLOR_DIM = "\u001B[90m";

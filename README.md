@@ -84,121 +84,65 @@ export const create: Procedure = {
 
 ## Define Workflows
 
-Workflows orchestrate procedures with **branching** and **parallel execution**.
-
-**Fluent Builder API (recommended):**
+Workflows are plain async functions inspired by [useworkflow.dev](https://useworkflow.dev) (Vercel Workflow DevKit).
 
 ```typescript
-import { workflow, step, parallel, condition } from "@c4c/workflow";
-import { z } from "zod";
+import { start, step, FatalError, sleep } from "@c4c/workflow";
 
-// Define reusable steps
-const createUserStep = step({
-  id: "create-user",
-  input: z.object({ name: z.string(), email: z.string(), plan: z.string() }),
-  output: z.object({ id: z.string(), plan: z.string() }),
-  execute: ({ engine, inputData }) => engine.run("users.create", inputData),
+// Steps get automatic retry semantics
+const createUser = step("users.create", async (input: { name: string; email: string; plan: string }) => {
+  const resp = await fetch("/api/users", { method: "POST", body: JSON.stringify(input) });
+  if (!resp.ok) throw new Error("Failed to create user");
+  return resp.json();
 });
 
-// Parallel execution for premium users
-const premiumSetup = parallel({
-  id: "premium-setup",
-  branches: [
-    step({
-      id: "setup-analytics",
-      input: z.object({ userId: z.string() }),
-      output: z.object({ trackingId: z.string() }),
-      execute: ({ engine }) => engine.run("analytics.setup"),
-    }),
-    step({
-      id: "assign-manager",
-      input: z.object({ userId: z.string() }),
-      output: z.object({ managerId: z.string() }),
-      execute: ({ engine }) => engine.run("users.assignManager"),
-    }),
-    step({
-      id: "enable-features",
-      input: z.object({ userId: z.string() }),
-      output: z.object({ features: z.array(z.string()) }),
-      execute: ({ engine }) => engine.run("features.enablePremium"),
-    }),
-  ],
-  waitForAll: true,
-  output: z.object({ setupComplete: z.boolean() }),
+const enablePremium = step("features.enablePremium", async (userId: string) => {
+  // If this fails, it's retried automatically
+  return await featureService.enable(userId, "premium");
 });
 
-// Branching based on user plan
-const planCheck = condition({
-  id: "check-plan",
-  input: z.object({ plan: z.string() }),
-  predicate: (ctx) => ctx.get("create-user")?.plan === "premium",
-  whenTrue: premiumSetup,
-  whenFalse: step({
-    id: "free-setup",
-    input: z.object({ userId: z.string() }),
-    output: z.object({ trialDays: z.number() }),
-    execute: ({ engine }) => engine.run("users.setupFreeTrial"),
-  }),
+const sendWelcome = step("emails.sendWelcome", async (email: string, name: string) => {
+  await emailService.send({ to: email, subject: `Welcome ${name}!` });
+  return { sent: true };
 });
 
-// Build the complete workflow
-export default workflow("user-onboarding")
-  .name("User Onboarding Flow")
-  .version("1.0.0")
-  .step(createUserStep)
-  .step(planCheck)
-  .step(step({
-    id: "send-welcome",
-    input: z.object({ userId: z.string() }),
-    output: z.object({ sent: z.boolean() }),
-    execute: ({ engine }) => engine.run("emails.sendWelcome"),
-  }))
-  .commit();
+// Workflow is just an async function!
+export async function userOnboarding(name: string, email: string, plan: string) {
+  "use workflow";
 
-// ✅ Both export styles work:
-// export default workflow(...)     - default export (recommended)
-// export const myWorkflow = ...    - named export
+  // Step 1: Create user
+  const user = await createUser({ name, email, plan });
+
+  // Step 2: Conditional logic - just use if/else!
+  if (plan === "premium") {
+    // Parallel execution - just use Promise.all!
+    await Promise.all([
+      enablePremium(user.id),
+      setupAnalytics(user.id),
+      assignManager(user.id),
+    ]);
+  } else {
+    await setupFreeTrial(user.id);
+  }
+
+  // Step 3: Send welcome email
+  await sendWelcome(email, name);
+
+  return { user, onboarded: true };
+}
+
+// Start the workflow
+const run = start(userOnboarding, ["Alice", "alice@example.com", "premium"]);
+const result = await run.result;
 ```
 
-**Declarative API (also supported):**
-
-```typescript
-import type { WorkflowDefinition } from "@c4c/workflow";
-
-export const userOnboarding: WorkflowDefinition = {
-  id: "user-onboarding",
-  name: "User Onboarding Flow",
-  version: "1.0.0",
-  startNode: "create-user",
-  nodes: [
-    {
-      id: "create-user",
-      type: "procedure",
-      procedureName: "users.create",
-      next: "check-plan",
-    },
-    {
-      id: "check-plan",
-      type: "condition",
-      config: {
-        expression: "get('create-user').plan === 'premium'",
-        trueBranch: "premium-setup",
-        falseBranch: "free-setup",
-      },
-    },
-    {
-      id: "premium-setup",
-      type: "parallel",
-      config: {
-        branches: ["setup-analytics", "assign-manager", "enable-features"],
-        waitForAll: true,
-      },
-      next: "send-welcome",
-    },
-    // ... other nodes
-  ]
-};
-```
+**Key patterns:**
+- **Sequential**: Just `await` one step after another
+- **Parallel**: Use `Promise.all()`
+- **Conditional**: Use `if/else` or `switch`
+- **Error handling**: Use `try/catch` with `FatalError` / `RetryableError`
+- **Sleep**: Use `sleep("5s")` for durable delays
+- **Hooks**: Use `createHook()` for external events (webhooks, approvals)
 
 ---
 
@@ -301,12 +245,12 @@ POST /users
 }
 ```
 
-### Execute Workflows
+### Start Workflows
 ```bash
-POST /workflow/execute
+POST /workflow/start
 {
-  "workflow": { ... },
-  "input": { ... }
+  "workflow": "userOnboarding",
+  "args": ["Alice", "alice@example.com", "premium"]
 }
 ```
 
@@ -448,35 +392,29 @@ c4c serve
 Use the generated procedures in your workflows:
 
 ```typescript
-// External API integration - Google Calendar
-steps: [
-  {
-    id: 'create-event',
-    procedure: 'google-calendar.calendar.events.insert',
-    input: { 
-      calendarId: 'primary',
-      summary: 'Meeting',
-      start: { dateTime: '2024-01-01T10:00:00Z' }
-    }
-  }
-]
+import { step } from "@c4c/workflow";
 
-// c4c app integration - cross-app calls
-steps: [
-  {
-    id: 'create-task',
-    procedure: 'tasks.create',
-    input: { title: 'New task', description: 'Task description' }
-  },
-  {
-    id: 'send-notification',
-    procedure: 'notification-service.notifications.send', // ← From another c4c app!
-    input: { 
-      message: '✅ New task created!',
-      channel: 'push'
-    }
-  }
-]
+// External API integration - Google Calendar
+const createEvent = step("google-calendar.events.insert", async (input) => {
+  // Uses generated client to call Google Calendar API
+  return await googleCalendar.events.insert(input);
+});
+
+// Cross-app calls
+const createTask = step("tasks.create", async (input) => {
+  return await taskService.create(input);
+});
+
+const sendNotification = step("notification-service.send", async (input) => {
+  return await notificationService.send(input); // ← From another c4c app!
+});
+
+export async function createTaskWorkflow() {
+  "use workflow";
+  const task = await createTask({ title: "New task" });
+  await sendNotification({ message: "New task created!", channel: "push" });
+  return task;
+}
 ```
 
 ---
@@ -487,7 +425,7 @@ steps: [
 
 No hardcoded paths! The framework scans your entire project and discovers:
 - **Procedures** - Objects with `contract` and `handler` properties
-- **Workflows** - Objects with `id`, `name`, `version`, `nodes`, `startNode`
+- **Workflows** - Async functions with `"use workflow"` directive and `step()` wrappers
 
 This means you can organize your code however you want.
 

@@ -2,7 +2,7 @@
   "name": "c4c-monorepo",
   "version": "0.1.0",
   "private": true,
-  "description": "c4c (Code For Coders) - n8n but for coders",
+  "description": "c4c (Code For Coders) - Workflow DevKit for TypeScript",
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter workflow-viz dev",

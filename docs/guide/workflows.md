@@ -1,458 +1,399 @@
 # Workflows
 
-Workflows orchestrate multiple procedures with branching, parallel execution, and complex control flow.
+Workflows orchestrate multiple steps using plain TypeScript async functions, inspired by [useworkflow.dev](https://useworkflow.dev) (Vercel Workflow DevKit).
 
 ## What is a Workflow?
 
-A workflow is a series of steps that execute procedures in a specific order. Workflows support:
+A workflow is an async function that composes durable steps. Workflows support:
 
-- **Sequential execution** - Steps run one after another
-- **Parallel execution** - Multiple steps run simultaneously
-- **Conditional branching** - Different paths based on conditions
-- **Context sharing** - Steps can access outputs from previous steps
+- **Sequential execution** - Steps run one after another with `await`
+- **Parallel execution** - Multiple steps run simultaneously with `Promise.all()`
+- **Conditional branching** - Use standard `if/else` and `switch`
+- **Error handling** - Use `try/catch` with `FatalError` and `RetryableError`
+- **Automatic retries** - Steps automatically retry on failure
+- **Durable sleep** - `sleep()` survives process restarts
+- **Hooks** - Suspend workflow for external events (webhooks, approvals)
 
-## Declarative API
-
-Define workflows using a declarative structure:
+## Quick Start
 
 ```typescript
-import type { WorkflowDefinition } from "@c4c/workflow";
+import { start, step, FatalError } from "@c4c/workflow";
 
-export const userOnboarding: WorkflowDefinition = {
-  id: "user-onboarding",
-  name: "User Onboarding Flow",
-  version: "1.0.0",
-  startNode: "create-user",
-  nodes: [
-    {
-      id: "create-user",
-      type: "procedure",
-      procedureName: "users.create",
-      next: "send-welcome",
-    },
-    {
-      id: "send-welcome",
-      type: "procedure",
-      procedureName: "emails.sendWelcome",
-      config: {
-        userId: "{{create-user.id}}",
-      },
-    },
-  ],
-};
+// Define steps with automatic retry semantics
+const fetchUser = step("fetchUser", async (userId: string) => {
+  const resp = await fetch(`/api/users/${userId}`);
+  if (!resp.ok) throw new Error("Failed to fetch user");
+  return resp.json();
+});
+
+const sendEmail = step("sendEmail", async (email: string, subject: string) => {
+  // If this fails, it will be retried automatically
+  await emailService.send({ to: email, subject });
+  return { sent: true };
+});
+
+// Define workflow - just a plain async function!
+export async function onboardUser(userId: string) {
+  "use workflow";
+
+  const user = await fetchUser(userId);
+  await sendEmail(user.email, "Welcome!");
+  return { user, onboarded: true };
+}
+
+// Start the workflow
+const run = start(onboardUser, ["user_123"]);
+const result = await run.result;
 ```
 
-## Basic Step
+## Steps
 
-A step is the smallest unit of execution in a workflow:
+Steps are the building blocks of workflows. They wrap functions with automatic retry semantics.
 
 ```typescript
-const myStep = step({
-  id: "step-id",
-  input: z.object({ ... }),
-  output: z.object({ ... }),
-  execute: ({ engine, inputData, context }) => {
-    // Step logic here
-    return { result: "value" };
-  },
+import { step } from "@c4c/workflow";
+
+const add = step("math.add", async (a: number, b: number) => {
+  return a + b;
+});
+
+// Configure retry behavior
+const callAPI = step("callExternalAPI", async (url: string) => {
+  const resp = await fetch(url);
+  return resp.json();
+}, {
+  maxAttempts: 5,     // Retry up to 5 times (default: 3)
+  retryDelay: 2000,   // Base retry delay in ms (default: 1000)
 });
 ```
 
-### Step Execution Context
+### Step Metadata
 
-The execute function receives a context object:
+Access step metadata inside a step function:
 
 ```typescript
-interface StepContext {
-  engine: WorkflowEngine;        // Execute procedures
-  inputData: any;                // Workflow input data
-  context: WorkflowContext;      // Access previous step outputs
-}
+import { step, getStepMetadata, RetryableError } from "@c4c/workflow";
+
+const myStep = step("myStep", async () => {
+  const { attempt, maxAttempts } = getStepMetadata();
+  console.log(`Attempt ${attempt} of ${maxAttempts}`);
+
+  if (attempt === 1) {
+    throw new RetryableError("Retry me!", { retryAfter: "5s" });
+  }
+
+  return "Success";
+});
 ```
 
-### Accessing Previous Steps
+## Error Handling
 
-Use `context.get()` to access outputs from previous steps:
+### FatalError - Non-Retryable
+
+When a step throws `FatalError`, it will NOT be retried:
 
 ```typescript
-step({
-  id: "process-user",
-  execute: ({ context }) => {
-    const user = context.get("create-user");
-    const email = context.get("send-welcome");
-    
-    return {
-      userId: user.id,
-      emailSent: email.sent
-    };
-  },
-})
+import { step, FatalError } from "@c4c/workflow";
+
+const processPayment = step("payment", async (amount: number) => {
+  if (amount <= 0) {
+    throw new FatalError("Invalid payment amount");
+  }
+  // Process payment...
+});
 ```
 
-## Running Procedures
+### RetryableError - Explicit Retry
 
-Execute procedures by referencing their names:
+Control retry timing explicitly:
 
 ```typescript
-{
-  id: "create-user",
-  type: "procedure",
-  procedureName: "users.create",
-  config: {
-    name: "{{input.name}}",
-    email: "{{input.email}}"
+import { step, RetryableError } from "@c4c/workflow";
+
+const callAPI = step("callAPI", async () => {
+  const resp = await fetch("https://api.example.com");
+  if (resp.status === 429) {
+    throw new RetryableError("Rate limited", { retryAfter: "30s" });
+  }
+  return resp.json();
+});
+```
+
+### Regular Errors - Automatic Retry
+
+Regular errors are automatically retried with exponential backoff:
+
+```typescript
+const fetchData = step("fetchData", async () => {
+  // If this throws, it will be retried automatically
+  // up to maxAttempts with exponential backoff
+  const resp = await fetch("https://api.example.com");
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.json();
+});
+```
+
+### try/catch in Workflows
+
+Catch errors at the workflow level:
+
+```typescript
+export async function resilientWorkflow() {
+  "use workflow";
+
+  try {
+    await riskyStep();
+  } catch (error) {
+    console.log("Step failed after all retries:", error);
+    await fallbackStep();
   }
 }
 ```
 
 ## Parallel Execution
 
-Execute multiple steps simultaneously:
+Use `Promise.all()` for parallel execution:
 
 ```typescript
-export const systemSetup: WorkflowDefinition = {
-  id: "system-setup",
-  name: "System Setup",
-  version: "1.0.0",
-  startNode: "parallel-setup",
-  nodes: [
-    {
-      id: "parallel-setup",
-      type: "parallel",
-      config: {
-        branches: ["setup-database", "setup-cache", "setup-messaging"],
-        waitForAll: true,
-      },
-    },
-    {
-      id: "setup-database",
-      type: "procedure",
-      procedureName: "db.setup",
-    },
-    {
-      id: "setup-cache",
-      type: "procedure",
-      procedureName: "cache.setup",
-    },
-    {
-      id: "setup-messaging",
-      type: "procedure",
-      procedureName: "messaging.setup",
-    },
-  ],
-};
-```
+export async function setupWorkflow() {
+  "use workflow";
 
-### Partial Completion
+  // Run three steps in parallel
+  const [db, cache, messaging] = await Promise.all([
+    setupDatabase(),
+    setupCache(),
+    setupMessaging(),
+  ]);
 
-Execute parallel steps but continue if some fail:
-
-```typescript
-{
-  id: "notify-services",
-  type: "parallel",
-  config: {
-    branches: ["notify-email", "notify-sms", "notify-push"],
-    waitForAll: false,
-    minSuccess: 1,
-  }
+  console.log("All services ready:", { db, cache, messaging });
+  return { db, cache, messaging };
 }
 ```
 
-## Conditional Branching
+### Promise.race
 
-Execute different steps based on conditions:
+Use `Promise.race()` to get the fastest response:
 
 ```typescript
-{
-  id: "check-plan",
-  type: "condition",
-  config: {
-    expression: "get('create-user').plan === 'premium'",
-    trueBranch: "premium-setup",
-    falseBranch: "free-setup",
-  }
+export async function fetchWithFallback() {
+  "use workflow";
+
+  const result = await Promise.race([
+    fetchFromPrimary(),
+    fetchFromSecondary(),
+    sleep("10s").then(() => ({ source: "timeout", data: null })),
+  ]);
+
+  return result;
 }
 ```
 
-Full example:
+## Conditional Logic
+
+Use standard JavaScript `if/else` and `switch`:
 
 ```typescript
-export const userOnboarding: WorkflowDefinition = {
-  id: "user-onboarding",
-  name: "User Onboarding",
-  version: "1.0.0",
-  startNode: "create-user",
-  nodes: [
-    {
-      id: "create-user",
-      type: "procedure",
-      procedureName: "users.create",
-      next: "check-plan",
-    },
-    {
-      id: "check-plan",
-      type: "condition",
-      config: {
-        expression: "get('create-user').plan === 'premium'",
-        trueBranch: "premium-setup",
-        falseBranch: "free-setup",
-      },
-    },
-    {
-      id: "premium-setup",
-      type: "procedure",
-      procedureName: "features.enablePremium",
-    },
-    {
-      id: "free-setup",
-      type: "procedure",
-      procedureName: "features.enableFree",
-    },
-  ],
-};
+export async function onboardUser(userId: string) {
+  "use workflow";
+
+  const user = await fetchUser(userId);
+
+  // Conditional logic - just JavaScript!
+  if (user.plan === "premium") {
+    await Promise.all([
+      setupAnalytics(userId),
+      assignManager(userId),
+      enablePremiumFeatures(userId),
+    ]);
+  } else {
+    await setupFreeTrial(userId);
+  }
+
+  await sendWelcomeEmail(user.email, user.name);
+  return { user, onboarded: true };
+}
 ```
 
-## Complex Workflow Example
+## Durable Sleep
 
-Here's a complete example with all features:
+Pause workflows for specified durations:
 
 ```typescript
-import type { WorkflowDefinition } from "@c4c/workflow";
+import { sleep } from "@c4c/workflow";
 
-export const userOnboardingComplete: WorkflowDefinition = {
-  id: "user-onboarding-complete",
-  name: "User Onboarding Flow",
-  version: "1.0.0",
-  startNode: "create-user",
-  nodes: [
-    // Step 1: Create user
-    {
-      id: "create-user",
-      type: "procedure",
-      procedureName: "users.create",
-      next: "check-plan",
-    },
-    
-    // Step 2: Check user plan
-    {
-      id: "check-plan",
-      type: "condition",
-      config: {
-        expression: "get('create-user').plan === 'premium'",
-        trueBranch: "premium-setup",
-        falseBranch: "free-setup",
-      },
-    },
-    
-    // Premium user setup (parallel execution)
-    {
-      id: "premium-setup",
-      type: "parallel",
-      config: {
-        branches: ["setup-analytics", "assign-manager", "enable-features"],
-        waitForAll: true,
-      },
-      next: "send-welcome",
-    },
-    {
-      id: "setup-analytics",
-      type: "procedure",
-      procedureName: "analytics.setup",
-      config: {
-        userId: "{{create-user.id}}",
-      },
-    },
-    {
-      id: "assign-manager",
-      type: "procedure",
-      procedureName: "users.assignManager",
-      config: {
-        userId: "{{create-user.id}}",
-      },
-    },
-    {
-      id: "enable-features",
-      type: "procedure",
-      procedureName: "features.enablePremium",
-      config: {
-        userId: "{{create-user.id}}",
-      },
-    },
-    
-    // Free tier setup
-    {
-      id: "free-setup",
-      type: "procedure",
-      procedureName: "users.setupFreeTrial",
-      config: {
-        userId: "{{create-user.id}}",
-      },
-      next: "send-welcome",
-    },
-    
-    // Step 3: Send welcome email
-    {
-      id: "send-welcome",
-      type: "procedure",
-      procedureName: "emails.sendWelcome",
-      config: {
-        userId: "{{create-user.id}}",
-        email: "{{create-user.email}}",
-        name: "{{create-user.name}}",
-      },
-    },
-  ],
-};
+export async function scheduledWorkflow() {
+  "use workflow";
+
+  await processFirst();
+  await sleep("5m");     // Wait 5 minutes
+  await processSecond();
+  await sleep("1h");     // Wait 1 hour
+  await processThird();
+}
 ```
 
-## Declarative API
+Supported formats: `"5s"`, `"1m"`, `"2h"`, `"1d"`, or number (milliseconds).
 
-You can also define workflows declaratively:
+## Hooks (Suspend/Resume)
+
+Suspend a workflow until an external event occurs:
 
 ```typescript
-import type { WorkflowDefinition } from "@c4c/workflow";
+import { createHook, resolveHook } from "@c4c/workflow";
 
-export const userOnboarding: WorkflowDefinition = {
-  id: "user-onboarding",
-  name: "User Onboarding Flow",
-  version: "1.0.0",
-  startNode: "create-user",
-  nodes: [
-    {
-      id: "create-user",
-      type: "procedure",
-      procedureName: "users.create",
-      next: "check-plan",
-    },
-    {
-      id: "check-plan",
-      type: "condition",
-      config: {
-        expression: "get('create-user').plan === 'premium'",
-        trueBranch: "premium-setup",
-        falseBranch: "free-setup",
-      },
-    },
-    {
-      id: "premium-setup",
-      type: "parallel",
-      config: {
-        branches: ["setup-analytics", "assign-manager", "enable-features"],
-        waitForAll: true,
-      },
-      next: "send-welcome",
-    },
-    {
-      id: "free-setup",
-      type: "procedure",
-      procedureName: "users.setupFreeTrial",
-      next: "send-welcome",
-    },
-    {
-      id: "send-welcome",
-      type: "procedure",
-      procedureName: "emails.sendWelcome",
-    },
-  ]
-};
+export async function approvalWorkflow(orderId: string) {
+  "use workflow";
+
+  await prepareOrder(orderId);
+
+  // Create a hook - the workflow suspends here
+  const hook = createHook<{ approved: boolean; reviewer: string }>({
+    token: `approval:${orderId}`,
+    timeout: "24h",
+  });
+
+  // Send email with approval link that includes hook.token
+  await sendApprovalEmail(orderId, hook.token);
+
+  // Workflow suspends until hook is resolved
+  const { approved, reviewer } = await hook;
+
+  if (approved) {
+    await processOrder(orderId);
+  } else {
+    await cancelOrder(orderId);
+  }
+
+  return { orderId, approved, reviewer };
+}
+
+// External system resolves the hook:
+// resolveHook("approval:order_123", { approved: true, reviewer: "alice" });
 ```
 
-## Workflow Execution
+## Streaming
 
-Execute workflows via CLI:
+Stream data from workflows:
+
+```typescript
+import { getWritable } from "@c4c/workflow";
+
+export async function streamingWorkflow() {
+  "use workflow";
+
+  const writable = getWritable<Uint8Array>();
+  const writer = writable.getWriter();
+
+  for (let i = 0; i < 10; i++) {
+    await writer.write(new TextEncoder().encode(`chunk ${i}\n`));
+    await sleep("1s");
+  }
+
+  await writer.close();
+}
+```
+
+## Workflow Metadata
+
+Access workflow metadata:
+
+```typescript
+import { getWorkflowMetadata } from "@c4c/workflow";
+
+export async function myWorkflow() {
+  "use workflow";
+
+  const { workflowRunId, workflowStartedAt } = getWorkflowMetadata();
+  console.log(`Run ${workflowRunId} started at ${workflowStartedAt}`);
+}
+```
+
+## Starting Workflows
+
+### Programmatically
+
+```typescript
+import { start } from "@c4c/workflow";
+
+// Start and wait for result
+const run = start(myWorkflow, ["arg1", "arg2"]);
+const result = await run.result;
+
+// Start with custom options
+const run2 = start(myWorkflow, ["arg1"], {
+  runId: "custom-run-id",
+  maxStepRetries: 5,
+  retryDelay: 2000,
+});
+```
+
+### Via HTTP API
 
 ```bash
-c4c exec user-onboarding --input '{"name":"Alice","email":"alice@example.com","plan":"premium"}'
+curl -X POST http://localhost:3000/workflow/start \
+  -H "Content-Type: application/json" \
+  -d '{"workflow": "onboardUser", "args": ["user_123"]}'
 ```
 
-Or programmatically:
+## Monitoring
+
+### Event System
+
+Subscribe to workflow events:
 
 ```typescript
-import { execute } from "@c4c/core";
-import { collectRegistry } from "@c4c/core";
+import { subscribeToRun, subscribeToAll } from "@c4c/workflow";
 
-const registry = await collectRegistry("./src");
+// Subscribe to a specific run
+const unsub = subscribeToRun(run.runId, (event) => {
+  console.log(event.type, event);
+});
 
-const result = await execute(
-  registry,
-  "user-onboarding",
-  {
-    name: "Alice",
-    email: "alice@example.com",
-    plan: "premium"
-  }
-);
-
-console.log(result);
+// Subscribe to all runs
+const unsubAll = subscribeToAll((event) => {
+  console.log(event.type, event);
+});
 ```
 
-## Error Handling
+### Execution Store
 
-Handle errors in workflows:
+Query run history:
 
 ```typescript
-step({
-  id: "risky-operation",
-  execute: async ({ engine }) => {
-    try {
-      return await engine.run("external.api");
-    } catch (error) {
-      console.error("Operation failed:", error);
-      // Return fallback value
-      return { success: false, error: error.message };
-    }
-  },
-})
+import { getExecutionStore } from "@c4c/workflow";
+
+const store = getExecutionStore();
+const runs = store.getAllRuns();
+const stats = store.getStats();
 ```
 
-## Workflow Context
+## Migration from Old DSL
 
-The workflow context stores outputs from all executed steps:
+The old DAG-based `WorkflowDefinition` has been replaced with plain async functions:
 
-```typescript
-interface WorkflowContext {
-  // Get output from a specific step
-  get(stepId: string): any;
-  
-  // Get all step outputs
-  getAll(): Record<string, any>;
-  
-  // Check if step has executed
-  has(stepId: string): boolean;
-}
-```
-
-## Export Styles
-
-Both export styles work:
-
-```typescript
-// Default export (recommended)
-export default workflow("my-workflow")
-  .step(...)
-  .commit();
-
-// Named export
-export const myWorkflow = workflow("my-workflow")
-  .step(...)
-  .commit();
-```
+| Old Pattern | New Pattern |
+|---|---|
+| `WorkflowDefinition` objects | `async function` with `"use workflow"` |
+| `{ type: "procedure", procedureName: "..." }` nodes | `step("name", fn)` |
+| `{ type: "parallel", branches: [...] }` | `Promise.all([...])` |
+| `{ type: "condition", trueBranch, falseBranch }` | `if/else` |
+| `node.next = "nextNode"` | Sequential `await` |
+| `workflow().step().commit()` builder | Plain function composition |
+| `executeWorkflow(definition, registry, input)` | `start(workflowFn, args)` |
 
 ## Best Practices
 
-1. **Use descriptive IDs** - Make step IDs self-documenting
-2. **Keep steps focused** - One step = one responsibility
-3. **Use parallel execution** - Speed up independent operations
-4. **Handle errors** - Add error handling for external calls
-5. **Test workflows** - Write tests for workflow logic
-6. **Document complex flows** - Add comments for complex branching
-7. **Reuse steps** - Define common steps once
-8. **Version workflows** - Use semantic versioning
+1. **Write plain functions** - Workflows are just async functions
+2. **Use steps for side effects** - Wrap API calls, DB queries in steps for retry
+3. **Use Promise.all for parallelism** - Standard JavaScript patterns work
+4. **Throw FatalError for non-retryable failures** - Don't retry invalid input
+5. **Use createHook for external events** - Webhooks, approvals, callbacks
+6. **Keep workflows focused** - One workflow per business process
+7. **Test like regular functions** - Workflows are testable without special setup
 
 ## Next Steps
 
-- [Learn about the Registry](/guide/registry)
-- [Add Policies to Workflows](/guide/policies)
-- [Set up OpenTelemetry](/guide/opentelemetry)
-- [Build Complex Workflows](/examples/modules)
+- [Learn about Procedures](/guide/procedures)
+- [Set up Triggers](/guide/triggers)
+- [Use the HTTP API](/guide/http-api)
+- [View Examples](/examples/basic)

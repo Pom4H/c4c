@@ -4,7 +4,20 @@
  * OpenTelemetry Trace Viewer Component
  */
 
-import type { TraceSpan } from "@c4c/workflow";
+/** Legacy TraceSpan type for visualization compatibility */
+interface TraceSpan {
+  spanId: string;
+  traceId: string;
+  parentSpanId?: string;
+  name: string;
+  kind: string;
+  startTime: number;
+  endTime: number;
+  duration: number;
+  status: { code: "OK" | "ERROR" | "UNSET"; message?: string };
+  attributes: Record<string, string | number | boolean>;
+  events?: Array<{ name: string; timestamp: number; attributes?: Record<string, unknown> }>;
+}
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";

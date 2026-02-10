@@ -24,6 +24,7 @@
     "@c4c/adapters": "workspace:*",
     "@c4c/core": "workspace:*",
     "@c4c/generators": "workspace:*",
+    "@c4c/workflow": "workspace:*",
     "commander": "^14.0.1",
     "zod": "catalog:"
   },

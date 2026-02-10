@@ -17,7 +17,36 @@ import {
   Panel,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { WorkflowDefinition, TraceSpan } from "@c4c/workflow";
+/** Legacy types for visualization compatibility */
+interface WorkflowNode {
+  id: string;
+  type: string;
+  procedureName?: string;
+  config?: Record<string, unknown>;
+  next?: string | string[];
+}
+
+interface WorkflowDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  version: string;
+  nodes: WorkflowNode[];
+  startNode: string;
+}
+
+interface TraceSpan {
+  spanId: string;
+  traceId: string;
+  parentSpanId?: string;
+  name: string;
+  kind: string;
+  startTime: number;
+  endTime: number;
+  duration: number;
+  status: { code: "OK" | "ERROR" | "UNSET"; message?: string };
+  attributes: Record<string, string | number | boolean>;
+}
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 

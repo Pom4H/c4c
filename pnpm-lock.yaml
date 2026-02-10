@@ -69,6 +69,9 @@ importers:
       '@c4c/generators':
         specifier: workspace:*
         version: link:../../packages/generators
+      '@c4c/workflow':
+        specifier: workspace:*
+        version: link:../../packages/workflow
       commander:
         specifier: ^14.0.1
         version: 14.0.1

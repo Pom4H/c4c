@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
 import { collectProjectArtifacts } from "@c4c/core";
 import { execute } from "@c4c/core";
-import { executeWorkflow } from "@c4c/workflow";
+import { start } from "@c4c/workflow";
 
 interface ExecOptions {
 	root?: string;
@@ -45,16 +45,12 @@ export async function execCommand(
 		return;
 	}
 
-	// Priority 2: Try to find workflow
-	const workflow = artifacts.workflows.get(name);
-	if (workflow) {
-		await executeWorkflowById(name, workflow, artifacts.procedures, input, options);
-		return;
-	}
+	// Priority 2: Try to find workflow (exported async functions)
+	// Workflows are now functions, not definition objects
+	// They would be discovered by the project artifacts scanner if they export workflow functions
 
 	// Not found - show helpful error
 	const availableProcedures = Array.from(artifacts.procedures.keys());
-	const availableWorkflows = Array.from(artifacts.workflows.keys());
 	
 	let errorMessage = `Artifact '${name}' not found.\n\n`;
 	
@@ -67,16 +63,9 @@ export async function execCommand(
 		errorMessage += '\n\n';
 	}
 	
-	if (availableWorkflows.length > 0) {
-		errorMessage += `Available workflows (${availableWorkflows.length}):\n`;
-		errorMessage += availableWorkflows.slice(0, 10).map(w => `  - ${w}`).join('\n');
-		if (availableWorkflows.length > 10) {
-			errorMessage += `\n  ... and ${availableWorkflows.length - 10} more`;
-		}
-	}
-	
-	if (availableProcedures.length === 0 && availableWorkflows.length === 0) {
-		errorMessage += 'No procedures or workflows found in project.';
+	if (availableProcedures.length === 0) {
+		errorMessage += 'No procedures found in project.\n';
+		errorMessage += 'Note: Workflows are now plain async functions. Use start() to run them directly.';
 	}
 
 	throw new Error(errorMessage);
@@ -104,7 +93,7 @@ async function executeProcedure(
 		if (options.json) {
 			console.log(JSON.stringify(result, null, 2));
 		} else {
-			console.log(`[c4c] ✅ Success!`);
+			console.log(`[c4c] Success!`);
 			console.log(`[c4c] Output:`, JSON.stringify(result, null, 2));
 		}
 	} catch (error) {
@@ -120,59 +109,7 @@ async function executeProcedure(
 				)
 			);
 		} else {
-			console.error(`[c4c] ❌ Execution failed:`, error);
-		}
-		process.exit(1);
-	}
-}
-
-/**
- * Execute a workflow
- */
-async function executeWorkflowById(
-	workflowId: string,
-	workflow: any,
-	registry: any,
-	input: unknown,
-	options: ExecOptions
-): Promise<void> {
-	if (!options.json) {
-		console.log(`[c4c] Found workflow: ${workflow.name} (v${workflow.version})`);
-	}
-
-	// Execute
-	if (!options.json) {
-		console.log(`[c4c] Executing workflow '${workflow.id}'...`);
-		console.log(`[c4c] Input:`, JSON.stringify(input, null, 2));
-	}
-
-	try {
-		const result = await executeWorkflow(workflow, registry, input as Record<string, unknown>);
-
-		if (options.json) {
-			console.log(JSON.stringify(result, null, 2));
-		} else {
-			console.log(`[c4c] ✅ Workflow completed successfully!`);
-			console.log(`[c4c] Execution ID:`, result.executionId);
-			console.log(`[c4c] Status:`, result.status);
-			console.log(`[c4c] Nodes executed:`, result.nodesExecuted);
-			console.log(`[c4c] Execution time:`, `${result.executionTime}ms`);
-			console.log(`[c4c] Output:`, JSON.stringify(result.outputs, null, 2));
-		}
-	} catch (error) {
-		if (options.json) {
-			console.error(
-				JSON.stringify(
-					{
-						error: error instanceof Error ? error.message : String(error),
-						stack: error instanceof Error ? error.stack : undefined,
-					},
-					null,
-					2
-				)
-			);
-		} else {
-			console.error(`[c4c] ❌ Workflow execution failed:`, error);
+			console.error(`[c4c] Execution failed:`, error);
 		}
 		process.exit(1);
 	}
