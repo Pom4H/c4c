@@ -1,131 +1,83 @@
-import type { WorkflowResumeState, WorkflowExecutionResult } from "./types.js";
+/**
+ * Workflow event system
+ *
+ * Provides pub/sub for workflow execution events.
+ * Used for real-time monitoring, SSE streaming, and logging.
+ */
 
-export type SerializedWorkflowExecutionResult = Omit<WorkflowExecutionResult, "error"> & {
-  error?: {
-    message: string;
-    name?: string;
-    stack?: string;
-  };
-};
+import type { WorkflowEvent } from "./types.js";
 
-export type WorkflowEvent =
-  | {
-      type: "workflow.started";
-      workflowId: string;
-      executionId: string;
-      startTime: number;
-    }
-  | {
-      type: "workflow.resumed";
-      workflowId: string;
-      executionId: string;
-      timestamp: number;
-    }
-  | {
-      type: "workflow.completed";
-      workflowId: string;
-      executionId: string;
-      executionTime: number;
-      nodesExecuted: string[];
-    }
-  | {
-      type: "workflow.failed";
-      workflowId: string;
-      executionId: string;
-      executionTime: number;
-      nodesExecuted: string[];
-      error: string;
-    }
-  | {
-      type: "workflow.paused";
-      workflowId: string;
-      executionId: string;
-      executionTime: number;
-      nodesExecuted: string[];
-      resumeState: WorkflowResumeState;
-    }
-  | {
-      type: "node.started";
-      workflowId: string;
-      executionId: string;
-      nodeId: string;
-      nodeIndex?: number;
-      timestamp: number;
-    }
-  | {
-      type: "node.completed";
-      workflowId: string;
-      executionId: string;
-      nodeId: string;
-      nodeIndex?: number;
-      nextNodeId?: string;
-      timestamp: number;
-      output?: unknown;
-    }
-  | {
-      type: "workflow.result";
-      workflowId: string;
-      executionId: string;
-      result: SerializedWorkflowExecutionResult;
-    };
+type EventListener = (event: WorkflowEvent) => void;
 
-type Listener = (event: WorkflowEvent) => void;
+/** Listeners keyed by runId */
+const runListeners = new Map<string, Set<EventListener>>();
 
-const executionIdToListeners = new Map<string, Set<Listener>>();
-const globalListeners = new Set<Listener>();
+/** Global listeners that receive all events */
+const globalListeners = new Set<EventListener>();
 
-export function subscribeToExecution(
-  executionId: string,
-  listener: Listener
+/**
+ * Subscribe to events from a specific workflow run
+ */
+export function subscribeToRun(
+	runId: string,
+	listener: EventListener,
 ): () => void {
-  let set = executionIdToListeners.get(executionId);
-  if (!set) {
-    set = new Set();
-    executionIdToListeners.set(executionId, set);
-  }
-  set.add(listener);
-  return () => {
-    set?.delete(listener);
-    if (set && set.size === 0) {
-      executionIdToListeners.delete(executionId);
-    }
-  };
+	let set = runListeners.get(runId);
+	if (!set) {
+		set = new Set();
+		runListeners.set(runId, set);
+	}
+	set.add(listener);
+
+	return () => {
+		set?.delete(listener);
+		if (set && set.size === 0) {
+			runListeners.delete(runId);
+		}
+	};
 }
 
-export function subscribeToAllExecutions(listener: Listener): () => void {
-  globalListeners.add(listener);
-  return () => {
-    globalListeners.delete(listener);
-  };
+/**
+ * Subscribe to events from all workflow runs
+ */
+export function subscribeToAll(listener: EventListener): () => void {
+	globalListeners.add(listener);
+	return () => {
+		globalListeners.delete(listener);
+	};
 }
 
-export function publish(event: WorkflowEvent): void {
-  // Notify execution-specific listeners
-  const listeners = executionIdToListeners.get(event.executionId);
-  if (listeners) {
-    for (const listener of Array.from(listeners)) {
-      try {
-        listener(event);
-      } catch {
-        // ignore listener errors
-      }
-    }
-  }
-  
-  // Notify global listeners
-  for (const listener of Array.from(globalListeners)) {
-    try {
-      listener(event);
-    } catch {
-      // ignore listener errors
-    }
-  }
-  
-  if (
-    event.type === "workflow.completed" ||
-    event.type === "workflow.failed" ||
-    event.type === "workflow.paused"
-  ) {
-    executionIdToListeners.delete(event.executionId);
-  }
+/**
+ * Publish a workflow event
+ */
+export function publishEvent(event: WorkflowEvent): void {
+	// Notify run-specific listeners
+	const runId = event.runId;
+	const listeners = runListeners.get(runId);
+	if (listeners) {
+		for (const listener of Array.from(listeners)) {
+			try {
+				listener(event);
+			} catch {
+				// ignore listener errors
+			}
+		}
+	}
+
+	// Notify global listeners
+	for (const listener of Array.from(globalListeners)) {
+		try {
+			listener(event);
+		} catch {
+			// ignore listener errors
+		}
+	}
+
+	// Clean up run listeners when workflow completes or fails
+	if (
+		event.type === "workflow.completed" ||
+		event.type === "workflow.failed"
+	) {
+		runListeners.delete(runId);
+	}
 }

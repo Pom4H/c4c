@@ -1,182 +1,151 @@
 /**
- * Workflow system types
- * 
- * Procedures with input/output contracts become workflow nodes automatically!
+ * Workflow DevKit Types
+ *
+ * Inspired by useworkflow.dev (Vercel Workflow DevKit)
+ * "use workflow" / "use step" directive-based durable workflow system
  */
-
-import type { z } from "zod";
 
 /**
- * Workflow node - automatically generated from Procedure
+ * Metadata available inside a step function via getStepMetadata()
  */
-export interface WorkflowNode {
-	id: string;
-	type: "procedure" | "condition" | "parallel" | "sequential" | "trigger";
-	procedureName?: string; // Reference to registered procedure (for trigger nodes, this is the trigger procedure)
-	config?: Record<string, unknown>;
-	next?: string | string[]; // Next node(s) to execute
-	onError?: string; // Error handler node
+export interface StepMetadata {
+	/** Current attempt number (1-indexed). Increases on retries. */
+	attempt: number;
+	/** Maximum number of retry attempts */
+	maxAttempts: number;
+	/** The workflow run ID this step belongs to */
+	workflowRunId: string;
+	/** When the workflow started */
+	workflowStartedAt: Date;
 }
 
 /**
- * Workflow definition
+ * Metadata available inside a workflow function via getWorkflowMetadata()
  */
-export interface WorkflowDefinition {
-	id: string;
-	name: string;
-	description?: string;
-	version: string;
-	nodes: WorkflowNode[];
-	startNode: string;
-	variables?: Record<string, unknown>; // Workflow-level variables
-	metadata?: Record<string, unknown>;
-	/** If true, this workflow is triggered by external events and should not be run directly */
-	isTriggered?: boolean;
-	/** Trigger configuration for event-driven workflows */
-	trigger?: TriggerConfig;
+export interface WorkflowMetadata {
+	/** Unique identifier for this workflow run */
+	workflowRunId: string;
+	/** When the workflow was started */
+	workflowStartedAt: Date;
 }
 
 /**
- * Trigger configuration for event-driven workflows
+ * A running workflow instance returned by start()
  */
-export interface TriggerConfig {
-	/** Provider (e.g., "googleDrive", "slack") */
-	provider: string;
-	/** Trigger procedure name that creates the webhook subscription */
-	triggerProcedure: string;
-	/** Event type filter */
-	eventType?: string;
-	/** Additional subscription configuration */
-	subscriptionConfig?: Record<string, unknown>;
+export interface WorkflowRun<T = unknown> {
+	/** Unique identifier for this run */
+	runId: string;
+	/** Promise that resolves with the workflow result */
+	result: Promise<T>;
+	/** ReadableStream for consuming workflow output (for streaming use cases) */
+	readable: ReadableStream<Uint8Array>;
+	/** Current status of the workflow run */
+	status: WorkflowRunStatus;
+}
+
+export type WorkflowRunStatus =
+	| "running"
+	| "completed"
+	| "failed"
+	| "suspended";
+
+/**
+ * Options for starting a workflow
+ */
+export interface StartOptions {
+	/** Custom run ID (auto-generated if not provided) */
+	runId?: string;
+	/** Maximum number of retry attempts for steps (default: 3) */
+	maxStepRetries?: number;
+	/** Default retry delay in milliseconds (default: 1000) */
+	retryDelay?: number;
 }
 
 /**
- * Workflow execution context
+ * Hook that can be used to suspend a workflow until an external event
  */
-export interface WorkflowContext {
-	workflowId: string;
-	executionId: string;
-	variables: Record<string, unknown>;
-	nodeOutputs: Map<string, unknown>; // Store outputs from each node
-	startTime: Date;
-	currentNode?: string;
+export interface Hook<T = unknown> extends Promise<T> {
+	/** Token that external systems use to resume this hook */
+	token: string;
 }
 
 /**
- * Workflow execution result
+ * Options for creating a hook
  */
-export interface WorkflowExecutionResult {
-	executionId: string;
-  status: "completed" | "failed" | "cancelled" | "paused";
-	outputs: Record<string, unknown>;
-	error?: Error;
-	executionTime: number;
-	nodesExecuted: string[];
-  spans?: TraceSpan[]; // Optional: for visualization purposes
-  resumeState?: WorkflowResumeState; // Present when status === "paused"
+export interface HookOptions {
+	/** Token identifier for this hook */
+	token: string;
+	/** Timeout duration (e.g., "10m", "1h", 60000) */
+	timeout?: string | number;
 }
 
 /**
- * OpenTelemetry span representation for visualization
+ * Options for RetryableError
  */
-export interface TraceSpan {
-	spanId: string;
-	traceId: string;
-	parentSpanId?: string;
-	name: string;
-	kind: string;
-	startTime: number;
-	endTime: number;
-	duration: number;
-	status: {
-		code: "OK" | "ERROR" | "UNSET";
-		message?: string;
-	};
-	attributes: Record<string, string | number | boolean>;
-	events?: Array<{
-		name: string;
+export interface RetryableErrorOptions {
+	/** When to retry (e.g., "5s", "1m", 5000) */
+	retryAfter?: string | number;
+}
+
+/**
+ * Event emitted during workflow execution
+ */
+export type WorkflowEvent =
+	| {
+		type: "workflow.started";
+		runId: string;
 		timestamp: number;
-		attributes?: Record<string, unknown>;
-	}>;
-}
-
-/**
- * Node metadata for UI generation
- */
-export interface NodeMetadata {
-	id: string;
-	name: string;
-	description?: string;
-	category: string;
-	icon?: string;
-	color?: string;
-	inputSchema: z.ZodType;
-	outputSchema: z.ZodType;
-	configSchema?: z.ZodType; // Node-specific configuration
-	examples?: Array<{
-		input: unknown;
-		output: unknown;
-	}>;
-}
-
-/**
- * Workflow UI configuration
- */
-export interface WorkflowUIConfig {
-	nodes: NodeMetadata[];
-	categories: string[];
-	connections: Array<{
-		from: string;
-		to: string;
-		fromPort?: string;
-		toPort?: string;
-	}>;
-}
-
-/**
- * Serialized state required to resume a paused workflow
- */
-export interface WorkflowResumeState {
-  workflowId: string;
-  executionId: string;
-  currentNode: string; // Node ID to resume from next
-  variables: Record<string, unknown>;
-  nodeOutputs: Record<string, unknown>; // Flattened Map<string, unknown>
-  nodesExecuted: string[];
-}
-
-/**
- * Condition node configuration
- */
-export interface ConditionPredicateContext {
-	variables: Record<string, unknown>;
-	outputs: Map<string, unknown>;
-	get<T = unknown>(key: string): T | undefined;
-	inputData?: unknown;
-}
-
-export type ConditionPredicate = (context: ConditionPredicateContext) => boolean;
-
-export interface ConditionConfig {
-	expression?: string; // JavaScript expression
-	trueBranch: string; // Node ID for true
-	falseBranch: string; // Node ID for false
-	predicateFn?: ConditionPredicate; // Optional runtime predicate
-}
-
-/**
- * Parallel execution configuration
- */
-export interface ParallelConfig {
-	branches: string[]; // Node IDs to execute in parallel
-	waitForAll: boolean; // Wait for all branches or first completion
-}
-
-/**
- * Sub-workflow runner configuration (for procedure-based subworkflow node)
- */
-export interface SubWorkflowConfig {
-  workflowId: string;
-  input?: Record<string, unknown>;
-  mergeOutputs?: boolean; // if true, return child outputs directly
-}
+	}
+	| {
+		type: "workflow.completed";
+		runId: string;
+		result: unknown;
+		executionTime: number;
+		timestamp: number;
+	}
+	| {
+		type: "workflow.failed";
+		runId: string;
+		error: string;
+		executionTime: number;
+		timestamp: number;
+	}
+	| {
+		type: "step.started";
+		runId: string;
+		stepName: string;
+		attempt: number;
+		timestamp: number;
+	}
+	| {
+		type: "step.completed";
+		runId: string;
+		stepName: string;
+		attempt: number;
+		result: unknown;
+		timestamp: number;
+	}
+	| {
+		type: "step.failed";
+		runId: string;
+		stepName: string;
+		attempt: number;
+		error: string;
+		isFatal: boolean;
+		timestamp: number;
+	}
+	| {
+		type: "step.retrying";
+		runId: string;
+		stepName: string;
+		attempt: number;
+		nextAttempt: number;
+		retryAfter: number;
+		timestamp: number;
+	}
+	| {
+		type: "workflow.suspended";
+		runId: string;
+		hookToken: string;
+		timestamp: number;
+	};

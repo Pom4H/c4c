@@ -1,8 +1,8 @@
 {
   "name": "modules-example",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Example demonstrating modular procedures and client generation",
+  "description": "Example demonstrating modular procedures with Workflow DevKit",
   "type": "module",
   "scripts": {
     "dev": "tsx ../../apps/cli/src/bin.ts serve --root .",
@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@c4c/core": "workspace:*",
+    "@c4c/workflow": "workspace:*",
     "@c4c/adapters": "workspace:*",
     "@c4c/policies": "workspace:*",
     "@c4c/generators": "workspace:*",

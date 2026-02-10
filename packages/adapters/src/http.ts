@@ -129,7 +129,7 @@ export function buildHttpApp(registry: Registry, options: HttpAppOptions = {}) {
 	}
 
 	if (enableWorkflow) {
-		app.route("/", createWorkflowRouter(registry, { workflowsPath }));
+		app.route("/", createWorkflowRouter());
 	}
 
 	if (enableWebhooks) {

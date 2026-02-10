@@ -1,57 +1,56 @@
 /**
  * Workflow: Notify on Task Created
- * 
- * After integration with App B (notification-service),
- * this workflow automatically sends a notification when a task is created
+ *
+ * When a task is created, fetch its details and send a notification
+ * via the cross-app notification service.
+ *
+ * Before (old DSL): workflow().step().step().commit()
+ * After: Plain async function with steps
  */
 
-import { workflow, step } from '@c4c/workflow';
-import { z } from 'zod';
+import { step } from "@c4c/workflow";
 
-// Step 1: Get task details
-const getTaskDetails = step({
-  id: 'get-task',
-  input: z.object({ taskId: z.string() }),
-  output: z.object({
-    id: z.string(),
-    title: z.string(),
-    priority: z.string().optional(),
-  }),
-  execute: ({ engine, inputData }) => 
-    engine.run('tasks.get', { id: inputData.taskId }),
+// Step: Get task details from local task service
+const getTaskDetails = step("tasks.get", async (taskId: string) => {
+	console.log(`[tasks.get] Fetching task: ${taskId}`);
+	// Mock: would call actual task service
+	return {
+		id: taskId,
+		title: "Example Task",
+		priority: "high",
+	};
 });
 
-// Step 2: Send notification via App B (after integration!)
-const sendNotification = step({
-  id: 'send-notification',
-  input: z.object({
-    title: z.string(),
-    priority: z.string().optional(),
-  }),
-  output: z.object({
-    id: z.string(),
-    message: z.string(),
-  }),
-  execute: ({ engine, inputData }) => 
-    engine.run('notification-service.notifications.send', {
-      message: `🆕 New task created: ${inputData.title}`,
-      channel: 'push',
-      priority: inputData.priority === 'high' ? 'urgent' : 'normal',
-    }),
-});
-
-// Assemble workflow
-export const notifyOnTaskCreated = workflow('notify-on-task-created')
-  .step(getTaskDetails)
-  .step(sendNotification)
-  .commit();
+// Step: Send notification via App B
+const sendNotification = step(
+	"notification-service.notifications.send",
+	async (input: { message: string; channel: string; priority: string }) => {
+		console.log(`[notification-service] Sending: ${input.message}`);
+		return {
+			id: `notif_${Date.now()}`,
+			message: input.message,
+		};
+	},
+);
 
 /**
- * How it works:
- * 
- * 1. The tasks.trigger.created trigger fires when a task is created
- * 2. Workflow receives taskId from trigger data
- * 3. Step 1 calls tasks.get (local procedure of App A)
- * 4. Step 2 calls notification-service.notifications.send (from App B!)
- * 5. App B receives the request and sends notification
+ * Notify on task created workflow
  */
+export async function notifyOnTaskCreated(taskId: string) {
+	"use workflow";
+
+	console.log("Notify on task created workflow started");
+
+	// Step 1: Get task details
+	const task = await getTaskDetails(taskId);
+
+	// Step 2: Send notification via App B (cross-app call)
+	const notification = await sendNotification({
+		message: `New task created: ${task.title}`,
+		channel: "push",
+		priority: task.priority === "high" ? "urgent" : "normal",
+	});
+
+	console.log("Notification sent:", notification.id);
+	return { task, notification };
+}

@@ -1,8 +1,8 @@
 {
   "name": "basic-example",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Basic usage example of c4c framework",
+  "description": "Basic usage example demonstrating Workflow DevKit patterns",
   "type": "module",
   "scripts": {
     "dev": "tsx src/apps/http.ts",
@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@c4c/core": "workspace:*",
+    "@c4c/workflow": "workspace:*",
     "@c4c/adapters": "workspace:*",
     "@c4c/policies": "workspace:*",
     "zod": "catalog:"

@@ -1,58 +1,72 @@
 /**
  * Workflow: Check Overdue Tasks
- * 
- * After integration with App A (task-manager),
- * this workflow periodically checks for overdue tasks and sends notifications
+ *
+ * Checks for overdue tasks in App A (task-manager) and sends notifications.
+ * Demonstrates cross-app data fetching.
+ *
+ * Before (old DSL): workflow().step().step().commit()
+ * After: Plain async function with steps
  */
 
-import { workflow, step } from '@c4c/workflow';
-import { z } from 'zod';
+import { step } from "@c4c/workflow";
 
-// Step 1: Get tasks from App A
-const getTasks = step({
-  id: 'get-tasks',
-  input: z.object({}),
-  output: z.object({
-    tasks: z.array(z.object({
-      id: z.string(),
-      title: z.string(),
-      dueDate: z.string().optional(),
-      assignee: z.string().optional(),
-    })),
-    total: z.number(),
-  }),
-  execute: ({ engine }) => 
-    engine.run('task-manager.tasks.list', { status: 'in_progress' }),
+// Step: Get tasks from App A (cross-app call)
+const getTasksFromTaskManager = step("task-manager.tasks.list", async (status: string) => {
+	console.log(`[task-manager] Listing tasks with status: ${status}`);
+	// Mock: would call App A's task-manager service via HTTP
+	return {
+		tasks: [
+			{ id: "task_1", title: "Overdue task 1", dueDate: "2025-01-01", assignee: "alice" },
+			{ id: "task_2", title: "Overdue task 2", dueDate: "2025-01-15", assignee: "bob" },
+		],
+		total: 2,
+	};
 });
 
-// Step 2: Send notification
-const sendOverdueNotification = step({
-  id: 'send-notification',
-  input: z.object({
-    count: z.number(),
-  }),
-  output: z.object({
-    id: z.string(),
-    message: z.string(),
-  }),
-  execute: ({ engine, inputData }) => 
-    engine.run('notifications.send', {
-      message: `⚠️ You have ${inputData.count} overdue task(s)!`,
-      channel: 'email',
-      priority: 'high',
-    }),
+// Step: Send notification locally
+const sendOverdueNotification = step("notifications.send", async (input: {
+	message: string;
+	channel: string;
+	priority: string;
+}) => {
+	console.log(`[notifications.send] Sending: ${input.message}`);
+	return {
+		id: `notif_${Date.now()}`,
+		message: input.message,
+	};
 });
-
-export const checkOverdueTasks = workflow('check-overdue-tasks')
-  .step(getTasks)
-  .step(sendOverdueNotification)
-  .commit();
 
 /**
- * How it works:
- * 
- * 1. Cron trigger runs every day at 9:00 AM
- * 2. Step 1 calls task-manager.tasks.list (from App A!)
- * 3. Step 2 calls notifications.send (local procedure of App B)
- * 4. User receives email with count of overdue tasks
+ * Check overdue tasks and notify
  */
+export async function checkOverdueTasks() {
+	"use workflow";
+
+	console.log("Check overdue tasks workflow started");
+
+	// Step 1: Get in-progress tasks from App A
+	const { tasks, total } = await getTasksFromTaskManager("in_progress");
+	console.log(`Found ${total} in-progress tasks`);
+
+	// Filter overdue tasks
+	const now = new Date();
+	const overdueTasks = tasks.filter((task) => {
+		if (!task.dueDate) return false;
+		return new Date(task.dueDate) < now;
+	});
+
+	if (overdueTasks.length === 0) {
+		console.log("No overdue tasks found");
+		return { overdueTasks: [], notificationSent: false };
+	}
+
+	// Step 2: Send notification about overdue tasks
+	const notification = await sendOverdueNotification({
+		message: `You have ${overdueTasks.length} overdue task(s)!`,
+		channel: "email",
+		priority: "high",
+	});
+
+	console.log("Overdue notification sent:", notification.id);
+	return { overdueTasks, notificationSent: true };
+}

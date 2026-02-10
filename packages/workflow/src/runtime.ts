@@ -1,732 +1,311 @@
 /**
- * Workflow Runtime Executor
- * 
- * Executes workflows composed of procedure nodes
- * Fully integrated with OpenTelemetry tracing
+ * Workflow Runtime
+ *
+ * Executes workflow functions with "use workflow" / "use step" semantics.
+ * Provides automatic retry for steps, error handling, and event emission.
+ *
+ * This is the core execution engine inspired by useworkflow.dev (Vercel Workflow DevKit).
+ *
+ * Key concepts:
+ * - Workflow functions ("use workflow"): Orchestrators that compose steps
+ * - Step functions ("use step"): Individual units of work with retry semantics
+ * - Standard JS patterns (Promise.all, Promise.race, try/catch) work naturally
+ * - FatalError stops retries immediately
+ * - RetryableError triggers a retry with configurable delay
+ * - Regular errors are automatically retried up to maxAttempts
  */
 
-import { trace, type Span, SpanStatusCode } from "@opentelemetry/api";
-import { inspect } from "node:util";
-import { executeProcedure, createExecutionContext, type Registry } from "@c4c/core";
-import type {
-	WorkflowDefinition,
-	WorkflowContext,
-	WorkflowExecutionResult,
-	WorkflowNode,
-	ConditionConfig,
-	ParallelConfig,
-	ConditionPredicateContext,
-  WorkflowResumeState,
-} from "./types.js";
-import { publish, type SerializedWorkflowExecutionResult } from "./events.js";
-import { SpanCollector, bindCollector, forceFlush, clearActiveCollector } from "./otel.js";
-import { getExecutionStore } from "./execution-store.js";
+import type { WorkflowRun, StartOptions, WorkflowEvent } from "./types.js";
+import { FatalError, RetryableError } from "./errors.js";
+import { runInWorkflowContext, updateWorkflowContext, getWorkflowContext } from "./context.js";
+import { publishEvent } from "./events.js";
 
-const tracer = trace.getTracer("c4c.workflow");
-
-// PauseSignal removed - use TriggerWorkflowManager for event-driven workflows
+function generateRunId(): string {
+	return `wfr_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+}
 
 /**
- * Execute a workflow with full OpenTelemetry tracing
- * Creates a parent span for the entire workflow with child spans for each node
+ * Start a workflow function.
+ *
+ * Takes any async function marked with "use workflow" and executes it
+ * with the workflow runtime providing durability, retry, and observability.
+ *
+ * @param workflowFn - The workflow function to execute
+ * @param args - Arguments to pass to the workflow function
+ * @param options - Execution options
+ * @returns A WorkflowRun with runId, result promise, and readable stream
+ *
+ * @example
+ * ```ts
+ * import { start } from "@c4c/workflow";
+ *
+ * async function myWorkflow(name: string) {
+ *   "use workflow";
+ *   const greeting = await greet(name);
+ *   return greeting;
+ * }
+ *
+ * const run = await start(myWorkflow, ["World"]);
+ * const result = await run.result;
+ * ```
  */
-export async function executeWorkflow(
-	workflow: WorkflowDefinition,
-	registry: Registry,
-	initialInput: Record<string, unknown> = {},
-	options?: { executionId?: string; collector?: SpanCollector }
-): Promise<WorkflowExecutionResult> {
-	const executionId = options?.executionId ?? `wf_exec_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-	const startTime = Date.now();
-	const collector = options?.collector ?? new SpanCollector();
-	let collectorBound = false;
+export function start<TArgs extends unknown[], TResult>(
+	workflowFn: (...args: TArgs) => Promise<TResult>,
+	args?: TArgs,
+	options?: StartOptions,
+): WorkflowRun<TResult> {
+	const runId = options?.runId ?? generateRunId();
+	const startedAt = new Date();
 
-	try {
-		await bindCollector(collector);
-		collectorBound = true;
-	} catch (error) {
-		console.warn("[Workflow] Failed to initialize OpenTelemetry collector:", error);
-	}
+	// Create a TransformStream for streaming output
+	const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
 
-	// Start tracking execution in store
-	const executionStore = getExecutionStore();
-	executionStore.startExecution(
-		executionId,
-		workflow.id,
-		workflow.name || workflow.id
+	// Create a promise that resolves when the workflow completes
+	const resultPromise = executeWorkflow<TArgs, TResult>(
+		workflowFn,
+		args ?? ([] as unknown as TArgs),
+		{
+			runId,
+			startedAt,
+			writable,
+			maxStepRetries: options?.maxStepRetries ?? 3,
+			retryDelay: options?.retryDelay ?? 1000,
+		},
 	);
 
-	const result = await tracer.startActiveSpan(
-		`workflow.execute`,
-		{
-			attributes: {
-				"workflow.id": workflow.id,
-				"workflow.name": workflow.name,
-				"workflow.version": workflow.version,
-				"workflow.execution_id": executionId,
-				"workflow.start_node": workflow.startNode,
-				"workflow.node_count": workflow.nodes.length,
+	const run: WorkflowRun<TResult> = {
+		runId,
+		result: resultPromise,
+		readable,
+		status: "running",
+	};
+
+	// Update status when the workflow completes
+	resultPromise
+		.then(() => {
+			run.status = "completed";
+		})
+		.catch(() => {
+			run.status = "failed";
+		});
+
+	return run;
+}
+
+interface ExecutionConfig {
+	runId: string;
+	startedAt: Date;
+	writable: WritableStream<Uint8Array>;
+	maxStepRetries: number;
+	retryDelay: number;
+}
+
+async function executeWorkflow<TArgs extends unknown[], TResult>(
+	workflowFn: (...args: TArgs) => Promise<TResult>,
+	args: TArgs,
+	config: ExecutionConfig,
+): Promise<TResult> {
+	const startTime = Date.now();
+
+	publishEvent({
+		type: "workflow.started",
+		runId: config.runId,
+		timestamp: startTime,
+	});
+
+	try {
+		const result = await runInWorkflowContext(
+			{
+				runId: config.runId,
+				startedAt: config.startedAt,
+				writable: config.writable,
 			},
-		},
-		async (workflowSpan: Span) => {
-			const workflowContext: WorkflowContext = {
-				workflowId: workflow.id,
-				executionId,
-				variables: { ...workflow.variables, ...initialInput },
-				nodeOutputs: new Map(),
-				startTime: new Date(),
-			};
+			() => workflowFn(...args),
+		);
 
-			const nodesExecuted: string[] = [];
+		const executionTime = Date.now() - startTime;
 
-			publish({
-				type: "workflow.started",
-				workflowId: workflow.id,
-				executionId,
-				startTime,
+		publishEvent({
+			type: "workflow.completed",
+			runId: config.runId,
+			result,
+			executionTime,
+			timestamp: Date.now(),
+		});
+
+		// Close the writable stream
+		try {
+			const writer = config.writable.getWriter();
+			await writer.close();
+		} catch {
+			// Stream may already be closed
+		}
+
+		return result;
+	} catch (error) {
+		const executionTime = Date.now() - startTime;
+
+		publishEvent({
+			type: "workflow.failed",
+			runId: config.runId,
+			error: error instanceof Error ? error.message : String(error),
+			executionTime,
+			timestamp: Date.now(),
+		});
+
+		// Close the writable stream on failure
+		try {
+			const writer = config.writable.getWriter();
+			await writer.abort(error instanceof Error ? error : new Error(String(error)));
+		} catch {
+			// Stream may already be closed
+		}
+
+		throw error;
+	}
+}
+
+/**
+ * Create a step executor that wraps a function with retry semantics.
+ *
+ * This is called internally by the runtime when it encounters a step function.
+ * In the useworkflow.dev paradigm, step functions are marked with "use step"
+ * and automatically get retry behavior.
+ *
+ * Since we can't use compiler transforms to detect "use step" at runtime
+ * (that requires SWC/build-time transformation), we provide `step()` as
+ * an explicit wrapper that gives the same semantics.
+ *
+ * @param name - Step name for logging and tracing
+ * @param fn - The step function to execute
+ * @param options - Step options (maxAttempts, retryDelay)
+ * @returns A function with the same signature but with retry semantics
+ */
+export function step<TArgs extends unknown[], TResult>(
+	name: string,
+	fn: (...args: TArgs) => Promise<TResult>,
+	options?: { maxAttempts?: number; retryDelay?: number },
+): (...args: TArgs) => Promise<TResult> {
+	const maxAttempts = options?.maxAttempts ?? 3;
+	const baseRetryDelay = options?.retryDelay ?? 1000;
+
+	return async (...args: TArgs): Promise<TResult> => {
+		let attempt = 0;
+
+		while (true) {
+			attempt++;
+
+			// Update context with step metadata
+			updateWorkflowContext({
+				stepAttempt: attempt,
+				stepName: name,
+				maxAttempts,
+			});
+
+		const ctx = (() => {
+			try {
+				return getWorkflowContext();
+			} catch {
+				return undefined;
+			}
+		})();
+		const runId = ctx?.runId ?? "unknown";
+
+			publishEvent({
+				type: "step.started",
+				runId,
+				stepName: name,
+				attempt,
+				timestamp: Date.now(),
 			});
 
 			try {
-				let currentNodeId: string | undefined = workflow.startNode;
-				let nodeIndex = 0;
+				const result = await fn(...args);
 
-				while (currentNodeId) {
-					const node = workflow.nodes.find((n) => n.id === currentNodeId);
-					if (!node) {
-						throw new Error(`Node ${currentNodeId} not found in workflow`);
+				publishEvent({
+					type: "step.completed",
+					runId,
+					stepName: name,
+					attempt,
+					result,
+					timestamp: Date.now(),
+				});
+
+				return result;
+			} catch (error) {
+				// FatalError - never retry
+				if (error instanceof FatalError) {
+					publishEvent({
+						type: "step.failed",
+						runId,
+						stepName: name,
+						attempt,
+						error: error.message,
+						isFatal: true,
+						timestamp: Date.now(),
+					});
+					throw error;
+				}
+
+				// RetryableError - retry with specified delay
+				if (error instanceof RetryableError) {
+					if (attempt >= maxAttempts) {
+						publishEvent({
+							type: "step.failed",
+							runId,
+							stepName: name,
+							attempt,
+							error: error.message,
+							isFatal: false,
+							timestamp: Date.now(),
+						});
+						throw error;
 					}
 
-					workflowContext.currentNode = currentNodeId;
-					nodesExecuted.push(currentNodeId);
+					const retryDelay = error.retryAfterMs;
 
-					workflowSpan.setAttributes({
-						"workflow.current_node": currentNodeId,
-						"workflow.current_node_index": nodeIndex,
-						"workflow.nodes_executed": nodesExecuted.length,
+					publishEvent({
+						type: "step.retrying",
+						runId,
+						stepName: name,
+						attempt,
+						nextAttempt: attempt + 1,
+						retryAfter: retryDelay,
+						timestamp: Date.now(),
 					});
 
-				publish({
-					type: "node.started",
-					workflowId: workflow.id,
-					executionId,
-					nodeId: currentNodeId,
-					nodeIndex,
-					timestamp: Date.now(),
-				});
-
-				// Update node status in store
-				executionStore.updateNodeStatus(executionId, currentNodeId, "running", {
-					startTime: new Date(),
-				});
-
-				const nextNodeId = await executeNode(node, workflowContext, registry, workflow);
-
-				// Get output for this node
-				const nodeOutput = workflowContext.nodeOutputs.get(node.id);
-
-				// Update node status in store
-				executionStore.updateNodeStatus(executionId, node.id, "completed", {
-					endTime: new Date(),
-					output: nodeOutput,
-				});
-
-				publish({
-					type: "node.completed",
-					workflowId: workflow.id,
-					executionId,
-					nodeId: node.id,
-					nodeIndex,
-					nextNodeId,
-					timestamp: Date.now(),
-					output: nodeOutput,
-				});
-
-					currentNodeId = nextNodeId;
-					nodeIndex++;
+					await new Promise((resolve) => setTimeout(resolve, retryDelay));
+					continue;
 				}
 
-				const outputs: Record<string, unknown> = {};
-				for (const [nodeId, output] of workflowContext.nodeOutputs.entries()) {
-					outputs[nodeId] = output;
-				}
-
-				const executionTime = Date.now() - startTime;
-
-				workflowSpan.setAttributes({
-					"workflow.status": "completed",
-					"workflow.nodes_executed_total": nodesExecuted.length,
-					"workflow.execution_time_ms": executionTime,
-				});
-				workflowSpan.setStatus({ code: SpanStatusCode.OK });
-
-				console.log(
-					`[Workflow] ✅ Completed: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`
-				);
-
-				const workflowResult: WorkflowExecutionResult = {
-					executionId,
-					status: "completed",
-					outputs,
-					executionTime,
-					nodesExecuted,
-				};
-
-				// Save execution result to store
-				executionStore.completeExecution(executionId, workflowResult);
-
-				publish({
-					type: "workflow.completed",
-					workflowId: workflow.id,
-					executionId,
-					executionTime,
-					nodesExecuted,
-				});
-
-				return workflowResult;
-			} catch (error) {
-				const executionTime = Date.now() - startTime;
-				const normalizedError = normalizeError(error);
-
-				workflowSpan.setAttributes({
-					"workflow.status": "failed",
-					"workflow.nodes_executed_total": nodesExecuted.length,
-					"workflow.execution_time_ms": executionTime,
-					"workflow.error": normalizedError.message,
-				});
-				workflowSpan.recordException(normalizedError);
-				workflowSpan.setStatus({
-					code: SpanStatusCode.ERROR,
-					message: normalizedError.message,
-				});
-
-				console.error(
-					`[Workflow] ❌ Failed: ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`,
-					normalizedError
-				);
-
-				const failureResult: WorkflowExecutionResult = {
-					executionId,
-					status: "failed",
-					outputs: {},
-					error: normalizedError,
-					executionTime,
-					nodesExecuted,
-				};
-
-				// Save failed execution to store
-				executionStore.completeExecution(executionId, failureResult);
-
-				publish({
-					type: "workflow.failed",
-					workflowId: workflow.id,
-					executionId,
-					executionTime,
-					nodesExecuted,
-					error: normalizedError.message,
-				});
-
-				return failureResult;
-			} finally {
-				workflowSpan.end();
-			}
-		}
-	);
-
-	if (collectorBound) {
-		try {
-			await forceFlush();
-		} catch (flushError) {
-			console.warn("[Workflow] Failed to flush collected spans:", flushError);
-		}
-		result.spans = collector.getSpans();
-		clearActiveCollector();
-	}
-
-	result.spans ??= [];
-
-	// Update execution in store with spans
-	const execution = executionStore.getExecution(result.executionId);
-	if (execution) {
-		execution.spans = result.spans;
-	}
-
-	publish({
-		type: "workflow.result",
-		workflowId: workflow.id,
-		executionId: result.executionId,
-		result: toSerializedResult(result),
-	});
-
-	return result;
-}
-
-// resumeWorkflow removed - use TriggerWorkflowManager for event-driven workflows
-
-function normalizeError(error: unknown): Error {
-	if (error instanceof Error) {
-		return error;
-	}
-
-	if (typeof Response !== "undefined" && error instanceof Response) {
-		const statusText = error.statusText || "Response error";
-		return new Error(`HTTP ${error.status}: ${statusText}`);
-	}
-
-	if (error && typeof error === "object") {
-		const maybeMessage = (error as { message?: unknown }).message;
-		const maybeName = (error as { name?: unknown }).name;
-
-		let message: string | undefined;
-		if (typeof maybeMessage === "string") {
-			message = maybeMessage;
-		} else if (maybeMessage !== undefined) {
-			message = stringifyUnknown(maybeMessage);
-		}
-
-		if (!message) {
-			message = stringifyUnknown(error);
-		}
-
-		const normalized = new Error(message);
-		if (typeof maybeName === "string" && maybeName.length > 0) {
-			normalized.name = maybeName;
-		}
-		return normalized;
-	}
-
-	return new Error(stringifyUnknown(error));
-}
-
-function stringifyUnknown(value: unknown): string {
-	if (typeof value === "string") return value;
-	if (typeof value === "number" || typeof value === "boolean") return String(value);
-	if (typeof value === "bigint") return value.toString();
-	if (value === null || value === undefined) return String(value);
-
-	try {
-		return JSON.stringify(
-			value,
-			(_, v) => (typeof v === "bigint" ? v.toString() : v),
-			2
-		);
-	} catch {
-		return inspect(value, { depth: 5 });
-	}
-}
-
-function toSerializedResult(result: WorkflowExecutionResult): SerializedWorkflowExecutionResult {
-  const { error, ...rest } = result;
-  return {
-    ...rest,
-    error: error
-      ? {
-          message: error.message,
-          name: error.name,
-          stack: error.stack,
-        }
-      : undefined,
-  };
-}
-
-/**
- * Execute a single workflow node with its own span
- */
-async function executeNode(
-	node: WorkflowNode,
-	context: WorkflowContext,
-	registry: Registry,
-	workflow: WorkflowDefinition
-): Promise<string | undefined> {
-	// Create span for node execution
-	return tracer.startActiveSpan(
-		`workflow.node.${node.type}`,
-		{
-			attributes: {
-				"workflow.id": workflow.id,
-				"workflow.execution_id": context.executionId,
-				"node.id": node.id,
-				"node.type": node.type,
-				...(node.procedureName && { "node.procedure": node.procedureName }),
-			},
-		},
-		async (nodeSpan: Span) => {
-			try {
-				console.log(
-					`[Workflow] 🔷 Executing node: ${node.id} (type: ${node.type}${node.procedureName ? `, procedure: ${node.procedureName}` : ""})`
-				);
-
-				// Publish started for any node (including parallel branches)
-				publish({
-					type: "node.started",
-					workflowId: workflow.id,
-					executionId: context.executionId,
-					nodeId: node.id,
-					timestamp: Date.now(),
-				});
-
-				let nextNodeId: string | undefined;
-
-				switch (node.type) {
-					case "procedure":
-						nextNodeId = await executeProcedureNode(node, context, registry);
-						break;
-					case "condition":
-						nextNodeId = await executeConditionNode(node, context);
-						break;
-					case "parallel":
-						nextNodeId = await executeParallelNode(node, context, registry, workflow);
-						break;
-					case "sequential":
-						nextNodeId = await executeSequentialNode(node, context);
-						break;
-					case "trigger":
-						nextNodeId = await executeTriggerNode(node, context);
-						break;
-					default:
-						throw new Error(`Unknown node type: ${node.type}`);
-				}
-
-				// Set success attributes
-				nodeSpan.setAttributes({
-					"node.status": "completed",
-					...(nextNodeId && { "node.next": nextNodeId }),
-				});
-				nodeSpan.setStatus({ code: SpanStatusCode.OK });
-
-				console.log(`[Workflow] ✅ Node completed: ${node.id}${nextNodeId ? ` → ${nextNodeId}` : " (end)"}`);
-
-				// Publish completed for any node
-				publish({
-					type: "node.completed",
-					workflowId: workflow.id,
-					executionId: context.executionId,
-					nodeId: node.id,
-					nextNodeId,
-					timestamp: Date.now(),
-					output: context.nodeOutputs.get(node.id),
-				});
-
-				return nextNodeId;
-			} catch (error) {
-				const normalizedError = normalizeError(error);
-
-				// Set error attributes
-				nodeSpan.setAttributes({
-					"node.status": "failed",
-					"node.error": normalizedError.message,
-				});
-				nodeSpan.recordException(normalizedError);
-				nodeSpan.setStatus({
-					code: SpanStatusCode.ERROR,
-					message: normalizedError.message,
-				});
-
-				console.error(`[Workflow] ❌ Node failed: ${node.id}`, normalizedError);
-
-				// Handle error node if configured
-				if (node.onError) {
-					console.log(`[Workflow] 🔄 Redirecting to error handler: ${node.onError}`);
-					return node.onError;
-				}
-
-				throw normalizedError;
-			} finally {
-				nodeSpan.end();
-			}
-		}
-	);
-}
-
-/**
- * Execute a procedure node
- * The procedure itself will create its own spans via policies (withSpan)
- * This creates a hierarchy: workflow span → node span → procedure span → policy spans
- */
-async function executeProcedureNode(
-	node: WorkflowNode,
-	context: WorkflowContext,
-	registry: Registry
-): Promise<string | undefined> {
-	if (!node.procedureName) {
-		throw new Error(`Procedure node ${node.id} missing procedureName`);
-	}
-
-	const procedure = registry.get(node.procedureName);
-	if (!procedure) {
-		throw new Error(`Procedure ${node.procedureName} not found in registry`);
-	}
-
-	// Build input from context variables and node config
-	const input = buildNodeInput(node, context);
-
-	// Execute procedure with workflow context metadata
-	// This ensures the procedure's spans are children of the workflow node span
-	const execContext = createExecutionContext({
-		transport: "workflow",
-		workflowId: context.workflowId,
-		workflowName: context.workflowId, // Could be enhanced with actual workflow name
-		executionId: context.executionId,
-		nodeId: node.id,
-		nodeProcedure: node.procedureName,
-		registry, // expose registry to procedures (e.g., subworkflow runner)
-	});
-
-	// Add workflow-level attributes to the execution context
-	// These will be picked up by the procedure's withSpan policy
-	const activeSpan = trace.getActiveSpan();
-	if (activeSpan) {
-		activeSpan.setAttributes({
-			"procedure.input": JSON.stringify(input),
-		});
-	}
-
-	// Execute procedure - it will create its own span hierarchy
-	const output = await executeProcedure(procedure, input, execContext);
-
-	// Record output in the current span
-	if (activeSpan) {
-		activeSpan.setAttributes({
-			"procedure.output": JSON.stringify(output),
-			"procedure.output_keys": Object.keys(output as object).join(","),
-		});
-	}
-
-	// Store output in context
-	context.nodeOutputs.set(node.id, output);
-
-	// Update context variables with output (for next nodes)
-	Object.assign(context.variables, output);
-
-	console.log(`[Workflow] 📤 Node ${node.id} output:`, Object.keys(output as object));
-
-	// Return next node ID
-	return typeof node.next === "string" ? node.next : node.next?.[0];
-}
-
-/**
- * Execute a condition node
- */
-async function executeConditionNode(
-	node: WorkflowNode,
-	context: WorkflowContext
-): Promise<string | undefined> {
-	const config = node.config as unknown as ConditionConfig;
-	if (!config?.expression && typeof config?.predicateFn !== "function") {
-		throw new Error(`Condition node ${node.id} is missing expression or predicate`);
-	}
-
-	const activeSpan = trace.getActiveSpan();
-	let result = false;
-	let expressionLabel = config.expression ?? "predicate";
-
-	if (typeof config.predicateFn === "function") {
-		try {
-			const predicateContext = createPredicateContext(context);
-			result = Boolean(config.predicateFn(predicateContext));
-			expressionLabel = config.expression ?? config.predicateFn.name ?? "predicate";
-		} catch (error) {
-			console.error(`[Workflow] Condition predicate failed for node ${node.id}`, error);
-			throw error;
-		}
-	} else {
-		result = evaluateExpression(config.expression, context.variables);
-		expressionLabel = config.expression ?? "expression";
-	}
-
-	const nextBranch = result ? config.trueBranch : config.falseBranch;
-
-	if (activeSpan) {
-		activeSpan.setAttributes({
-			"condition.expression": expressionLabel,
-			"condition.variables": JSON.stringify(context.variables),
-			"condition.result": result,
-			"condition.branch_taken": nextBranch,
-		});
-	}
-
-	console.log(
-		`[Workflow] 🔀 Condition "${expressionLabel}" = ${result} → ${nextBranch}`
-	);
-
-	// Return appropriate branch
-	return nextBranch;
-}
-
-/**
- * Execute parallel nodes
- * Each branch gets its own span
- */
-async function executeParallelNode(
-	node: WorkflowNode,
-	context: WorkflowContext,
-	registry: Registry,
-	workflow: WorkflowDefinition
-): Promise<string | undefined> {
-	const config = node.config as unknown as ParallelConfig;
-	if (!config?.branches || config.branches.length === 0) {
-		throw new Error(`Parallel node ${node.id} missing branches`);
-	}
-
-	console.log(
-		`[Workflow] 🔀 Executing ${config.branches.length} parallel branches (waitForAll: ${config.waitForAll})`
-	);
-
-	// Execute all branches in parallel
-	const branchPromises = config.branches.map(async (branchNodeId, index) => {
-		return tracer.startActiveSpan(
-			`workflow.parallel.branch`,
-			{
-				attributes: {
-					"workflow.id": workflow.id,
-					"workflow.execution_id": context.executionId,
-					"parallel.node_id": node.id,
-					"parallel.branch_id": branchNodeId,
-					"parallel.branch_index": index,
-				},
-			},
-			async (branchSpan: Span) => {
-				try {
-					const branchNode = workflow.nodes.find((n) => n.id === branchNodeId);
-					if (!branchNode) {
-						throw new Error(`Branch node ${branchNodeId} not found`);
-					}
-
-					// Execute branch node
-					await executeNode(branchNode, context, registry, workflow);
-
-					branchSpan.setStatus({ code: SpanStatusCode.OK });
-					return { branchNodeId, success: true };
-				} catch (error) {
-					branchSpan.recordException(error instanceof Error ? error : new Error(String(error)));
-					branchSpan.setStatus({ code: SpanStatusCode.ERROR });
+				// Regular error - retry with exponential backoff
+				if (attempt >= maxAttempts) {
+					publishEvent({
+						type: "step.failed",
+						runId,
+						stepName: name,
+						attempt,
+						error: error instanceof Error ? error.message : String(error),
+						isFatal: false,
+						timestamp: Date.now(),
+					});
 					throw error;
-				} finally {
-					branchSpan.end();
 				}
+
+				const retryDelay = baseRetryDelay * 2 ** (attempt - 1);
+
+				publishEvent({
+					type: "step.retrying",
+					runId,
+					stepName: name,
+					attempt,
+					nextAttempt: attempt + 1,
+					retryAfter: retryDelay,
+					timestamp: Date.now(),
+				});
+
+				await new Promise((resolve) => setTimeout(resolve, retryDelay));
 			}
-		);
-	});
-
-	if (config.waitForAll) {
-		await Promise.all(branchPromises);
-		console.log(`[Workflow] ✅ All ${config.branches.length} branches completed`);
-	} else {
-		await Promise.race(branchPromises);
-		console.log(`[Workflow] ✅ First branch completed`);
-	}
-
-	// Return next node after parallel execution
-	return typeof node.next === "string" ? node.next : node.next?.[0];
-}
-
-/**
- * Execute sequential nodes
- */
-async function executeSequentialNode(
-	node: WorkflowNode,
-	context: WorkflowContext
-): Promise<string | undefined> {
-	// Sequential is just returning next node
-	return typeof node.next === "string" ? node.next : node.next?.[0];
-}
-
-/**
- * Execute trigger node
- * Trigger nodes are entry points - they just pass through to the next node
- * The actual trigger event data should be in context.variables
- */
-async function executeTriggerNode(
-	node: WorkflowNode,
-	context: WorkflowContext
-): Promise<string | undefined> {
-	// Trigger node is just a marker - the event data is already in context.variables
-	// Just log that we started from a trigger
-	console.log(`[Workflow] 🎯 Triggered by: ${node.procedureName || "unknown trigger"}`);
-	
-	// Store trigger information in outputs for reference
-	context.nodeOutputs.set(node.id, {
-		triggerId: node.procedureName,
-		timestamp: new Date(),
-		event: context.variables.webhook || context.variables.trigger || {},
-	});
-	
-	// Move to next node
-	return typeof node.next === "string" ? node.next : node.next?.[0];
-}
-
-/**
- * Build input for a node from context and config
- */
-function buildNodeInput(node: WorkflowNode, context: WorkflowContext): Record<string, unknown> {
-	const input: Record<string, unknown> = {};
-
-	// Start with node config
-	if (node.config) {
-		Object.assign(input, node.config);
-	}
-
-	// Add context variables (can override config)
-	Object.assign(input, context.variables);
-
-	return input;
-}
-
-/**
- * Evaluate a JavaScript expression in context
- */
-
-function createPredicateContext(context: WorkflowContext): ConditionPredicateContext {
-	return {
-		variables: context.variables,
-		outputs: context.nodeOutputs,
-		get: <T = unknown>(key: string) => context.variables[key] as T | undefined,
-		inputData: context.variables,
+		}
 	};
-}
-
-function evaluateExpression(
-	expression: string | undefined,
-	variables: Record<string, unknown>
-): boolean {
-	if (!expression) return false;
-	try {
-		// Create a function with variables as parameters
-		const func = new Function(...Object.keys(variables), `return ${expression}`);
-		return func(...Object.values(variables));
-	} catch (error) {
-		console.error(`Error evaluating expression: ${expression}`, error);
-		return false;
-	}
-}
-
-/**
- * Validate workflow definition
- */
-export function validateWorkflow(workflow: WorkflowDefinition, registry: Registry): string[] {
-	const errors: string[] = [];
-
-	// Check start node exists
-	if (!workflow.nodes.find((n) => n.id === workflow.startNode)) {
-		errors.push(`Start node ${workflow.startNode} not found`);
-	}
-
-	// Validate each node
-	for (const node of workflow.nodes) {
-		// Check procedure exists in registry
-		if (node.type === "procedure" && node.procedureName) {
-			if (!registry.has(node.procedureName)) {
-				errors.push(`Node ${node.id}: procedure ${node.procedureName} not found in registry`);
-			}
-		}
-
-		// Check next nodes exist
-		const nextNodes = Array.isArray(node.next) ? node.next : node.next ? [node.next] : [];
-		for (const nextId of nextNodes) {
-			if (!workflow.nodes.find((n) => n.id === nextId)) {
-				errors.push(`Node ${node.id}: next node ${nextId} not found`);
-			}
-		}
-	}
-
-	return errors;
 }

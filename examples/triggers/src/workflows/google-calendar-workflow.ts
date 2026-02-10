@@ -1,140 +1,141 @@
 /**
  * Google Calendar Workflow
- * 
- * Handles changes in Google Calendar and sends notifications
+ *
+ * Handles changes in Google Calendar and sends notifications.
+ * Demonstrates the "use workflow" / step() pattern for event-driven workflows.
+ *
+ * Before (old DSL): Complex WorkflowDefinition object with trigger config and step arrays
+ * After: Plain async function with steps and standard JS control flow
  */
 
-import type { WorkflowDefinition } from '@c4c/workflow';
+import { step, FatalError, createHook } from "@c4c/workflow";
 
-export const googleCalendarWorkflow: WorkflowDefinition = {
-  id: 'google-calendar-sync',
-  name: 'Google Calendar Event Sync',
-  description: 'Syncs calendar events and sends notifications',
-  
-  // ==========================================
-  // TRIGGER: Watch from Google Calendar
-  // ==========================================
-  trigger: {
-    type: 'webhook' as const,
-    config: {
-      // Use generated procedure for watch
-      procedure: 'google-calendar.calendar.events.watch',
-      provider: 'google-calendar',
-      
-      // Parameters for watch registration
-      initialSetup: {
-        calendarId: 'primary',
-        channel: {
-          id: '{{ generateUUID() }}',
-          type: 'web_hook',
-          address: 'https://your-domain.com/webhooks/google-calendar',
-          expiration: '{{ timestamp + 604800000 }}', // 7 days
-        },
-      },
-    },
-  },
-  
-  steps: [
-    // ==========================================
-    // STEP 1: Determine event type
-    // ==========================================
-    {
-      id: 'route-event',
-      name: 'Route Calendar Event',
-      procedure: 'google.calendar.route.event',
-      input: {
-        notification: '{{ trigger.data }}',
-      },
-    },
-    
-    // ==========================================
-    // STEP 2: Fetch event details (if needed)
-    // ==========================================
-    {
-      id: 'fetch-event-details',
-      name: 'Fetch Event Details',
-      procedure: 'google-calendar.calendar.events.get',
-      condition: "{{ steps['route-event'].output.shouldFetchDetails === true }}",
-      input: {
-        calendarId: 'primary',
-        eventId: "{{ steps['route-event'].output.eventId }}",
-      },
-    },
-    
-    // ==========================================
-    // STEP 3: Handle event creation
-    // ==========================================
-    {
-      id: 'handle-created',
-      name: 'Handle Event Created',
-      procedure: 'google.calendar.handle.event.created',
-      condition: "{{ steps['route-event'].output.eventType === 'created' }}",
-      input: {
-        event: "{{ steps['fetch-event-details'].output }}",
-        calendarId: 'primary',
-      },
-    },
-    
-    // ==========================================
-    // STEP 4: Handle event update
-    // ==========================================
-    {
-      id: 'handle-updated',
-      name: 'Handle Event Updated',
-      procedure: 'google.calendar.handle.event.updated',
-      condition: "{{ steps['route-event'].output.eventType === 'updated' }}",
-      input: {
-        event: "{{ steps['fetch-event-details'].output }}",
-        calendarId: 'primary',
-        // previousEvent can be retrieved from cache/DB
-      },
-    },
-    
-    // ==========================================
-    // STEP 5: Handle event deletion
-    // ==========================================
-    {
-      id: 'handle-deleted',
-      name: 'Handle Event Deleted',
-      procedure: 'google.calendar.handle.event.deleted',
-      condition: "{{ steps['route-event'].output.eventType === 'deleted' }}",
-      input: {
-        eventId: "{{ steps['route-event'].output.eventId }}",
-        calendarId: 'primary',
-      },
-    },
-    
-    // ==========================================
-    // STEP 6: Send Telegram notification (if needed)
-    // ==========================================
-    {
-      id: 'notify-telegram',
-      name: 'Send Telegram Notification',
-      procedure: 'telegram.post.send.message',
-      condition: "{{ (steps['handle-created']?.output?.shouldNotify || steps['handle-updated']?.output?.shouldNotify) === true }}",
-      input: {
-        chat_id: '{{ env.TELEGRAM_ADMIN_CHAT_ID }}',
-        text: "{{ steps['handle-created']?.output?.message || steps['handle-updated']?.output?.message }}",
-        parse_mode: 'Markdown',
-      },
-    },
-    
-    // ==========================================
-    // STEP 7: Logging
-    // ==========================================
-    {
-      id: 'log-event',
-      name: 'Log Calendar Event',
-      procedure: 'system.log',
-      input: {
-        level: 'info',
-        message: 'Calendar event processed',
-        data: {
-          eventType: "{{ steps['route-event'].output.eventType }}",
-          calendarId: 'primary',
-          processed: true,
-        },
-      },
-    },
-  ],
-};
+// Steps
+
+const routeCalendarEvent = step("google.calendar.route.event", async (notification: unknown) => {
+	const data = notification as Record<string, unknown>;
+	console.log("[route] Routing calendar event:", data);
+
+	// Determine event type from notification
+	const resourceState = data?.resourceState as string;
+	const eventType = resourceState === "exists" ? "created"
+		: resourceState === "sync" ? "updated"
+			: resourceState === "not_exists" ? "deleted"
+				: "unknown";
+
+	return {
+		eventType,
+		eventId: data?.resourceId as string,
+		shouldFetchDetails: eventType !== "deleted",
+	};
+});
+
+const fetchEventDetails = step("google.calendar.events.get", async (calendarId: string, eventId: string) => {
+	console.log(`[fetch] Getting event ${eventId} from calendar ${calendarId}`);
+	// Mock: would call Google Calendar API
+	return {
+		id: eventId,
+		summary: "Team Meeting",
+		start: { dateTime: new Date().toISOString() },
+		end: { dateTime: new Date(Date.now() + 3600000).toISOString() },
+		attendees: [{ email: "alice@example.com" }, { email: "bob@example.com" }],
+	};
+});
+
+const handleEventCreated = step("google.calendar.handle.created", async (event: Record<string, unknown>) => {
+	console.log("[handle-created] New event:", event.summary);
+	return {
+		shouldNotify: true,
+		message: `*New Calendar Event*\n${event.summary}`,
+	};
+});
+
+const handleEventUpdated = step("google.calendar.handle.updated", async (event: Record<string, unknown>) => {
+	console.log("[handle-updated] Updated event:", event.summary);
+	return {
+		shouldNotify: true,
+		message: `*Updated Calendar Event*\n${event.summary}`,
+	};
+});
+
+const handleEventDeleted = step("google.calendar.handle.deleted", async (eventId: string) => {
+	console.log("[handle-deleted] Deleted event:", eventId);
+	return { shouldNotify: false };
+});
+
+const sendTelegramNotification = step("telegram.sendMessage", async (chatId: string, text: string) => {
+	console.log(`[telegram] Sending to ${chatId}: ${text}`);
+	// Mock: would call Telegram Bot API
+	return { ok: true, messageId: `msg_${Date.now()}` };
+});
+
+const logEvent = step("system.log", async (level: string, message: string, data: unknown) => {
+	console.log(`[${level}] ${message}`, data);
+});
+
+/**
+ * Google Calendar Event Sync Workflow
+ *
+ * Standard async function - no DAG, no config objects.
+ * Control flow uses if/else, try/catch, and standard JS patterns.
+ */
+export async function googleCalendarSync(notification: unknown) {
+	"use workflow";
+
+	console.log("Google Calendar sync workflow started");
+
+	// Step 1: Route the event
+	const route = await routeCalendarEvent(notification);
+	console.log("Event type:", route.eventType);
+
+	// Step 2: Fetch details if needed (conditional - just use if!)
+	let eventDetails: Record<string, unknown> | null = null;
+	if (route.shouldFetchDetails && route.eventId) {
+		eventDetails = await fetchEventDetails("primary", route.eventId);
+	}
+
+	// Step 3: Handle based on event type (conditional - just use switch!)
+	let shouldNotify = false;
+	let notificationMessage = "";
+
+	switch (route.eventType) {
+		case "created": {
+			if (eventDetails) {
+				const result = await handleEventCreated(eventDetails);
+				shouldNotify = result.shouldNotify;
+				notificationMessage = result.message;
+			}
+			break;
+		}
+		case "updated": {
+			if (eventDetails) {
+				const result = await handleEventUpdated(eventDetails);
+				shouldNotify = result.shouldNotify;
+				notificationMessage = result.message;
+			}
+			break;
+		}
+		case "deleted": {
+			if (route.eventId) {
+				const result = await handleEventDeleted(route.eventId);
+				shouldNotify = result.shouldNotify;
+			}
+			break;
+		}
+	}
+
+	// Step 4: Send Telegram notification if needed
+	if (shouldNotify && notificationMessage) {
+		const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID ?? "default-chat";
+		await sendTelegramNotification(chatId, notificationMessage);
+	}
+
+	// Step 5: Log the event
+	await logEvent("info", "Calendar event processed", {
+		eventType: route.eventType,
+		calendarId: "primary",
+		processed: true,
+	});
+
+	return { eventType: route.eventType, notified: shouldNotify };
+}
