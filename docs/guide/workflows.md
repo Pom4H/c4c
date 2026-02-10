@@ -1,6 +1,6 @@
 # Workflows
 
-Workflows orchestrate multiple steps using plain TypeScript async functions, inspired by [useworkflow.dev](https://useworkflow.dev) (Vercel Workflow DevKit).
+Workflows orchestrate multiple steps using plain TypeScript async functions, powered by the [Vercel Workflow DevKit](https://useworkflow.dev).
 
 ## What is a Workflow?
 
@@ -17,22 +17,23 @@ A workflow is an async function that composes durable steps. Workflows support:
 ## Quick Start
 
 ```typescript
-import { start, step, FatalError } from "@c4c/workflow";
+import { sleep, FatalError } from "@c4c/workflow";
 
-// Define steps with automatic retry semantics
-const fetchUser = step("fetchUser", async (userId: string) => {
+// Steps use the "use step" directive - automatically retried on failure
+async function fetchUser(userId: string) {
+  "use step";
   const resp = await fetch(`/api/users/${userId}`);
   if (!resp.ok) throw new Error("Failed to fetch user");
   return resp.json();
-});
+}
 
-const sendEmail = step("sendEmail", async (email: string, subject: string) => {
-  // If this fails, it will be retried automatically
+async function sendEmail(email: string, subject: string) {
+  "use step";
   await emailService.send({ to: email, subject });
   return { sent: true };
-});
+}
 
-// Define workflow - just a plain async function!
+// Workflows use the "use workflow" directive
 export async function onboardUser(userId: string) {
   "use workflow";
 
@@ -41,30 +42,29 @@ export async function onboardUser(userId: string) {
   return { user, onboarded: true };
 }
 
-// Start the workflow
-const run = start(onboardUser, ["user_123"]);
-const result = await run.result;
+// Start the workflow from server code:
+// import { start } from "workflow/api";
+// const run = await start(onboardUser, ["user_123"]);
 ```
 
 ## Steps
 
-Steps are the building blocks of workflows. They wrap functions with automatic retry semantics.
+Steps are async functions marked with the `"use step"` directive. They have:
+- Full Node.js runtime access (file system, network, etc.)
+- Automatic retry on failure
+- Results cached in the event log
 
 ```typescript
-import { step } from "@c4c/workflow";
-
-const add = step("math.add", async (a: number, b: number) => {
+async function add(a: number, b: number): Promise<number> {
+  "use step";
   return a + b;
-});
+}
 
-// Configure retry behavior
-const callAPI = step("callExternalAPI", async (url: string) => {
+async function callExternalAPI(url: string) {
+  "use step";
   const resp = await fetch(url);
   return resp.json();
-}, {
-  maxAttempts: 5,     // Retry up to 5 times (default: 3)
-  retryDelay: 2000,   // Base retry delay in ms (default: 1000)
-});
+}
 ```
 
 ### Step Metadata
@@ -72,18 +72,18 @@ const callAPI = step("callExternalAPI", async (url: string) => {
 Access step metadata inside a step function:
 
 ```typescript
-import { step, getStepMetadata, RetryableError } from "@c4c/workflow";
+import { getStepMetadata } from "@c4c/workflow";
 
-const myStep = step("myStep", async () => {
-  const { attempt, maxAttempts } = getStepMetadata();
-  console.log(`Attempt ${attempt} of ${maxAttempts}`);
+async function myStep() {
+  "use step";
+  const { attempt } = getStepMetadata();
+  console.log(`Attempt ${attempt}`);
 
   if (attempt === 1) {
-    throw new RetryableError("Retry me!", { retryAfter: "5s" });
+    throw new Error("Retry me!"); // Will be retried automatically
   }
-
   return "Success";
-});
+}
 ```
 
 ## Error Handling

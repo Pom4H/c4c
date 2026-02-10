@@ -1,19 +1,12 @@
 /**
  * Workflow: Check Overdue Tasks
  *
- * Checks for overdue tasks in App A (task-manager) and sends notifications.
- * Demonstrates cross-app data fetching.
- *
- * Before (old DSL): workflow().step().step().commit()
- * After: Plain async function with steps
+ * Uses "use step" / "use workflow" directives from the Workflow DevKit.
  */
 
-import { step } from "@c4c/workflow";
-
-// Step: Get tasks from App A (cross-app call)
-const getTasksFromTaskManager = step("task-manager.tasks.list", async (status: string) => {
+async function getTasksFromTaskManager(status: string) {
+	"use step";
 	console.log(`[task-manager] Listing tasks with status: ${status}`);
-	// Mock: would call App A's task-manager service via HTTP
 	return {
 		tasks: [
 			{ id: "task_1", title: "Overdue task 1", dueDate: "2025-01-01", assignee: "alice" },
@@ -21,34 +14,20 @@ const getTasksFromTaskManager = step("task-manager.tasks.list", async (status: s
 		],
 		total: 2,
 	};
-});
+}
 
-// Step: Send notification locally
-const sendOverdueNotification = step("notifications.send", async (input: {
-	message: string;
-	channel: string;
-	priority: string;
-}) => {
+async function sendOverdueNotification(input: { message: string; channel: string; priority: string }) {
+	"use step";
 	console.log(`[notifications.send] Sending: ${input.message}`);
-	return {
-		id: `notif_${Date.now()}`,
-		message: input.message,
-	};
-});
+	return { id: `notif_${Date.now()}`, message: input.message };
+}
 
-/**
- * Check overdue tasks and notify
- */
 export async function checkOverdueTasks() {
 	"use workflow";
 
-	console.log("Check overdue tasks workflow started");
-
-	// Step 1: Get in-progress tasks from App A
 	const { tasks, total } = await getTasksFromTaskManager("in_progress");
 	console.log(`Found ${total} in-progress tasks`);
 
-	// Filter overdue tasks
 	const now = new Date();
 	const overdueTasks = tasks.filter((task) => {
 		if (!task.dueDate) return false;
@@ -56,17 +35,14 @@ export async function checkOverdueTasks() {
 	});
 
 	if (overdueTasks.length === 0) {
-		console.log("No overdue tasks found");
 		return { overdueTasks: [], notificationSent: false };
 	}
 
-	// Step 2: Send notification about overdue tasks
 	const notification = await sendOverdueNotification({
 		message: `You have ${overdueTasks.length} overdue task(s)!`,
 		channel: "email",
 		priority: "high",
 	});
 
-	console.log("Overdue notification sent:", notification.id);
-	return { overdueTasks, notificationSent: true };
+	return { overdueTasks, notificationSent: true, notification };
 }

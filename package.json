@@ -35,6 +35,8 @@
     "vue": "^3.5.22"
   },
   "dependencies": {
-    "@c4c/workflow-react": "workspace:*"
+    "@c4c/workflow-react": "workspace:*",
+    "@workflow/world-local": "4.1.0-beta.30",
+    "workflow": "4.1.0-beta.54"
   }
 }

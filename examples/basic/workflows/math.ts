@@ -1,41 +1,39 @@
 /**
  * Simple Math Workflow
  *
- * Demonstrates the "use workflow" / step() pattern
- * replacing the old DAG-based WorkflowDefinition approach.
+ * Demonstrates the Vercel Workflow DevKit pattern (useworkflow.dev).
+ * Workflows are plain async functions with "use workflow" directive.
+ * Steps are plain async functions with "use step" directive.
  *
- * Before (old DSL):
- *   export const simpleMathWorkflow: WorkflowDefinition = {
- *     nodes: [{ id: "add", type: "procedure", procedureName: "math.add", ... }]
- *   };
- *
- * After (Workflow DevKit):
- *   Just write plain async functions!
+ * No DSL, no DAGs, no config objects - just TypeScript.
  */
 
-import { step, FatalError } from "@c4c/workflow";
+import { FatalError } from "@c4c/workflow";
 
-// Step functions - these get automatic retry semantics
-const add = step("math.add", async (a: number, b: number): Promise<number> => {
+// Step functions - each gets "use step" for automatic retry semantics
+// Steps run with full Node.js access and are retried on failure.
+
+async function add(a: number, b: number): Promise<number> {
+	"use step";
 	console.log(`[math.add] ${a} + ${b}`);
 	return a + b;
-});
+}
 
-const multiply = step("math.multiply", async (a: number, b: number): Promise<number> => {
+async function multiply(a: number, b: number): Promise<number> {
+	"use step";
 	console.log(`[math.multiply] ${a} * ${b}`);
 	return a * b;
-});
+}
 
-const subtract = step("math.subtract", async (a: number, b: number): Promise<number> => {
+async function subtract(a: number, b: number): Promise<number> {
+	"use step";
 	console.log(`[math.subtract] ${a} - ${b}`);
 	return a - b;
-});
+}
 
 /**
- * Simple sequential math workflow
- *
- * Just a normal async function - no DAG, no nodes, no config objects.
- * Control flow uses standard JavaScript.
+ * Simple sequential math workflow.
+ * Just a normal async function - standard JavaScript control flow.
  */
 export async function simpleMathWorkflow() {
 	"use workflow";
@@ -56,8 +54,7 @@ export async function simpleMathWorkflow() {
 }
 
 /**
- * Math workflow with parallel steps
- *
+ * Math workflow with parallel steps.
  * Promise.all replaces the old "parallel" node type.
  */
 export async function parallelMathWorkflow() {
@@ -82,8 +79,7 @@ export async function parallelMathWorkflow() {
 }
 
 /**
- * Math workflow with conditional logic
- *
+ * Math workflow with conditional logic.
  * if/else replaces the old "condition" node type.
  */
 export async function conditionalMathWorkflow(x: number) {
@@ -93,7 +89,7 @@ export async function conditionalMathWorkflow(x: number) {
 
 	const doubled = await multiply(x, 2);
 
-	// Conditional logic is just JavaScript - no config objects needed!
+	// Conditional logic is just JavaScript!
 	let result: number;
 	if (doubled > 20) {
 		result = await subtract(doubled, 10);

@@ -1,7 +1,7 @@
 {
   "name": "@c4c/workflow",
   "version": "0.2.0",
-  "description": "Workflow DevKit - Build durable workflows with plain TypeScript functions. Inspired by useworkflow.dev.",
+  "description": "Workflow DevKit integration for c4c - re-exports useworkflow.dev primitives with monitoring extensions",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -20,12 +20,14 @@
     "workflow",
     "durable",
     "steps",
-    "retry",
-    "orchestration"
+    "useworkflow",
+    "vercel"
   ],
   "author": "",
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "workflow": "4.1.0-beta.54"
+  },
   "devDependencies": {
     "@types/node": "^24.7.2",
     "typescript": "^5.9.3"

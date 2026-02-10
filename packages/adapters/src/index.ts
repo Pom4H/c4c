@@ -22,5 +22,5 @@ export type {
 } from "./webhook.js";
 export { runCli } from "./cli.js";
 export { createRestRouter, listRESTRoutes } from "./rest.js";
-export { createWorkflowRouter, type WorkflowRouterOptions, type WorkflowRegistry } from "./workflow-http.js";
+export { createWorkflowRouter, type WorkflowRouterOptions } from "./workflow-http.js";
 export { createRpcRouter, extractAuthFromHeaders } from "./rpc.js";

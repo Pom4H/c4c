@@ -1,83 +1,93 @@
 /**
- * @c4c/workflow - Workflow DevKit
+ * @c4c/workflow - Workflow DevKit Integration
  *
- * Build durable, resilient, and observable workflows using plain TypeScript functions.
- * Inspired by useworkflow.dev (Vercel Workflow DevKit).
+ * Re-exports the Vercel Workflow DevKit (useworkflow.dev) primitives
+ * and adds c4c-specific extensions for monitoring and HTTP integration.
+ *
+ * ## Architecture (from useworkflow.dev)
+ *
+ * The Workflow DevKit uses compiler directives to create durable workflows:
+ *
+ * - `"use workflow"` marks a function as a workflow orchestrator
+ *   (runs in sandboxed VM for determinism)
+ * - `"use step"` marks a function as a step with full Node.js access
+ *   (retried automatically on failure)
+ *
+ * At build time, the SWC compiler transforms workflow files into three bundles:
+ * - `flow.js` - Workflow orchestration (sandboxed)
+ * - `step.js` - Step execution (full runtime)
+ * - `webhook.js` - Webhook handling
+ *
+ * These are exposed via HTTP at `/.well-known/workflow/v1/` endpoints.
  *
  * ## Quick Start
  *
  * ```ts
- * import { start, step, FatalError } from "@c4c/workflow";
+ * import { sleep, createWebhook, FatalError } from "@c4c/workflow";
  *
- * // Define a step with retry semantics
- * const add = step("add", async (a: number, b: number) => {
- *   return a + b;
- * });
- *
- * // Define a workflow that composes steps
- * async function mathWorkflow(x: number) {
+ * export async function onboardUser(email: string) {
  *   "use workflow";
- *   const sum = await add(x, 10);
- *   const doubled = await add(sum, sum);
- *   return doubled;
+ *
+ *   const user = await createUser(email);
+ *   await sleep("5s");
+ *   await sendWelcomeEmail(user);
+ *   return user;
  * }
  *
- * // Start the workflow
- * const run = start(mathWorkflow, [5]);
- * const result = await run.result; // 30
+ * async function createUser(email: string) {
+ *   "use step";
+ *   return { id: crypto.randomUUID(), email };
+ * }
+ *
+ * async function sendWelcomeEmail(user: { id: string; email: string }) {
+ *   "use step";
+ *   console.log(`Welcome email sent to ${user.email}`);
+ * }
  * ```
  *
- * ## Key Concepts
- *
- * - **"use workflow"**: Marks a function as a workflow orchestrator
- * - **step()**: Wraps a function with retry semantics (replaces "use step")
- * - **FatalError**: Non-retryable error that stops the workflow
- * - **RetryableError**: Explicitly retryable error with configurable delay
- * - **sleep()**: Durable sleep within workflows
- * - **createHook()**: Suspend workflow until external event (webhooks, approvals)
- * - **start()**: Start a workflow and get back a run handle
- *
- * Standard JavaScript patterns work naturally:
- * - `Promise.all()` for parallel steps
- * - `Promise.race()` for racing steps
- * - `try/catch` for error handling
- * - Loops and conditionals for control flow
+ * See https://useworkflow.dev for full documentation.
  */
 
-// Error types
-export { FatalError, RetryableError } from "./errors.js";
+// ============================================================
+// Re-exports from the Vercel Workflow DevKit (`workflow` npm package)
+// ============================================================
 
-// Runtime
-export { start, step } from "./runtime.js";
+// Error types - control retry behavior in step functions
+export { FatalError, RetryableError } from "workflow";
 
-// Context / Metadata hooks
-export { getStepMetadata, getWorkflowMetadata, getWritable } from "./context.js";
+// Hooks - for metadata access inside workflow/step functions
+export { getStepMetadata, getWorkflowMetadata } from "workflow";
 
-// Durable sleep
-export { sleep } from "./sleep.js";
+// Sleep - durable sleep within workflows
+export { sleep } from "workflow";
 
-// Duration parser
-export { parseDuration } from "./duration.js";
+// Writable stream - for streaming output from workflows
+export { getWritable } from "workflow";
 
-// Hook system (suspend/resume)
-export { createHook, resolveHook, rejectHook, isHookPending, getPendingHooks } from "./hooks.js";
+// Webhook - for creating webhook callbacks within workflows
+export { createWebhook } from "workflow";
 
-// Event system
+// Hook - for creating suspension hooks that wait for external events
+export { createHook, defineHook } from "workflow";
+
+// ============================================================
+// c4c extensions - monitoring, events, execution tracking
+// ============================================================
+
+// Event system for real-time monitoring
 export { subscribeToRun, subscribeToAll, publishEvent } from "./events.js";
 
-// Execution store
+// Execution store for run history
 export { ExecutionStore, getExecutionStore, setExecutionStore } from "./execution-store.js";
 
+// Duration parser utility
+export { parseDuration } from "./duration.js";
+
+// ============================================================
 // Types
+// ============================================================
+
 export type {
-	WorkflowRun,
-	WorkflowRunStatus,
-	StartOptions,
-	StepMetadata,
-	WorkflowMetadata,
-	Hook,
-	HookOptions,
-	RetryableErrorOptions,
 	WorkflowEvent,
 } from "./types.js";
 

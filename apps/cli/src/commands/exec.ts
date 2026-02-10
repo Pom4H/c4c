@@ -2,7 +2,6 @@ import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
 import { collectProjectArtifacts } from "@c4c/core";
 import { execute } from "@c4c/core";
-import { start } from "@c4c/workflow";
 
 interface ExecOptions {
 	root?: string;

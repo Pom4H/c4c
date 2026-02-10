@@ -1,54 +1,43 @@
 /**
  * Test Workflow - demonstrates Workflow DevKit patterns with modules
  *
- * Before (old DSL):
- *   workflow("test-workflow").step(createUserStep).step(createProductStep).commit()
- *
- * After (Workflow DevKit):
- *   Just an async function that calls steps!
+ * Uses "use workflow" / "use step" directives from the Workflow DevKit.
+ * Step functions have full Node.js runtime access and are automatically retried.
  */
 
-import { step, FatalError } from "@c4c/workflow";
+import { FatalError } from "@c4c/workflow";
 import { userDatabase } from "../users/database.js";
 import { productDatabase } from "../products/database.js";
 import { validateEmail, sanitizeName, validateUserRole } from "../users/validators.js";
 
-// Steps wrap database operations with retry semantics
+// Step functions - "use step" gives automatic retry semantics
 
-const createUser = step("users.create", async (input: {
-	name: string;
-	email: string;
-	role?: string;
-}) => {
+async function createUser(input: { name: string; email: string; role?: string }) {
+	"use step";
 	const { name, email, role = "user" } = input;
 
-	if (!validateEmail(email)) {
-		throw new FatalError("Invalid email format");
-	}
-	if (!validateUserRole(role)) {
-		throw new FatalError("Invalid role");
-	}
+	if (!validateEmail(email)) throw new FatalError("Invalid email format");
+	if (!validateUserRole(role)) throw new FatalError("Invalid role");
 
 	const existing = await userDatabase.findByEmail(email);
-	if (existing) {
-		throw new FatalError("User with this email already exists");
-	}
+	if (existing) throw new FatalError("User with this email already exists");
 
-	const sanitizedName = sanitizeName(name);
-	return await userDatabase.create({ name: sanitizedName, email, role });
-});
+	return await userDatabase.create({ name: sanitizeName(name), email, role });
+}
 
-const createProduct = step("products.create", async (input: {
+async function createProduct(input: {
 	name: string;
 	description: string;
 	price: number;
 	stock: number;
 	category: string;
-}) => {
+}) {
+	"use step";
 	return await productDatabase.create(input);
-});
+}
 
-const getAnalytics = step("analytics.stats", async () => {
+async function getAnalytics() {
+	"use step";
 	const users = await userDatabase.list();
 	const products = await productDatabase.list();
 
@@ -69,18 +58,16 @@ const getAnalytics = step("analytics.stats", async () => {
 		products: { total: products.length, totalValue, byCategory: productsByCategory },
 		timestamp: new Date().toISOString(),
 	};
-});
+}
 
 /**
- * Test workflow that creates a user, creates a product, then gets analytics.
- * Uses plain async/await instead of the old builder pattern.
+ * Test workflow: create user, create product, get analytics.
  */
 export async function testWorkflow() {
 	"use workflow";
 
 	console.log("Test workflow started");
 
-	// Step 1: Create a user
 	const user = await createUser({
 		name: "Test User",
 		email: `test-${Date.now()}@example.com`,
@@ -88,7 +75,6 @@ export async function testWorkflow() {
 	});
 	console.log("User created:", user.id);
 
-	// Step 2: Create a product
 	const product = await createProduct({
 		name: "Test Product",
 		description: "A test product",
@@ -98,11 +84,8 @@ export async function testWorkflow() {
 	});
 	console.log("Product created:", product.id);
 
-	// Step 3: Get analytics
 	const analytics = await getAnalytics();
 	console.log("Analytics:", analytics.users.total, "users,", analytics.products.total, "products");
-
-	console.log("Test workflow completed");
 
 	return { user, product, analytics };
 }
@@ -113,14 +96,10 @@ export async function testWorkflow() {
 export async function parallelCreationWorkflow() {
 	"use workflow";
 
-	console.log("Parallel creation workflow started");
-
-	// Create user and product in parallel
 	const [user, product] = await Promise.all([
 		createUser({
 			name: "Parallel User",
 			email: `parallel-${Date.now()}@example.com`,
-			role: "user",
 		}),
 		createProduct({
 			name: "Parallel Product",
@@ -131,9 +110,6 @@ export async function parallelCreationWorkflow() {
 		}),
 	]);
 
-	// Then get analytics
 	const analytics = await getAnalytics();
-
-	console.log("Parallel creation workflow completed");
 	return { user, product, analytics };
 }

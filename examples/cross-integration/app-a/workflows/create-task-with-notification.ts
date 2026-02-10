@@ -1,39 +1,32 @@
 /**
  * Cross-App Workflow: Create Task and Send Notification
  *
- * Demonstrates cross-app integration using Workflow DevKit:
- * 1. Creates a task in App A (local step)
- * 2. Calls App B to send a notification (cross-app step)
- *
- * Before (old DSL): WorkflowDefinition with nodes array
- * After: Plain async function with steps
+ * Uses "use step" directive for each operation.
+ * Cross-app calls are just step functions that make HTTP requests.
  */
 
-import { step, FatalError } from "@c4c/workflow";
-
-// Local step: create task in App A
-const createTask = step("tasks.create", async (input: {
+async function createTask(input: {
 	title: string;
 	description: string;
 	priority: string;
 	status: string;
-}) => {
-	// This would normally call the local tasks procedure
+}) {
+	"use step";
 	console.log(`[tasks.create] Creating task: ${input.title}`);
 	return {
 		id: `task_${Date.now()}`,
 		...input,
 		createdAt: new Date().toISOString(),
 	};
-});
+}
 
-// Cross-app step: call notification service in App B
-const sendNotification = step("notification-service.notifications.send", async (input: {
+async function sendNotificationToAppB(input: {
 	message: string;
 	channel: string;
 	priority: string;
-}) => {
-	// This would call App B's notification-service via HTTP
+}) {
+	"use step";
+	// In production, this would make an HTTP call to App B
 	console.log(`[notification-service] Sending: ${input.message}`);
 	return {
 		id: `notif_${Date.now()}`,
@@ -41,7 +34,7 @@ const sendNotification = step("notification-service.notifications.send", async (
 		channel: input.channel,
 		sentAt: new Date().toISOString(),
 	};
-});
+}
 
 /**
  * Creates a task and sends a notification via cross-app call
@@ -51,7 +44,6 @@ export async function createTaskWithNotification() {
 
 	console.log("Cross-app workflow: Create Task with Notification");
 
-	// Step 1: Create task locally
 	const task = await createTask({
 		title: "Cross-App Integration Test",
 		description: "This task was created by a workflow that calls another service",
@@ -60,8 +52,7 @@ export async function createTaskWithNotification() {
 	});
 	console.log("Task created:", task.id);
 
-	// Step 2: Send notification via App B
-	const notification = await sendNotification({
+	const notification = await sendNotificationToAppB({
 		message: "New task created via cross-app workflow!",
 		channel: "push",
 		priority: "high",
