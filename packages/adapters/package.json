@@ -1,7 +1,7 @@
 {
   "name": "@c4c/adapters",
-  "version": "0.1.0",
-  "description": "Transport adapters (HTTP, CLI, REST) for c4c",
+  "version": "0.3.0",
+  "description": "HTTP server for Workflow DevKit - serves .well-known/workflow/v1/ endpoints",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -16,24 +16,10 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
   },
-  "keywords": [
-    "http",
-    "cli",
-    "rest",
-    "adapters"
-  ],
-  "author": "",
   "license": "MIT",
   "dependencies": {
-    "@c4c/core": "workspace:*",
-    "@c4c/workflow": "workspace:*",
-    "@c4c/generators": "workspace:*",
-    "@hono/node-server": "^1.19.5",
-    "@hono/swagger-ui": "^0.5.2",
-    "@hono/zod-openapi": "^1.1.4",
-    "@hono/zod-validator": "^0.7.4",
-    "hono": "^4.9.12",
-    "zod": "catalog:"
+    "@workflow/world-local": "4.1.0-beta.30",
+    "workflow": "4.1.0-beta.54"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",

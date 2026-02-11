@@ -1,51 +1,44 @@
 /**
- * Simple Demo Workflow - uses math and data procedures
- * Can be executed immediately without external dependencies
+ * Math Workflow - the simplest possible example
  */
 
-import type { WorkflowDefinition } from "@c4c/workflow";
+import { FatalError } from "workflow";
 
-/**
- * Simple Math Workflow
- * Demonstrates basic sequential execution with math operations
- */
-export const simpleMathWorkflow: WorkflowDefinition = {
-  id: "simple-math-workflow",
-  name: "Simple Math Workflow",
-  description: "Basic math operations workflow for testing",
-  version: "1.0.0",
+async function add(a: number, b: number): Promise<number> {
+	"use step";
+	return a + b;
+}
 
-  startNode: "add",
+async function multiply(a: number, b: number): Promise<number> {
+	"use step";
+	return a * b;
+}
 
-  nodes: [
-    {
-      id: "add",
-      type: "procedure",
-      procedureName: "math.add",
-      config: {
-        a: 10,
-        b: 5,
-      },
-      next: "multiply",
-    },
-    {
-      id: "multiply",
-      type: "procedure",
-      procedureName: "math.multiply",
-      config: {
-        a: 3,
-        b: 2,
-      },
-      next: "subtract",
-    },
-    {
-      id: "subtract",
-      type: "procedure",
-      procedureName: "math.subtract",
-      config: {
-        a: 20,
-        b: 8,
-      },
-    },
-  ],
-};
+/** Sequential: add then multiply */
+export async function simpleMath(x: number) {
+	"use workflow";
+	const sum = await add(x, 10);
+	const result = await multiply(sum, 2);
+	return result;
+}
+
+/** Parallel: Promise.all */
+export async function parallelMath() {
+	"use workflow";
+	const [a, b, c] = await Promise.all([
+		add(10, 5),
+		multiply(3, 7),
+		add(100, 200),
+	]);
+	return { a, b, c };
+}
+
+/** Conditional: if/else */
+export async function conditionalMath(x: number) {
+	"use workflow";
+	const doubled = await multiply(x, 2);
+	if (doubled > 20) {
+		return await add(doubled, 100);
+	}
+	return await add(doubled, 1);
+}

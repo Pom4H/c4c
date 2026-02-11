@@ -1,22 +1,21 @@
 {
   "name": "basic-example",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "Basic usage example of c4c framework",
+  "description": "Basic workflow example using Vercel Workflow DevKit",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/apps/http.ts",
-    "cli": "tsx src/apps/cli.ts"
+    "build": "npx workflow build",
+    "dev": "c4c dev",
+    "start": "c4c serve"
   },
   "dependencies": {
-    "@c4c/core": "workspace:*",
-    "@c4c/adapters": "workspace:*",
-    "@c4c/policies": "workspace:*",
-    "zod": "catalog:"
+    "workflow": "4.1.0-beta.54",
+    "@workflow/world-local": "4.1.0-beta.30"
   },
   "devDependencies": {
+    "@c4c/cli": "workspace:*",
     "@types/node": "^24.7.2",
-    "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   }
 }

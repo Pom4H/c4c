@@ -1,6 +1,3 @@
-// Public API exports
-export { serve, dev, type ServeOptions } from "./lib/server.js";
-export { generateClient, type GenerateClientOptions } from "./lib/generate.js";
-export { stopDevServer } from "./lib/stop.js";
-export { readDevLogs, type DevLogsOptions } from "./lib/logs.js";
-export type { ServeMode } from "./lib/types.js";
+export { buildCommand } from "./commands/build.js";
+export { serveCommand } from "./commands/serve.js";
+export { devCommand } from "./commands/dev.js";

@@ -1,0 +1,5 @@
+.well-known/
+.workflow-data/
+*.cjs
+*.mjs
+dist/
