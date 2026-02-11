@@ -1,7 +1,7 @@
 {
   "name": "@c4c/cli",
-  "version": "0.1.0",
-  "description": "Command line tools for c4c (Code For Coders)",
+  "version": "0.2.0",
+  "description": "CLI for c4c Workflow DevKit",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -13,20 +13,11 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
   },
-  "keywords": [
-    "c4c",
-    "cli",
-    "workflow"
-  ],
-  "author": "",
   "license": "MIT",
   "dependencies": {
     "@c4c/adapters": "workspace:*",
-    "@c4c/core": "workspace:*",
-    "@c4c/generators": "workspace:*",
-    "@c4c/workflow": "workspace:*",
     "commander": "^14.0.1",
-    "zod": "catalog:"
+    "workflow": "4.1.0-beta.54"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",

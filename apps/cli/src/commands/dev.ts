@@ -1,195 +1,58 @@
-import { resolve, relative } from "node:path";
-import { dev as runDev, type ServeOptions } from "../lib/server.js";
-import { stopDevServer } from "../lib/stop.js";
-import { readDevLogs } from "../lib/logs.js";
-import { getDevStatus } from "../lib/status.js";
+import { execSync } from "node:child_process";
+import { resolve } from "node:path";
 
-interface DevCommandOptions {
-    port?: number;
-    root?: string;
-    docs?: boolean;
+interface DevOptions {
+	port: string;
+	root: string;
 }
 
-export async function devCommand(options: DevCommandOptions): Promise<void> {
-	const rootDir = resolve(options.root ?? process.cwd());
-    const enableDocs = options.docs ? true : undefined;
+export async function devCommand(options: DevOptions) {
+	const rootDir = resolve(options.root);
+	const port = Number(options.port);
 
-	const serveOptions: ServeOptions = {
-		port: options.port,
-		root: rootDir,
-		enableDocs,
-	};
-
-    await runDev("all", serveOptions);
-}
-
-interface DevStopOptions {
-	root?: string;
-}
-
-export async function devStopCommand(options: DevStopOptions): Promise<void> {
-	const rootDir = resolve(options.root ?? process.cwd());
-	await stopDevServer(rootDir);
-}
-
-interface DevLogsOptions {
-    root?: string;
-    json?: boolean;
-    tail?: number;
-}
-
-export async function devLogsCommand(options: DevLogsOptions): Promise<void> {
-	const rootDir = resolve(options.root ?? process.cwd());
-    const tailValue = options.tail !== undefined ? parsePositiveInteger(options.tail, "tail") : undefined;
-	const rootLabel = (() => {
-		const relativeRoot = relative(process.cwd(), rootDir);
-		if (!relativeRoot || relativeRoot === "") return rootDir;
-		return relativeRoot;
-	})();
-	const result = await readDevLogs({ projectRoot: rootDir, tail: tailValue });
-	if (!result) {
-		console.log(`[c4c] No running dev server found (searched from ${rootLabel}).`);
-		return;
+	// Step 1: Build workflows
+	console.log("[c4c] Building workflows...");
+	try {
+		execSync("npx workflow build", {
+			cwd: rootDir,
+			stdio: "inherit",
+		});
+	} catch {
+		console.error("[c4c] Build failed");
+		process.exit(1);
 	}
-    if (result.lines.length === 0) {
-        console.log("[c4c] No new log entries.");
-        return;
-    }
-    // If --json is specified, print raw JSONL lines as-is.
-    if (options.json) {
-        for (const line of result.lines) {
-            console.log(line);
-        }
-        return;
-    }
-    // Otherwise, pretty-print parsed entries.
-    for (const line of result.lines) {
-        const entry = parseJsonlLogLine(line);
-        if (!entry) {
-            console.log(line);
-            continue;
-        }
-        console.log(formatPrettyLogEntry(entry));
-    }
-}
 
-interface DevStatusOptions {
-    root?: string;
-    json?: boolean;
-}
+	// Step 2: Create ESM wrappers for CJS bundles
+	const { existsSync, readFileSync, writeFileSync } = await import("node:fs");
+	const { join } = await import("node:path");
+	const wellKnown = join(rootDir, ".well-known", "workflow", "v1");
 
-export async function devStatusCommand(options: DevStatusOptions): Promise<void> {
-    const rootDir = resolve(options.root ?? process.cwd());
-    const status = await getDevStatus(rootDir);
-    if (options.json) {
-        console.log(JSON.stringify(status, null, 2));
-        return;
-    }
-    if (status.status === "none") {
-        console.log(`[c4c] No running dev server found (searched from ${rootDir}).`);
-        return;
-    }
-    console.log(`[c4c] Dev server is ${status.status} on port ${status.port} (pid ${status.pid}).`);
-}
-
-function parsePositiveInteger(value: unknown, label: string): number {
-	const parsed = Number.parseInt(String(value), 10);
-	if (!Number.isFinite(parsed) || parsed <= 0) {
-		throw new Error(`Invalid ${label} '${value}'`);
+	for (const name of ["flow", "step"]) {
+		const jsPath = join(wellKnown, `${name}.js`);
+		if (existsSync(jsPath)) {
+			const content = readFileSync(jsPath, "utf-8");
+			// CJS bundles use module.exports
+			if (content.includes("module.exports")) {
+				writeFileSync(join(wellKnown, `${name}.cjs`), content);
+				const wrapper = `import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);\nconst mod = require("./${name}.cjs");\nexport const POST = mod.POST;\nexport default mod;\n`;
+				writeFileSync(join(wellKnown, `${name}.mjs`), wrapper);
+			}
+		}
 	}
-	return parsed;
-}
 
-// No parsing helpers needed; dev logs are JSONL.
-interface DevLogEntry {
-    timestamp: string;
-    level: string;
-    message: string;
-}
+	// webhook.js is already ESM, just copy
+	const webhookPath = join(wellKnown, "webhook.js");
+	if (existsSync(webhookPath)) {
+		const content = readFileSync(webhookPath, "utf-8");
+		if (!content.includes("module.exports")) {
+			writeFileSync(join(wellKnown, "webhook.mjs"), content);
+		}
+	}
 
-function parseJsonlLogLine(line: string): DevLogEntry | null {
-    try {
-        const parsed = JSON.parse(line) as Partial<DevLogEntry>;
-        if (!parsed || typeof parsed !== "object") return null;
-        if (typeof parsed.timestamp !== "string") return null;
-        if (typeof parsed.level !== "string") return null;
-        if (typeof parsed.message !== "string") return null;
-        return { timestamp: parsed.timestamp, level: parsed.level, message: parsed.message };
-    } catch {
-        return null;
-    }
-}
+	console.log("[c4c] ESM wrappers created");
 
-function formatPrettyLogEntry(entry: DevLogEntry): string {
-    const ts = formatTime(entry.timestamp);
-    const level = normalizeLevel(entry.level);
-    const icon = levelIcon(level);
-    const coloredLevel = colorizeLevel(level);
-    return `${dim(`[${ts}]`)} ${icon} ${coloredLevel} ${entry.message}`.trim();
-}
-
-function formatTime(iso: string): string {
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return iso;
-    const h = String(date.getHours()).padStart(2, "0");
-    const m = String(date.getMinutes()).padStart(2, "0");
-    const s = String(date.getSeconds()).padStart(2, "0");
-    return `${h}:${m}:${s}`;
-}
-
-function normalizeLevel(lvl: string): "info" | "warn" | "error" | "log" {
-    const v = String(lvl).toLowerCase();
-    if (v === "warn" || v === "warning") return "warn";
-    if (v === "error" || v === "err") return "error";
-    if (v === "info") return "info";
-    if (v === "log") return "log";
-    return "info";
-}
-
-function levelIcon(level: ReturnType<typeof normalizeLevel>): string {
-    switch (level) {
-        case "warn":
-            return "⚠";
-        case "error":
-            return "✖";
-        case "info":
-        case "log":
-        default:
-            return "ℹ";
-    }
-}
-
-// Minimal color utilities (mirrors style used elsewhere)
-const COLOR_RESET = "\u001B[0m";
-const COLOR_CYAN = "\u001B[36m";
-const COLOR_YELLOW = "\u001B[33m";
-const COLOR_RED = "\u001B[31m";
-const COLOR_DIM = "\u001B[90m";
-
-function colorEnabled(): boolean {
-    return Boolean(process.stdout?.isTTY && !process.env.NO_COLOR);
-}
-
-function dim(text: string): string {
-    if (!colorEnabled()) return text;
-    return `${COLOR_DIM}${text}${COLOR_RESET}`;
-}
-
-function colorize(text: string, colorCode: string): string {
-    if (!colorEnabled()) return text;
-    return `${colorCode}${text}${COLOR_RESET}`;
-}
-
-function colorizeLevel(level: ReturnType<typeof normalizeLevel>): string {
-    switch (level) {
-        case "warn":
-            return colorize("WARN", COLOR_YELLOW);
-        case "error":
-            return colorize("ERROR", COLOR_RED);
-        case "info":
-            return colorize("INFO", COLOR_CYAN);
-        case "log":
-        default:
-            return colorize("INFO", COLOR_CYAN);
-    }
+	// Step 3: Start server
+	console.log(`[c4c] Starting dev server on port ${port}...`);
+	const { createWorkflowServer } = await import("@c4c/adapters");
+	await createWorkflowServer({ port, rootDir });
 }

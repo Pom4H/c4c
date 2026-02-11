@@ -1,103 +1,44 @@
 /**
- * Simple Math Workflow
- *
- * Demonstrates the Vercel Workflow DevKit pattern (useworkflow.dev).
- * Workflows are plain async functions with "use workflow" directive.
- * Steps are plain async functions with "use step" directive.
- *
- * No DSL, no DAGs, no config objects - just TypeScript.
+ * Math Workflow - the simplest possible example
  */
 
-import { FatalError } from "@c4c/workflow";
-
-// Step functions - each gets "use step" for automatic retry semantics
-// Steps run with full Node.js access and are retried on failure.
+import { FatalError } from "workflow";
 
 async function add(a: number, b: number): Promise<number> {
 	"use step";
-	console.log(`[math.add] ${a} + ${b}`);
 	return a + b;
 }
 
 async function multiply(a: number, b: number): Promise<number> {
 	"use step";
-	console.log(`[math.multiply] ${a} * ${b}`);
 	return a * b;
 }
 
-async function subtract(a: number, b: number): Promise<number> {
-	"use step";
-	console.log(`[math.subtract] ${a} - ${b}`);
-	return a - b;
+/** Sequential: add then multiply */
+export async function simpleMath(x: number) {
+	"use workflow";
+	const sum = await add(x, 10);
+	const result = await multiply(sum, 2);
+	return result;
 }
 
-/**
- * Simple sequential math workflow.
- * Just a normal async function - standard JavaScript control flow.
- */
-export async function simpleMathWorkflow() {
+/** Parallel: Promise.all */
+export async function parallelMath() {
 	"use workflow";
-
-	console.log("Simple Math Workflow started");
-
-	const sum = await add(10, 5);
-	console.log("Step 1 completed - sum:", sum);
-
-	const product = await multiply(3, 2);
-	console.log("Step 2 completed - product:", product);
-
-	const difference = await subtract(20, 8);
-	console.log("Step 3 completed - difference:", difference);
-
-	console.log("Simple Math Workflow completed");
-	return { sum, product, difference };
-}
-
-/**
- * Math workflow with parallel steps.
- * Promise.all replaces the old "parallel" node type.
- */
-export async function parallelMathWorkflow() {
-	"use workflow";
-
-	console.log("Parallel Math Workflow started");
-
-	// Run multiple operations in parallel - just use Promise.all!
-	const [sum, product, difference] = await Promise.all([
+	const [a, b, c] = await Promise.all([
 		add(10, 5),
 		multiply(3, 7),
-		subtract(100, 42),
+		add(100, 200),
 	]);
-
-	console.log("All parallel steps completed:", { sum, product, difference });
-
-	// Chain more operations using previous results
-	const finalResult = await add(sum, product);
-	console.log("Final result:", finalResult);
-
-	return { sum, product, difference, finalResult };
+	return { a, b, c };
 }
 
-/**
- * Math workflow with conditional logic.
- * if/else replaces the old "condition" node type.
- */
-export async function conditionalMathWorkflow(x: number) {
+/** Conditional: if/else */
+export async function conditionalMath(x: number) {
 	"use workflow";
-
-	console.log(`Conditional Math Workflow started with x=${x}`);
-
 	const doubled = await multiply(x, 2);
-
-	// Conditional logic is just JavaScript!
-	let result: number;
 	if (doubled > 20) {
-		result = await subtract(doubled, 10);
-		console.log("Took the 'greater than 20' branch");
-	} else {
-		result = await add(doubled, 10);
-		console.log("Took the 'less than or equal to 20' branch");
+		return await add(doubled, 100);
 	}
-
-	return { input: x, doubled, result };
+	return await add(doubled, 1);
 }
