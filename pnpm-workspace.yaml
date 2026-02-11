@@ -3,6 +3,7 @@ packages:
   - 'examples/*'
   - 'examples/cross-integration/*'
   - 'apps/*'
+  - 'tests/*'
 
 catalog:
   zod: ^4.1.12

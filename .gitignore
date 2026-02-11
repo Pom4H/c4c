@@ -28,3 +28,4 @@ build/
 # Uncomment if standardizing on one package manager:
 # package-lock.json
 # yarn.lock
+.workflow-data/
