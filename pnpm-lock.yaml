@@ -85,15 +85,6 @@ importers:
 
   apps/workflow:
     dependencies:
-      '@c4c/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@c4c/workflow':
-        specifier: workspace:*
-        version: link:../../packages/workflow
-      '@c4c/workflow-react':
-        specifier: workspace:*
-        version: link:../../packages/workflow-react
       '@radix-ui/react-collapsible':
         specifier: ^1.1.12
         version: 1.1.12(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -118,6 +109,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      hono:
+        specifier: ^4.9.12
+        version: 4.9.12
       lucide-react:
         specifier: ^0.545.0
         version: 0.545.0(react@19.2.0)

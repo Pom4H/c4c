@@ -17,65 +17,91 @@ import {
   Panel,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { WorkflowDefinition, TraceSpan } from "@c4c/workflow";
+import type {
+  TraceSpan,
+  WorkflowDefinition,
+  StepExecution,
+} from "@/lib/useworkflow/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 interface WorkflowVisualizerProps {
   workflow: WorkflowDefinition;
-  executionResult?: {
-    nodesExecuted: string[];
-    spans: TraceSpan[];
-  };
+  stepExecutions?: StepExecution[];
+  spans?: TraceSpan[];
 }
 
 // Node type colors
-const getNodeTypeColor = (type: string) => {
-  const colors = {
-    procedure: "#4ade80",  // Green
-    condition: "#fbbf24",  // Yellow
-    parallel: "#818cf8",   // Purple
-    sequential: "#60a5fa", // Blue
-  } as const;
-  return colors[type as keyof typeof colors] || "#60a5fa";
+const getStatusColor = (status: StepExecution["status"]) => {
+  const colors: Record<StepExecution["status"], string> = {
+    pending: "#e5e7eb",
+    running: "#3b82f6",
+    waiting: "#fbbf24",
+    completed: "#4ade80",
+    failed: "#ef4444",
+    cancelled: "#a855f7",
+    skipped: "#6b7280",
+  };
+  return colors[status] ?? "#e5e7eb";
 };
 
 export default function WorkflowVisualizer({
   workflow,
-  executionResult,
+  stepExecutions,
+  spans,
 }: WorkflowVisualizerProps) {
+  const spanIndex = useMemo(() => {
+    if (!spans) return new Map<string, TraceSpan>();
+    const index = new Map<string, TraceSpan>();
+    for (const span of spans) {
+      const stepKey =
+        (span.attributes["step.key"] as string | undefined) ||
+        (span.attributes["node.id"] as string | undefined);
+      if (stepKey) {
+        index.set(stepKey, span);
+      }
+    }
+    return index;
+  }, [spans]);
+
+  const statusByStep = useMemo(() => {
+    const map = new Map<string, StepExecution["status"]>();
+    stepExecutions?.forEach((execution) => {
+      map.set(execution.stepKey, execution.status);
+    });
+    return map;
+  }, [stepExecutions]);
+
   // Convert workflow nodes to React Flow nodes
   const initialNodes = useMemo(() => {
     const nodes: Node[] = [];
     const nodeMap = new Map<string, number>();
 
     // Calculate positions based on node hierarchy
-    workflow.nodes.forEach((node, index) => {
-      const level = calculateNodeLevel(node.id, workflow, nodeMap);
+    workflow.steps.forEach((step, index) => {
+      const level = calculateStepLevel(step.key, workflow, nodeMap);
       const position = {
         x: level * 300 + 50,
         y: index * 150 + 50,
       };
 
-      const isExecuted = executionResult?.nodesExecuted.includes(node.id);
-      const nodeSpan = executionResult?.spans.find(
-        (s) => s.attributes["node.id"] === node.id
-      );
+      const status = statusByStep.get(step.key) ?? "pending";
+      const nodeSpan = spanIndex.get(step.key);
 
       nodes.push({
-        id: node.id,
+        id: step.key,
         type: "default",
         position,
         data: {
           label: (
             <div className="text-center">
-              <div className="font-bold">{node.id}</div>
+              <div className="font-bold">{step.title || step.key}</div>
               <div className="text-xs text-muted-foreground">
-                {node.type}
-                {node.procedureName && (
+                {status}
+                {step.hook && (
                   <>
                     <br />
-                    {node.procedureName}
+                    {step.hook}
                   </>
                 )}
               </div>
@@ -88,101 +114,49 @@ export default function WorkflowVisualizer({
           ),
         },
         style: {
-          background: isExecuted
-            ? getNodeTypeColor(node.type)
-            : "#e5e7eb",
+          background: getStatusColor(status),
           border: `2px solid ${nodeSpan && nodeSpan.status.code === "ERROR" ? "#ef4444" : "#1e40af"}`,
           borderRadius: "8px",
           padding: "10px",
           width: 180,
-          opacity: isExecuted ? 1 : 0.5,
-          color: isExecuted ? "#ffffff" : "#000000",
+          opacity: status === "pending" ? 0.6 : 1,
+          color: status === "pending" ? "#111827" : "#ffffff",
         },
       });
     });
 
     return nodes;
-  }, [workflow, executionResult]);
+  }, [workflow, statusByStep, spanIndex]);
 
   // Convert workflow edges to React Flow edges
   const initialEdges = useMemo(() => {
     const edges: Edge[] = [];
 
-    workflow.nodes.forEach((node) => {
-      if (node.next) {
-        const nextNodes = Array.isArray(node.next) ? node.next : [node.next];
-        nextNodes.forEach((nextId, index) => {
-          edges.push({
-            id: `${node.id}-${nextId}`,
-            source: node.id,
-            target: nextId,
-            animated: executionResult?.nodesExecuted.includes(node.id) ?? false,
-            style: {
-              stroke: executionResult?.nodesExecuted.includes(node.id)
-                ? "#4ade80"
-                : "#94a3b8",
-              strokeWidth: 2,
-            },
-            label: Array.isArray(node.next) ? `branch ${index + 1}` : undefined,
-          });
-        });
-      }
-
-      // Add conditional branches
-      if (node.type === "condition" && node.config) {
-        const config = node.config as { trueBranch?: string; falseBranch?: string };
-        if (config.trueBranch) {
-          edges.push({
-            id: `${node.id}-true-${config.trueBranch}`,
-            source: node.id,
-            target: config.trueBranch,
-            animated: executionResult?.nodesExecuted.includes(node.id) ?? false,
-            style: {
-              stroke: "#22c55e",
-              strokeWidth: 2,
-            },
-            label: "✓ true",
-          });
-        }
-        if (config.falseBranch) {
-          edges.push({
-            id: `${node.id}-false-${config.falseBranch}`,
-            source: node.id,
-            target: config.falseBranch,
-            animated: false,
-            style: {
-              stroke: "#ef4444",
-              strokeWidth: 2,
-            },
-            label: "✗ false",
-          });
-        }
-      }
-
-      // Add parallel branches
-      if (node.type === "parallel" && node.config) {
-        const config = node.config as { branches?: string[] };
-        if (config.branches) {
-          config.branches.forEach((branchId: string, index: number) => {
+    workflow.steps.forEach((step) => {
+      if (step.transitions) {
+        step.transitions
+          .filter((transition) => transition.to)
+          .forEach((transition, index) => {
+            const target = transition.to as string;
+            const status = statusByStep.get(step.key) ?? "pending";
+            const animated = status === "completed" || status === "running";
             edges.push({
-              id: `${node.id}-branch-${branchId}`,
-              source: node.id,
-              target: branchId,
-              animated:
-                executionResult?.nodesExecuted.includes(node.id) ?? false,
+              id: `${step.key}-${target}-${index}`,
+              source: step.key,
+              target,
+              animated,
               style: {
-                stroke: "#818cf8",
-                strokeWidth: 2,
+                stroke: status === "completed" ? "#4ade80" : "#94a3b8",
+                strokeWidth: status === "completed" ? 2 : 1,
               },
-              label: `parallel ${index + 1}`,
+              label: transition.label || transition.on || `branch ${index + 1}`,
             });
           });
-        }
       }
     });
 
     return edges;
-  }, [workflow, executionResult]);
+  }, [workflow, statusByStep]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -197,22 +171,18 @@ export default function WorkflowVisualizer({
     <div className="space-y-4">
       {/* Legend */}
       <div className="flex gap-4 text-xs flex-wrap">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded" style={{ background: "#4ade80" }} />
-          <span>Procedure</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded" style={{ background: "#fbbf24" }} />
-          <span>Condition</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded" style={{ background: "#818cf8" }} />
-          <span>Parallel</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded" style={{ background: "#60a5fa" }} />
-          <span>Sequential</span>
-        </div>
+        {[
+          { label: "Completed", color: getStatusColor("completed") },
+          { label: "Running", color: getStatusColor("running") },
+          { label: "Waiting", color: getStatusColor("waiting") },
+          { label: "Pending", color: getStatusColor("pending") },
+          { label: "Failed", color: getStatusColor("failed") },
+        ].map((item) => (
+          <div key={item.label} className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ background: item.color }} />
+            <span>{item.label}</span>
+          </div>
+        ))}
       </div>
       
       <div style={{ width: "100%", height: "600px" }}>
@@ -228,8 +198,8 @@ export default function WorkflowVisualizer({
         <Controls />
         <MiniMap
           nodeColor={(node) => {
-            const isExecuted = executionResult?.nodesExecuted.includes(node.id);
-            return isExecuted ? "#4ade80" : "#e5e7eb";
+            const status = statusByStep.get(node.id) ?? "pending";
+            return getStatusColor(status);
           }}
         />
         <Panel position="top-left">
@@ -243,12 +213,12 @@ export default function WorkflowVisualizer({
             <CardContent className="p-4 pt-0">
               <div className="flex gap-2 text-xs">
                 <Badge variant="secondary">v{workflow.version}</Badge>
-                <Badge variant="outline">{workflow.nodes.length} nodes</Badge>
+                <Badge variant="outline">{workflow.steps.length} steps</Badge>
               </div>
             </CardContent>
           </Card>
         </Panel>
-        {executionResult && (
+        {stepExecutions && (
           <Panel position="top-right">
             <Card className="min-w-[200px]">
               <CardHeader className="p-4">
@@ -256,13 +226,17 @@ export default function WorkflowVisualizer({
               </CardHeader>
               <CardContent className="p-4 pt-0 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Nodes:</span>
-                  <Badge variant="default">{executionResult.nodesExecuted.length}</Badge>
+                  <span className="text-muted-foreground">Completed:</span>
+                  <Badge variant="default">
+                    {stepExecutions.filter((step) => step.status === "completed").length}
+                  </Badge>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Spans:</span>
-                  <Badge variant="default">{executionResult.spans.length}</Badge>
-                </div>
+                {spans && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Spans:</span>
+                    <Badge variant="default">{spans.length}</Badge>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </Panel>
@@ -273,36 +247,33 @@ export default function WorkflowVisualizer({
   );
 }
 
-function calculateNodeLevel(
-  nodeId: string,
+function calculateStepLevel(
+  stepKey: string,
   workflow: WorkflowDefinition,
   cache: Map<string, number>
 ): number {
-  if (cache.has(nodeId)) {
-    return cache.get(nodeId)!;
+  if (cache.has(stepKey)) {
+    return cache.get(stepKey)!;
   }
 
-  if (nodeId === workflow.startNode) {
-    cache.set(nodeId, 0);
+  if (stepKey === workflow.entryStep) {
+    cache.set(stepKey, 0);
     return 0;
   }
 
-  // Find parent nodes
-  const parents = workflow.nodes.filter((n) => {
-    if (!n.next) return false;
-    const nextNodes = Array.isArray(n.next) ? n.next : [n.next];
-    return nextNodes.includes(nodeId);
-  });
+  const parents = workflow.steps.filter((step) =>
+    step.transitions?.some((transition) => transition.to === stepKey)
+  );
 
   if (parents.length === 0) {
-    cache.set(nodeId, 0);
+    cache.set(stepKey, 0);
     return 0;
   }
 
   const maxParentLevel = Math.max(
-    ...parents.map((p) => calculateNodeLevel(p.id, workflow, cache))
+    ...parents.map((parent) => calculateStepLevel(parent.key, workflow, cache))
   );
   const level = maxParentLevel + 1;
-  cache.set(nodeId, level);
+  cache.set(stepKey, level);
   return level;
 }
