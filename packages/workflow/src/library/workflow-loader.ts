@@ -1,7 +1,13 @@
+/**
+ * Workflow Loader
+ * 
+ * Discovers and loads workflow definitions from filesystem
+ */
+
 import { readdir } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { WorkflowDefinition } from "./types.js";
+import type { WorkflowDefinition } from "../types/index.js";
 
 export interface WorkflowSummary {
 	id: string;

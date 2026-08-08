@@ -9,8 +9,8 @@
 
 import type { Registry } from "@c4c/core";
 import { createExecutionContext } from "@c4c/core";
-import { executeWorkflow } from "./runtime.js";
-import type { WorkflowDefinition, WorkflowExecutionResult } from "./types.js";
+import { executeWorkflow } from "../execution/index.js";
+import type { WorkflowDefinition, WorkflowExecutionResult } from "../types/index.js";
 
 /**
  * Webhook event structure
