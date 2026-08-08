@@ -1,7 +1,8 @@
 {
-  "name": "cross-integration-tests",
+  "name": "pausable-workflows-example",
   "version": "1.0.0",
   "type": "module",
+  "description": "Example demonstrating pausable workflows with when() helper",
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest"

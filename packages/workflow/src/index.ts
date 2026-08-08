@@ -16,10 +16,12 @@ export type {
   ParallelConfig,
   SubWorkflowConfig,
   WorkflowResumeState,
+  WorkflowPauseState,
+  WhenFilterContext,
   TriggerConfig,
 } from "./types.js";
 
-export { executeWorkflow, validateWorkflow } from "./runtime.js";
+export { executeWorkflow, resumeWorkflow, validateWorkflow } from "./runtime.js";
 
 export { createSubworkflowProcedure } from "./subworkflow.js";
 
@@ -39,7 +41,7 @@ export {
 } from "./library.js";
 
 // Workflow builder API
-export { workflow, step, parallel, condition, sequence } from "./builder.js";
+export { workflow, step, parallel, condition, sequence, when } from "./builder.js";
 export type { StepContext, ConditionContext } from "./builder.js";
 
 // Re-export selected core types for app/example convenience

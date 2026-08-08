@@ -11,7 +11,7 @@ import type { z } from "zod";
  */
 export interface WorkflowNode {
 	id: string;
-	type: "procedure" | "condition" | "parallel" | "sequential" | "trigger";
+	type: "procedure" | "condition" | "parallel" | "sequential" | "trigger" | "await";
 	procedureName?: string; // Reference to registered procedure (for trigger nodes, this is the trigger procedure)
 	config?: Record<string, unknown>;
 	next?: string | string[]; // Next node(s) to execute
@@ -146,6 +146,34 @@ export interface WorkflowResumeState {
 }
 
 /**
+ * Detailed pause state for workflow execution
+ * Used by TriggerWorkflowManager to match incoming events to paused workflows
+ */
+export interface WorkflowPauseState extends WorkflowResumeState {
+	/** Node ID where workflow is paused (await node) */
+	pausedAt: string;
+	/** What trigger(s) this workflow is waiting for */
+	waitingFor: {
+		procedures: string[];
+		filter?: (event: unknown, context: WhenFilterContext) => boolean;
+	};
+	/** When the workflow was paused */
+	pausedTime: Date;
+	/** When the workflow should timeout (if configured) */
+	timeoutAt?: Date;
+}
+
+/**
+ * Context provided to filter functions in when() helper
+ */
+export interface WhenFilterContext {
+	variables: Record<string, unknown>;
+	nodeOutputs: Map<string, unknown>;
+	executionId: string;
+	workflowId: string;
+}
+
+/**
  * Condition node configuration
  */
 export interface ConditionPredicateContext {
@@ -156,12 +184,22 @@ export interface ConditionPredicateContext {
 }
 
 export type ConditionPredicate = (context: ConditionPredicateContext) => boolean;
+export type SwitchPredicate = (context: ConditionPredicateContext) => string | number;
 
+/**
+ * Condition configuration supporting both binary (true/false) and switch-case modes
+ */
 export interface ConditionConfig {
+	// Binary mode (true/false)
 	expression?: string; // JavaScript expression
-	trueBranch: string; // Node ID for true
-	falseBranch: string; // Node ID for false
+	trueBranch?: string; // Node ID for true
+	falseBranch?: string; // Node ID for false
 	predicateFn?: ConditionPredicate; // Optional runtime predicate
+	
+	// Switch-case mode
+	switchFn?: SwitchPredicate; // Returns case key
+	cases?: Record<string | number, string>; // case key -> node ID
+	defaultBranch?: string; // Default node ID if no case matches
 }
 
 /**

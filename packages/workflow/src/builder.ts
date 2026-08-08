@@ -5,6 +5,7 @@ import type {
 	ConditionConfig,
 	ParallelConfig,
 	ConditionPredicateContext,
+	WhenFilterContext,
 } from "./types.js";
 
 type AnyZod = z.ZodTypeAny;
@@ -74,7 +75,8 @@ interface ParallelOptions<
 	metadata?: Record<string, unknown>;
 }
 
-interface ConditionOptions<
+// Binary condition (true/false)
+interface BinaryConditionOptions<
 	Id extends string,
 	InputSchema extends AnyZod,
 	TrueBranch extends NormalizedComponent,
@@ -88,6 +90,47 @@ interface ConditionOptions<
 	predicate?: (ctx: ConditionAuthoringContext<z.infer<InputSchema>>) => boolean;
 	expression?: string;
 	output?: OutputSchema;
+	metadata?: Record<string, unknown>;
+}
+
+// Switch-case condition
+interface SwitchConditionOptions<
+	Id extends string,
+	InputSchema extends AnyZod,
+	Cases extends Record<string | number, NormalizedComponent>,
+	OutputSchema extends AnyZod | undefined,
+> {
+	id: Id;
+	input: InputSchema;
+	switch: (ctx: ConditionAuthoringContext<z.infer<InputSchema>>) => string | number;
+	cases: Cases;
+	default?: NormalizedComponent;
+	output?: OutputSchema;
+	metadata?: Record<string, unknown>;
+}
+
+// Legacy type alias for backward compatibility
+type ConditionOptions<
+	Id extends string,
+	InputSchema extends AnyZod,
+	TrueBranch extends NormalizedComponent,
+	FalseBranch extends NormalizedComponent,
+	OutputSchema extends AnyZod | undefined,
+> = BinaryConditionOptions<Id, InputSchema, TrueBranch, FalseBranch, OutputSchema>;
+
+interface WhenOptions<
+	Id extends string,
+	OutputSchema extends AnyZod,
+> {
+	id: Id;
+	on: string | string[];
+	mode?: 'before' | 'after' | 'instead';
+	filter?: (event: unknown, context: WhenFilterContext) => boolean;
+	timeout?: {
+		duration: number;
+		onTimeout?: string;
+	};
+	output: OutputSchema;
 	metadata?: Record<string, unknown>;
 }
 
@@ -299,45 +342,147 @@ export function parallel<
 	};
 }
 
+// Binary condition (true/false)
 export function condition<
 	Id extends string,
 	InputSchema extends AnyZod,
 	TrueBranch extends NormalizedComponent,
 	FalseBranch extends NormalizedComponent,
 	OutputSchema extends AnyZod | undefined,
->(options: ConditionOptions<Id, InputSchema, TrueBranch, FalseBranch, OutputSchema>): WorkflowComponent<
+>(options: BinaryConditionOptions<Id, InputSchema, TrueBranch, FalseBranch, OutputSchema>): WorkflowComponent<
 	InputSchema,
 	OutputSchema extends AnyZod ? OutputSchema : AnyZod
-> {
+>;
+
+// Switch-case condition
+export function condition<
+	Id extends string,
+	InputSchema extends AnyZod,
+	Cases extends Record<string | number, NormalizedComponent>,
+	OutputSchema extends AnyZod | undefined,
+>(options: SwitchConditionOptions<Id, InputSchema, Cases, OutputSchema>): WorkflowComponent<
+	InputSchema,
+	OutputSchema extends AnyZod ? OutputSchema : AnyZod
+>;
+
+// Implementation
+export function condition<
+	Id extends string,
+	InputSchema extends AnyZod,
+	TrueBranch extends NormalizedComponent,
+	FalseBranch extends NormalizedComponent,
+	Cases extends Record<string | number, NormalizedComponent>,
+	OutputSchema extends AnyZod | undefined,
+>(
+	options:
+		| BinaryConditionOptions<Id, InputSchema, TrueBranch, FalseBranch, OutputSchema>
+		| SwitchConditionOptions<Id, InputSchema, Cases, OutputSchema>
+): WorkflowComponent<InputSchema, OutputSchema extends AnyZod ? OutputSchema : AnyZod> {
+	// Check if it's switch-case mode
+	if ('switch' in options && 'cases' in options) {
+		// Switch-case mode
+		const switchOptions = options as SwitchConditionOptions<Id, InputSchema, Cases, OutputSchema>;
+		const caseEntries = Object.entries(switchOptions.cases);
+		const caseBranches: Record<string | number, string> = {};
+		
+		for (const [key, component] of caseEntries) {
+			caseBranches[key] = component.entryId;
+		}
+		
+		const node: WorkflowNode = {
+			id: switchOptions.id,
+			type: "condition",
+			config: {
+				switchFn: switchOptions.switch,
+				cases: caseBranches,
+				defaultBranch: switchOptions.default?.entryId,
+			} satisfies ConditionConfig,
+		};
+
+		const nodes: WorkflowNode[] = [node];
+		const allBranches = [...Object.values(switchOptions.cases), ...(switchOptions.default ? [switchOptions.default] : [])];
+		
+		for (const branch of allBranches) {
+			for (const branchNode of branch.nodes) {
+				if (!nodes.includes(branchNode)) {
+					nodes.push(branchNode);
+				}
+			}
+		}
+
+		const exitIds = allBranches.flatMap(b => b.exitIds);
+
+		return {
+			id: switchOptions.id,
+			nodes,
+			entryId: node.id,
+			exitIds,
+			input: switchOptions.input,
+			output: (switchOptions.output ?? Object.values(switchOptions.cases)[0]?.output) as OutputSchema extends AnyZod ? OutputSchema : AnyZod,
+		};
+	} else {
+		// Binary mode (existing logic)
+		const binaryOptions = options as BinaryConditionOptions<Id, InputSchema, TrueBranch, FalseBranch, OutputSchema>;
+		
+		const node: WorkflowNode = {
+			id: binaryOptions.id,
+			type: "condition",
+			config: {
+				expression: binaryOptions.expression ?? binaryOptions.predicate?.toString(),
+				predicateFn: binaryOptions.predicate,
+				trueBranch: binaryOptions.whenTrue.entryId,
+				falseBranch: binaryOptions.whenFalse.entryId,
+			} satisfies ConditionConfig,
+		};
+
+		const nodes: WorkflowNode[] = [node];
+		for (const branch of [...binaryOptions.whenTrue.nodes, ...binaryOptions.whenFalse.nodes]) {
+			if (!nodes.includes(branch)) {
+				nodes.push(branch);
+			}
+		}
+
+		const exitIds = [...binaryOptions.whenTrue.exitIds, ...binaryOptions.whenFalse.exitIds];
+
+		return {
+			id: binaryOptions.id,
+			nodes,
+			entryId: node.id,
+			exitIds,
+			input: binaryOptions.input,
+			output: (binaryOptions.output ??
+				binaryOptions.whenTrue.output ??
+				(binaryOptions.whenFalse.output as AnyZod)) as OutputSchema extends AnyZod ? OutputSchema : AnyZod,
+		};
+	}
+}
+
+export function when<Id extends string, OutputSchema extends AnyZod>(
+	options: WhenOptions<Id, OutputSchema>
+): WorkflowComponent<AnyZod, OutputSchema> {
+	const procedures = Array.isArray(options.on) ? options.on : [options.on];
+	
 	const node: WorkflowNode = {
 		id: options.id,
-		type: "condition",
+		type: "await",
+		procedureName: procedures[0], // Primary trigger procedure
 		config: {
-			expression: options.expression ?? options.predicate?.toString(),
-			predicateFn: options.predicate,
-			trueBranch: options.whenTrue.entryId,
-			falseBranch: options.whenFalse.entryId,
-		} satisfies ConditionConfig,
+			procedures,
+			mode: options.mode || 'after',
+			filter: options.filter,
+			timeout: options.timeout,
+			// This marks it as a pause point
+			pauseWorkflow: true,
+		},
 	};
-
-	const nodes: WorkflowNode[] = [node];
-	for (const branch of [...options.whenTrue.nodes, ...options.whenFalse.nodes]) {
-		if (!nodes.includes(branch)) {
-			nodes.push(branch);
-		}
-	}
-
-	const exitIds = [...options.whenTrue.exitIds, ...options.whenFalse.exitIds];
 
 	return {
 		id: options.id,
-		nodes,
+		nodes: [node],
 		entryId: node.id,
-		exitIds,
-		input: options.input,
-		output: (options.output ??
-			options.whenTrue.output ??
-			(options.whenFalse.output as AnyZod)) as OutputSchema extends AnyZod ? OutputSchema : AnyZod,
+		exitIds: [node.id],
+		input: undefined as unknown as AnyZod,
+		output: options.output,
 	};
 }
 

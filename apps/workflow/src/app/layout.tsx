@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   viewport: "width=device-width, initial-scale=1",
 };
 
+import { Navigation } from "@/components/Navigation";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -33,7 +35,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <Navigation />
+        {children}
+      </body>
     </html>
   );
 }

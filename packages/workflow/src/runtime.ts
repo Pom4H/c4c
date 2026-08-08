@@ -16,7 +16,9 @@ import type {
 	ConditionConfig,
 	ParallelConfig,
 	ConditionPredicateContext,
-  WorkflowResumeState,
+	WorkflowResumeState,
+	WorkflowPauseState,
+	WhenFilterContext,
 } from "./types.js";
 import { publish, type SerializedWorkflowExecutionResult } from "./events.js";
 import { SpanCollector, bindCollector, forceFlush, clearActiveCollector } from "./otel.js";
@@ -120,6 +122,72 @@ export async function executeWorkflow(
 				});
 
 				const nextNodeId = await executeNode(node, workflowContext, registry, workflow);
+
+				// Check if workflow should pause
+				if (nextNodeId === "PAUSE") {
+					const nodeOutput = workflowContext.nodeOutputs.get(node.id);
+					const executionTime = Date.now() - startTime;
+
+					// Get await node config for filter
+					const awaitConfig = node.config as {
+						procedures: string[];
+						filter?: (event: unknown, context: WhenFilterContext) => boolean;
+						timeout?: { duration: number; onTimeout?: string };
+					};
+
+					// Create pause state
+					const pauseState: WorkflowPauseState = {
+						workflowId: workflow.id,
+						executionId,
+						currentNode: node.id,
+						pausedAt: node.id,
+						waitingFor: {
+							procedures: awaitConfig.procedures,
+							filter: awaitConfig.filter,
+						},
+						variables: workflowContext.variables,
+						nodeOutputs: Object.fromEntries(workflowContext.nodeOutputs),
+						nodesExecuted,
+						pausedTime: new Date(),
+						timeoutAt: awaitConfig.timeout
+							? new Date(Date.now() + awaitConfig.timeout.duration)
+							: undefined,
+					};
+
+					workflowSpan.setAttributes({
+						"workflow.status": "paused",
+						"workflow.paused_at": node.id,
+						"workflow.waiting_for": awaitConfig.procedures.join(","),
+						"workflow.execution_time_ms": executionTime,
+					});
+					workflowSpan.setStatus({ code: SpanStatusCode.OK });
+
+					console.log(`[Workflow] ⏸️  Workflow paused at: ${node.id}`);
+					console.log(`[Workflow] 📢 Waiting for: ${awaitConfig.procedures.join(", ")}`);
+
+					const pausedResult: WorkflowExecutionResult = {
+						executionId,
+						status: "paused",
+						outputs: Object.fromEntries(workflowContext.nodeOutputs),
+						executionTime,
+						nodesExecuted,
+						resumeState: pauseState,
+					};
+
+					// Save paused execution to store
+					executionStore.completeExecution(executionId, pausedResult);
+
+					publish({
+						type: "workflow.paused",
+						workflowId: workflow.id,
+						executionId,
+						pausedAt: node.id,
+						waitingFor: awaitConfig.procedures,
+						executionTime,
+					});
+
+					return pausedResult;
+				}
 
 				// Get output for this node
 				const nodeOutput = workflowContext.nodeOutputs.get(node.id);
@@ -260,7 +328,267 @@ export async function executeWorkflow(
 	return result;
 }
 
-// resumeWorkflow removed - use TriggerWorkflowManager for event-driven workflows
+/**
+ * Resume a paused workflow from a saved pause state
+ * Called by TriggerWorkflowManager when a matching event arrives
+ */
+export async function resumeWorkflow(
+	workflow: WorkflowDefinition,
+	registry: Registry,
+	pauseState: WorkflowPauseState,
+	triggerData: unknown,
+	options?: { collector?: SpanCollector }
+): Promise<WorkflowExecutionResult> {
+	const executionId = pauseState.executionId;
+	const startTime = Date.now();
+	const collector = options?.collector ?? new SpanCollector();
+	let collectorBound = false;
+
+	try {
+		await bindCollector(collector);
+		collectorBound = true;
+	} catch (error) {
+		console.warn("[Workflow] Failed to initialize OpenTelemetry collector:", error);
+	}
+
+	console.log(`[Workflow] 🔄 Resuming workflow: ${workflow.id} (execution: ${executionId})`);
+	console.log(`[Workflow] 📥 Resume from node: ${pauseState.pausedAt}`);
+
+	const executionStore = getExecutionStore();
+
+	const result = await tracer.startActiveSpan(
+		`workflow.resume`,
+		{
+			attributes: {
+				"workflow.id": workflow.id,
+				"workflow.name": workflow.name,
+				"workflow.execution_id": executionId,
+				"workflow.resumed_from": pauseState.pausedAt,
+			},
+		},
+		async (workflowSpan: Span) => {
+			// Restore context from pause state
+			const workflowContext: WorkflowContext = {
+				workflowId: workflow.id,
+				executionId,
+				variables: {
+					...pauseState.variables,
+					// Add trigger data
+					trigger: triggerData,
+					resumeData: triggerData,
+				},
+				nodeOutputs: new Map(Object.entries(pauseState.nodeOutputs)),
+				startTime: pauseState.pausedTime,
+			};
+
+			// Store trigger data in the await node's output
+			workflowContext.nodeOutputs.set(pauseState.pausedAt, triggerData);
+
+			const nodesExecuted: string[] = [...pauseState.nodesExecuted];
+
+			publish({
+				type: "workflow.resumed",
+				workflowId: workflow.id,
+				executionId,
+				resumedFrom: pauseState.pausedAt,
+				timestamp: startTime,
+			});
+
+			try {
+				// Find the await node and get its next node
+				const awaitNode = workflow.nodes.find((n) => n.id === pauseState.pausedAt);
+				if (!awaitNode) {
+					throw new Error(`Await node ${pauseState.pausedAt} not found in workflow`);
+				}
+
+				let currentNodeId: string | undefined =
+					typeof awaitNode.next === "string" ? awaitNode.next : awaitNode.next?.[0];
+				let nodeIndex = nodesExecuted.length;
+
+				// Continue execution from next node
+				while (currentNodeId) {
+					const node = workflow.nodes.find((n) => n.id === currentNodeId);
+					if (!node) {
+						throw new Error(`Node ${currentNodeId} not found in workflow`);
+					}
+
+					workflowContext.currentNode = currentNodeId;
+					nodesExecuted.push(currentNodeId);
+
+					workflowSpan.setAttributes({
+						"workflow.current_node": currentNodeId,
+						"workflow.current_node_index": nodeIndex,
+						"workflow.nodes_executed": nodesExecuted.length,
+					});
+
+					publish({
+						type: "node.started",
+						workflowId: workflow.id,
+						executionId,
+						nodeId: currentNodeId,
+						nodeIndex,
+						timestamp: Date.now(),
+					});
+
+					executionStore.updateNodeStatus(executionId, currentNodeId, "running", {
+						startTime: new Date(),
+					});
+
+					const nextNodeId = await executeNode(node, workflowContext, registry, workflow);
+
+					// Check if workflow should pause again
+					if (nextNodeId === "PAUSE") {
+						const nodeOutput = workflowContext.nodeOutputs.get(node.id);
+						const executionTime = Date.now() - startTime;
+
+						const awaitConfig = node.config as {
+							procedures: string[];
+							filter?: (event: unknown, context: WhenFilterContext) => boolean;
+							timeout?: { duration: number; onTimeout?: string };
+						};
+
+						const newPauseState: WorkflowPauseState = {
+							workflowId: workflow.id,
+							executionId,
+							currentNode: node.id,
+							pausedAt: node.id,
+							waitingFor: {
+								procedures: awaitConfig.procedures,
+								filter: awaitConfig.filter,
+							},
+							variables: workflowContext.variables,
+							nodeOutputs: Object.fromEntries(workflowContext.nodeOutputs),
+							nodesExecuted,
+							pausedTime: new Date(),
+							timeoutAt: awaitConfig.timeout
+								? new Date(Date.now() + awaitConfig.timeout.duration)
+								: undefined,
+						};
+
+						console.log(`[Workflow] ⏸️  Workflow paused again at: ${node.id}`);
+
+						const pausedResult: WorkflowExecutionResult = {
+							executionId,
+							status: "paused",
+							outputs: Object.fromEntries(workflowContext.nodeOutputs),
+							executionTime,
+							nodesExecuted,
+							resumeState: newPauseState,
+						};
+
+						executionStore.completeExecution(executionId, pausedResult);
+
+						return pausedResult;
+					}
+
+					const nodeOutput = workflowContext.nodeOutputs.get(node.id);
+
+					executionStore.updateNodeStatus(executionId, node.id, "completed", {
+						endTime: new Date(),
+						output: nodeOutput,
+					});
+
+					publish({
+						type: "node.completed",
+						workflowId: workflow.id,
+						executionId,
+						nodeId: node.id,
+						nodeIndex,
+						nextNodeId,
+						timestamp: Date.now(),
+						output: nodeOutput,
+					});
+
+					currentNodeId = nextNodeId;
+					nodeIndex++;
+				}
+
+				// Workflow completed
+				const outputs: Record<string, unknown> = {};
+				for (const [nodeId, output] of workflowContext.nodeOutputs.entries()) {
+					outputs[nodeId] = output;
+				}
+
+				const executionTime = Date.now() - pauseState.pausedTime.getTime();
+
+				workflowSpan.setAttributes({
+					"workflow.status": "completed",
+					"workflow.nodes_executed_total": nodesExecuted.length,
+					"workflow.execution_time_ms": executionTime,
+				});
+				workflowSpan.setStatus({ code: SpanStatusCode.OK });
+
+				console.log(
+					`[Workflow] ✅ Completed (resumed): ${workflow.id} (${executionTime}ms, ${nodesExecuted.length} nodes)`
+				);
+
+				const workflowResult: WorkflowExecutionResult = {
+					executionId,
+					status: "completed",
+					outputs,
+					executionTime,
+					nodesExecuted,
+				};
+
+				executionStore.completeExecution(executionId, workflowResult);
+
+				publish({
+					type: "workflow.completed",
+					workflowId: workflow.id,
+					executionId,
+					executionTime,
+					nodesExecuted,
+				});
+
+				return workflowResult;
+			} catch (error) {
+				const executionTime = Date.now() - startTime;
+				const normalizedError = normalizeError(error);
+
+				workflowSpan.setAttributes({
+					"workflow.status": "failed",
+					"workflow.error": normalizedError.message,
+				});
+				workflowSpan.recordException(normalizedError);
+				workflowSpan.setStatus({
+					code: SpanStatusCode.ERROR,
+					message: normalizedError.message,
+				});
+
+				console.error(`[Workflow] ❌ Failed (on resume): ${workflow.id}`, normalizedError);
+
+				const failureResult: WorkflowExecutionResult = {
+					executionId,
+					status: "failed",
+					outputs: {},
+					error: normalizedError,
+					executionTime,
+					nodesExecuted,
+				};
+
+				executionStore.completeExecution(executionId, failureResult);
+
+				return failureResult;
+			} finally {
+				workflowSpan.end();
+			}
+		}
+	);
+
+	if (collectorBound) {
+		try {
+			await forceFlush();
+		} catch (flushError) {
+			console.warn("[Workflow] Failed to flush collected spans:", flushError);
+		}
+		result.spans = collector.getSpans();
+		clearActiveCollector();
+	}
+
+	result.spans ??= [];
+
+	return result;
+}
 
 function normalizeError(error: unknown): Error {
 	if (error instanceof Error) {
@@ -381,6 +709,9 @@ async function executeNode(
 						break;
 					case "trigger":
 						nextNodeId = await executeTriggerNode(node, context);
+						break;
+					case "await":
+						nextNodeId = await executeAwaitNode(node, context);
 						break;
 					default:
 						throw new Error(`Unknown node type: ${node.type}`);
@@ -505,17 +836,53 @@ async function executeProcedureNode(
 
 /**
  * Execute a condition node
+ * Supports both binary (true/false) and switch-case modes
  */
 async function executeConditionNode(
 	node: WorkflowNode,
 	context: WorkflowContext
 ): Promise<string | undefined> {
 	const config = node.config as unknown as ConditionConfig;
+	const activeSpan = trace.getActiveSpan();
+
+	// Check if this is switch-case mode
+	if (typeof config?.switchFn === "function" && config.cases) {
+		// Switch-case mode
+		let caseKey: string | number;
+		try {
+			const predicateContext = createPredicateContext(context);
+			caseKey = config.switchFn(predicateContext);
+		} catch (error) {
+			console.error(`[Workflow] Switch function failed for node ${node.id}`, error);
+			throw error;
+		}
+
+		const nextBranch = config.cases[caseKey] || config.defaultBranch;
+
+		if (!nextBranch) {
+			throw new Error(
+				`[Workflow] Switch node ${node.id}: no branch found for case '${caseKey}' and no default branch defined`
+			);
+		}
+
+		if (activeSpan) {
+			activeSpan.setAttributes({
+				"condition.mode": "switch",
+				"condition.case": String(caseKey),
+				"condition.branch_taken": nextBranch,
+			});
+		}
+
+		console.log(`[Workflow] 🔀 Switch case '${caseKey}' → ${nextBranch}`);
+
+		return nextBranch;
+	}
+
+	// Binary mode (true/false)
 	if (!config?.expression && typeof config?.predicateFn !== "function") {
 		throw new Error(`Condition node ${node.id} is missing expression or predicate`);
 	}
 
-	const activeSpan = trace.getActiveSpan();
 	let result = false;
 	let expressionLabel = config.expression ?? "predicate";
 
@@ -537,6 +904,7 @@ async function executeConditionNode(
 
 	if (activeSpan) {
 		activeSpan.setAttributes({
+			"condition.mode": "binary",
 			"condition.expression": expressionLabel,
 			"condition.variables": JSON.stringify(context.variables),
 			"condition.result": result,
@@ -652,6 +1020,48 @@ async function executeTriggerNode(
 	
 	// Move to next node
 	return typeof node.next === "string" ? node.next : node.next?.[0];
+}
+
+/**
+ * Execute await node (pause workflow until external event)
+ * Returns special "PAUSE" marker to signal workflow should pause
+ */
+async function executeAwaitNode(
+	node: WorkflowNode,
+	context: WorkflowContext
+): Promise<string | undefined | "PAUSE"> {
+	const config = node.config as {
+		procedures: string[];
+		mode?: string;
+		filter?: (event: unknown, context: WhenFilterContext) => boolean;
+		timeout?: { duration: number; onTimeout?: string };
+		pauseWorkflow?: boolean;
+	};
+
+	if (!config.pauseWorkflow) {
+		// This is a regular trigger node, not a pause point
+		return typeof node.next === "string" ? node.next : node.next?.[0];
+	}
+
+	// This is a pause point
+	console.log(`[Workflow] ⏸️  Pausing workflow at node: ${node.id}`);
+	console.log(`[Workflow] 📢 Waiting for trigger(s): ${config.procedures.join(", ")}`);
+
+	if (config.timeout) {
+		console.log(
+			`[Workflow] ⏰ Timeout configured: ${config.timeout.duration}ms → ${config.timeout.onTimeout || "fail"}`
+		);
+	}
+
+	// Store await node info for reference
+	context.nodeOutputs.set(node.id, {
+		awaitingTrigger: config.procedures,
+		pausedAt: new Date(),
+		timeoutDuration: config.timeout?.duration,
+	});
+
+	// Return special PAUSE marker
+	return "PAUSE";
 }
 
 /**
