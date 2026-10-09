@@ -1,0 +1,14 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "Tasks API contract fixture — synthetic provider", "version": "1.0.0"},
+  "servers": [{"url": "https://sandbox.example.test/v2"}],
+  "security": [{"bearer": []}],
+  "paths": {
+    "/tasks": {"get": {"operationId": "listTasks", "parameters": [{"name": "cursor", "in": "query", "schema": {"type": "string"}}], "responses": {"200": {"description": "Page", "content": {"application/json": {"schema": {"type": "object", "required": ["items"], "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/Task"}}, "nextCursor": {"type": ["string", "null"]}}}}}}}}},
+    "/tasks/{id}": {"get": {"operationId": "getTask", "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "Task", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Task"}}}}, "404": {"description": "Not found", "content": {"application/json": {"schema": {"type": "object", "required": ["error"], "properties": {"error": {"type": "string"}}}}}}}}}
+  },
+  "components": {
+    "securitySchemes": {"bearer": {"type": "http", "scheme": "bearer"}},
+    "schemas": {"Task": {"type": "object", "required": ["id", "title", "updatedAt"], "properties": {"id": {"type": "string"}, "title": {"type": "string"}, "updatedAt": {"type": "string"}}}}
+  }
+}

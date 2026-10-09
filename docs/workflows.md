@@ -1,43 +1,51 @@
-# Workflows вокруг инструментов
+# Workflows around tools
 
-## Граница ответственности
+## Responsibilities
 
-c4c — контракты, инструменты, интеграции и их описание. Сценарий — обычный TypeScript с `use workflow`; I/O — именованные `use step`. Runtime, очереди, журнал/replay, ожидания, hooks и inspection предоставляет Workflow SDK. Не создаём ещё одну БД runs, polling-daemon, DSL-интерпретатор или scheduler в c4c.
+c4c provides contracts, tools, integrations, and their descriptions. Write orchestration in ordinary TypeScript with `use workflow` and put I/O in named `use step` functions. Workflow SDK provides execution, queues, logs, replay, waits, hooks, and inspection. c4c does not maintain a separate run database, polling daemon, DSL interpreter, or scheduler.
 
-`define()` остаётся обычной вызываемой функцией с `.contract`. В `examples/workflows/lib/tools.ts` одни и те же функции вызываются HTTP-обработчиком, durable-шагом и описываются для внешнего клиента. `describeTools()` демонстрирует JSON Schema-интроспекцию; адаптер MCP/AI может использовать эти данные. Это НЕ новый готовый hosted MCP-сервер и не универсальное автоэкспонирование всех модулей.
+`define()` creates an ordinary callable function with `.contract` metadata. In `examples/workflows/lib/tools.ts`, the same functions serve an HTTP handler and a durable step, and expose descriptions to external clients. `describeTools()` demonstrates JSON Schema introspection that MCP or AI adapters can consume. The example provides this metadata; implementing an MCP server or exposing additional modules requires an application adapter.
 
-## Почему не durable(tool)
+## Statically declared steps
 
-SDK должен статически обнаружить настоящую функцию с `use step`. Обёртка в рантайме вокруг произвольного closure не заменяет его компиляцию. Поэтому `workflows/steps.ts` содержит явные типизированные функции, а `review-change.ts` — реальный workflow. Основная логика tools не зависит от runtime.
+The SDK must statically discover a function containing `use step`. A runtime wrapper such as `durable(tool)` around an arbitrary closure cannot replace this compilation step. The example therefore declares explicit, typed functions in `workflows/steps.ts` and a native workflow in `review-change.ts`. Tool logic remains independent of the runtime.
 
-Внутри workflow — детерминированный control flow. Сеть, БД, LLM и обычные таймеры внутри step. Длительные паузы — SDK `sleep()` в workflow, не `setTimeout` и не незавершённый HTTP-response. Сериализуйте небольшие значения, а не функции, клиентские объекты, токены и полные большие документы.
+Keep workflow control flow deterministic. Network requests, database access, LLM calls, and ordinary timers belong in steps. Use SDK `sleep()` inside the workflow for long waits, rather than `setTimeout` or a pending HTTP response. Pass small, serializable values across workflow boundaries. Keep functions, client objects, tokens, and large documents outside those inputs and outputs.
 
-## Контракт, ошибки и побочные эффекты
+## Contracts, errors, and side effects
 
-`ContractError` на входе/выходе инструмента и ошибка согласования hash переводятся в `FatalError`. Нельзя лечить их повтором. Настоящий provider adapter обязан отдельно классифицировать permission/business errors и transient failures. Повторы сети и `RetryableError` принадлежат SDK; вложенный самописный retry loop не добавлять.
+The example converts tool input/output `ContractError` failures and approval hash mismatches to `FatalError`, because retries cannot resolve them. Provider adapters must classify permission and business errors separately from transient failures. Let the SDK handle retries and use `RetryableError` where appropriate; avoid a nested custom retry loop.
 
-Durable replay НЕ гарантирует exactly-once side effect у внешнего API. Для отправки, оплаты, записи и создания PR приложение использует provider idempotency key/уникальный бизнес-идентификатор и проверку фактического результата. Пример возвращает решение, а не выполняет финансовых операций и не деплоит SDK.
+Durable replay does not guarantee exactly-once effects in an external API. For sending messages, taking payments, writing data, or creating PRs, the application must use provider idempotency keys or unique business identifiers and verify the actual result. The example returns an approval decision; financial operations and SDK deployment remain outside its scope.
 
-## Hooks и доверие
+## Hooks and authorization
 
-`defineHook({schema})` → `.create()` в workflow → `.resume()` из авторизованного endpoint. Токен связывает runId и candidateHash. Решение для другого snapshot не должно продолжать процесс. Токен — адрес маршрутизации, а не авторизация. `using` освобождает hook после решения/таймаута.
+Declare a hook with `defineHook({schema})`, call `.create()` in the workflow, and call `.resume()` from an authorized endpoint. The token binds `runId` and `candidateHash`. An approval for another snapshot must not resume the process. The token routes the event; authorization requires a separate check. `using` disposes of the hook after a decision or timeout.
 
-Пример защищён единым service token. Для продукта нужны membership/scopes и проверка принадлежности каждого run; внешние webhooks требуют подписи и дедупликации события. Не выдавайте пример с общим token за multi-tenant authorization. POST создания запуска не дедуплицируется по бизнес-задаче: добавьте это на уровне приложения, если повтор клиентского запроса должен ссылаться на тот же run.
+The example uses one service token. A multi-tenant application must enforce membership, scopes, and ownership of each run. External webhooks need signature verification and event deduplication. The POST endpoint that creates runs does not deduplicate by business task; add application-level deduplication when a repeated client request should refer to the same run.
 
 ## Deployment
 
-| Режим | Исполнение/состояние | Что делает c4c |
+| Mode | Execution and state | Application setup |
 |---|---|---|
-| Local World | SDK dev backend | Обычный `next dev`; не заявлять restart-durable очередь |
-| Vercel World | Managed SDK backend на Vercel | `withWorkflow`; обычные инструменты могут обращаться к PostgreSQL бизнес-данных |
-| Postgres World | PostgreSQL + Graphile Worker в постоянном Node-сервере | Env, официальный bootstrap, `world.start()` при server startup |
+| Local World | SDK development backend | Run `next dev`; queue recovery after a restart is not guaranteed |
+| Vercel World | Managed SDK backend on Vercel | Use `withWorkflow`; tools can access PostgreSQL for business data |
+| Postgres World | PostgreSQL and Graphile Worker in a long-lived Node server | Set environment variables, run the official bootstrap, and call `world.start()` at server startup |
 
-Postgres World не помещать внутрь Vercel serverless функции. PostgreSQL для предметных данных и PostgreSQL как backend runtime — разные решения. На self-hosted хосте защитите служебные `/.well-known/workflow/*` endpoints от публичного вызова (private ingress/reverse proxy); `C4C_ADMIN_TOKEN` защищает лишь API этого примера. Не открывайте локальный backend/inspection UI в интернет.
+Postgres World requires a long-lived server and cannot run inside a Vercel serverless function. Choosing PostgreSQL for business data is separate from choosing it as the workflow runtime backend. For self-hosted deployments, protect the internal `/.well-known/workflow/*` endpoints from public access with private ingress or a reverse proxy. `C4C_ADMIN_TOKEN` protects only the example's application API. Keep the local backend and inspection UI private.
 
-На Vercel старые runs привязаны к deployment. Для self-hosted обновлений отдельно следуйте правилам версионирования выбранного SDK; не заменяйте исполняемый код старых процессов неявно. Собственные записи 0.1 несовместимы с SDK-журналом.
+On Vercel, existing runs are tied to their deployment. For self-hosted upgrades, follow the selected SDK's versioning rules and preserve the executable code required by existing runs. The old c4c 0.1 execution records are incompatible with the SDK log.
 
-## Проверки
+## Verification
 
-По умолчанию тестируем pure business logic и конфигурационные границы. Скомпилированные steps, pause/resume, сохранение после рестарта и реальные Vercel/Postgres подключения проверяются отдельно — процедура в примере. Это разные уровни доказательств.
+Default checks cover pure business logic and configuration boundaries. Compiled steps, pause/resume, restart recovery, and real Vercel or Postgres connections require separate verification. Follow the procedures in the [workflow example](../examples/workflows/README.md); unit tests alone do not establish deployed runtime behavior.
 
-Источники: https://workflow-sdk.dev/docs/getting-started/next ; https://workflow-sdk.dev/worlds/vercel ; https://workflow-sdk.dev/worlds/postgres ; https://workflow-sdk.dev/worlds/local ; https://github.com/vercel/workflow-examples/tree/main/postgres . Версии workflow/world-postgres 5.0.1 взяты из официального примера; перед обновлением проверять docs установленной версии.
+## References
+
+- [Workflow SDK with Next.js](https://workflow-sdk.dev/docs/getting-started/next)
+- [Vercel World](https://workflow-sdk.dev/worlds/vercel)
+- [Postgres World](https://workflow-sdk.dev/worlds/postgres)
+- [Local World](https://workflow-sdk.dev/worlds/local)
+- [Official PostgreSQL example](https://github.com/vercel/workflow-examples/tree/main/postgres)
+
+The `workflow` and `@workflow/world-postgres` versions, 5.0.1, were taken from the official example. Consult the documentation for the installed version before upgrading.

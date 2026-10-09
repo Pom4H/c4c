@@ -11,7 +11,7 @@ test('actual codegen → typed standalone SDK → validated response, without c4
     const root = resolve('.tmp'); await mkdir(root,{recursive:true});
     const temp = await mkdtemp(join(root,'real-codegen-')); t.after(()=>rm(temp,{recursive:true,force:true}));
     const out = join(temp,'integration');
-    await integrate(resolve('examples/tender/openapi.json'),out);
+    await integrate(resolve('examples/tasks/openapi.json'),out);
     const sdkText = await readFile(join(out,'sdk','sdk.gen.ts'),'utf8');
     assert.equal(sdkText.includes('@c4c/'),false);
     const tsc = resolve('node_modules/typescript/bin/tsc');
@@ -21,17 +21,17 @@ test('actual codegen → typed standalone SDK → validated response, without c4
     globalThis.fetch = async () => { throw new Error('Unexpected network call in contract test'); };
     t.after(() => { globalThis.fetch = originalFetch; });
     const { tsImport } = await import('tsx/esm/api');
-    const { getTender } = await tsImport(join(out,'sdk','sdk.gen.ts'),import.meta.url);
+    const { getTask } = await tsImport(join(out,'sdk','sdk.gen.ts'),import.meta.url);
     const { client } = await tsImport(join(out,'sdk','client.gen.ts'),import.meta.url);
     let seen;
     client.setConfig({baseUrl:'https://example.test/v2',fetch:async request=>{
-      seen=request;return new Response(JSON.stringify({id:'42',title:'Fixture, not a live tender',updatedAt:'2026-01-01T00:00:00Z'}),{headers:{'content-type':'application/json'}});
+      seen=request;return new Response(JSON.stringify({id:'42',title:'Review API changes',updatedAt:'2026-01-01T00:00:00Z'}),{headers:{'content-type':'application/json'}});
     }});
     // Explicit injection avoids reliance on singleton identity across TS module loaders
     // and is also how independent tenants should supply their clients.
-    const result = await getTender({client,path:{id:'42'},throwOnError:true});
+    const result = await getTask({client,path:{id:'42'},throwOnError:true});
     assert.equal(result.data.id,'42');
-    assert.equal(seen.url,'https://example.test/v2/tenders/42');
+    assert.equal(seen.url,'https://example.test/v2/tasks/42');
     client.setConfig({fetch:async()=>new Response(JSON.stringify({id:42,title:'invalid',updatedAt:'x'}),{headers:{'content-type':'application/json'}})});
-    await assert.rejects(getTender({client,path:{id:'42'},throwOnError:true}));
+    await assert.rejects(getTask({client,path:{id:'42'},throwOnError:true}));
   });

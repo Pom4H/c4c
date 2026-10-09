@@ -1,33 +1,35 @@
-# c4c: собственный runtime → Workflow SDK
+# Migrating from the c4c runtime to Workflow SDK
 
-## Исправление направления
+## Migration scope
 
-Задача — сохранить workflows вокруг контрактных инструментов и заменить наш engine на Workflow SDK. Промежуточное сужение c4c до «core + SDK generator, без workflows» не соответствовало этой задаче. Core/codegen остаются небольшими и независимыми, но не определяют пределы продукта.
+Workflow SDK replaces the custom c4c engine while preserving workflows around typed tools. Core and code generation remain small, independently usable packages. Workflow execution uses native SDK functions.
 
-Старая 0.1 сохранена в `archive/v0.1`; codegen snapshots и механизм review 0.2 не удаляются. Новый runnable sample находится в `examples/workflows`. Это нативная интеграция с SDK, не восстановление старого интерпретатора и не drop-in compatibility layer.
+Version 0.1 is preserved in the [archive/v0.1 branch](https://github.com/Pom4H/c4c/tree/archive/v0.1). Version 0.2 retains code generation snapshots and the integration review process. The runnable example is in [`examples/workflows`](../examples/workflows/README.md). It uses the native SDK and requires migration from the old interpreter; it is not a drop-in compatibility layer.
 
-| Раньше | Теперь |
+| Previous implementation | Replacement |
 |---|---|
-| Procedure contract + handler | Callable `define()` tool и `.contract` |
-| Самописный workflow runner | `use workflow` + `start()` из Workflow SDK |
-| Runtime node dispatch | Именованные `use step` вызывают те же инструменты |
-| Своя очередь, таймеры, replay | SDK runtime и выбранный World |
-| Свои hooks/resume | `defineHook`, schema, `.create()` / `.resume()` |
-| Самописный журнал/visualizer | `workflow inspect`, `workflow web`, Vercel observability |
-| Неявный registry | Явный набор инструментов и интроспекция контрактов |
+| Procedure contract and handler | Callable `define()` tool with `.contract` |
+| Custom workflow runner | `use workflow` and `start()` from Workflow SDK |
+| Runtime node dispatch | Named `use step` functions that call the same tools |
+| Custom queue, timers, and replay | SDK runtime and the selected World |
+| Custom hooks and resume | `defineHook`, a schema, and `.create()` / `.resume()` |
+| Custom execution log and visualizer | `workflow inspect`, `workflow web`, and Vercel observability |
+| Implicit registry | Explicit tool set and contract introspection |
 
-## Последовательность переноса потребителя 0.1
+## Migrating an application from 0.1
 
-1. Сохранить доменные input/output контракты и права вызова; вынести handler в обычную функцию.
-2. Обернуть I/O в явную `use step` функцию, не в динамический closure.
-3. Перенести порядок, ветвление, параллелизм и ожидания в `use workflow`.
-4. Обработчики событий проверяют identity, scopes и подпись, затем возобновляют типизированный hook.
-5. Выбрать Vercel World либо long-lived Postgres World; схема runtime управляется официальным bootstrap.
-6. Проверить start/status/approval/cancel, restart и side-effect idempotency на выбранном backend.
-7. Старые runs завершить старым engine либо мигрировать через явно записанные бизнес-checkpoints. SDK не умеет читать журнал 0.1; не обещать автоматический replay старых процессов.
+1. Preserve domain input/output contracts and call permissions. Extract each handler into an ordinary function.
+2. Put I/O in an explicit, statically declared `use step` function.
+3. Move sequencing, branching, parallelism, and waits into `use workflow`.
+4. Validate identity, scopes, and signatures in event handlers before resuming a typed hook.
+5. Choose Vercel World or Postgres World with a long-lived server. Use the official bootstrap to manage the runtime schema.
+6. Verify start, status, approval, cancellation, restart recovery, and side-effect idempotency on the selected backend.
+7. Finish existing runs with the old engine, or migrate them through explicitly recorded business checkpoints. The SDK cannot read the 0.1 execution log or automatically replay its runs.
 
-Функциональный паритет конкретного приложения (старые триггеры, auth-policy, artifacts, UI) требует его тестов. Добавленный пример доказывает структуру нового пути, но сам по себе не является проверкой всех прежних приложений.
+Verify application-specific behavior with that application's tests, including existing triggers, authorization policies, artifacts, and UI. The example demonstrates the integration structure; it does not establish functional parity for every application built on 0.1.
 
-## Что не меняется в интеграциях
+## Integration lifecycle compatibility
 
-`c4c integrate/check/update`, snapshot и generator pin, запрет затирать hand edits, `--expect <candidateHash>` остаются. Generated SDK не обязан импортировать c4c. Задача workflow может подготовить review и ожидать решения, но фактическое изменение интеграции выполняется отдельной авторизованной CI-задачей/CLI-командой с той же проверкой hash. Не записывать generated source в файловую систему Vercel-функции.
+`c4c integrate`, `c4c check`, and `c4c update` retain their snapshots, pinned generator, protection for hand edits, and `--expect <candidateHash>` review requirement. Generated SDKs remain independent of c4c.
+
+A workflow can prepare a review and wait for a decision. Apply the actual integration update through a separately authorized CI job or CLI command with the same hash check. Do not write generated source files into a Vercel function's filesystem.

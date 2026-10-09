@@ -1,138 +1,130 @@
 # c4c
 
-**Типизированные инструменты и workflows вокруг них. Исполнение — Workflow SDK.**
+**Typed tools and workflows, powered by Workflow SDK.**
 
-c4c сохраняет контракты, интеграции и сценарии автоматизации. Мы заменяем **собственный рантайм**, а не отказываемся от workflows. Приложение не должно выбирать между обычной функцией и надёжным длительным процессом.
+Define callable tools with input/output contracts, generate independent API clients, and compose them into durable workflows. c4c makes contracts available to HTTP and AI adapters; Workflow SDK handles execution.
 
-```text
-контракт инструмента → обычная функция → use step → use workflow
-                            ↑                         ↓
-                 OpenAPI SDK / HTTP / AI      Workflow SDK runtime
-                                              ├─ Vercel World
-                                              └─ Postgres World
-```
-
-| Часть | Ответственность |
+| Part | Responsibility |
 |---|---|
-| `@c4c/core` | Вызываемые инструменты, проверка входа/выхода, доступные `.contract` для интроспекции. Без runtime-зависимостей. |
-| `@c4c/cli` | OpenAPI → snapshot + самостоятельный Fetch SDK + Zod. Проверка изменений и review перед обновлением. |
-| Workflow SDK | Durable execution, steps, hooks, ожидание, retries, состояние, история и observability. **Не наш второй движок.** |
-| Приложение | Бизнес-сценарий, права доступа, идемпотентность внешних эффектов и предметные данные. |
+| `@c4c/core` | Callable tools, input/output validation, and `.contract` metadata for introspection. Zero runtime dependencies. |
+| `@c4c/cli` | OpenAPI snapshots, standalone Fetch SDKs and Zod validators, and reviewed contract updates. |
+| Workflow SDK | Durable execution, steps, hooks, waits, retries, state, execution history and observability. |
+| Application | Business workflows, access control, side-effect idempotency and domain data. |
 
-Core и CLI можно использовать независимо от workflows. Сгенерированный SDK не импортирует c4c. Для процесса используйте нативные функции SDK, не строковый `engine.run()`.
+Core and CLI work independently of workflows. Generated SDKs do not import c4c. Compose durable processes with native Workflow SDK functions and directives.
 
-## Инструмент — обычная функция
+## A tool is an ordinary function
 
 ```ts
 import { define } from '@c4c/core';
 import { z } from 'zod';
 
-export const normalizeProduct = define(
-  { input: z.object({ sku: z.string(), name: z.string() }),
-    output: z.object({ sku: z.string(), title: z.string() }) },
-  ({ sku, name }) => ({ sku: sku.trim(), title: name.trim() }),
+export const normalizeTask = define(
+  { input: z.object({ id: z.string(), title: z.string() }),
+    output: z.object({ id: z.string(), title: z.string() }) },
+  ({ id, title }) => ({ id: id.trim(), title: title.trim() }),
 );
-const product = await normalizeProduct({ sku: ' KKS-2 ', name: 'Cable chamber' });
+const task = await normalizeTask({ id: ' 42 ', title: ' Review API changes ' });
 ```
 
-Вход проверяется до handler, выход — после. Поддерживается Standard Schema v1; Zod — выбор приложения. Схемы доступны через `normalizeProduct.contract`. Нет обязательного сканирования модулей или скрытой авторизации.
+Input is validated before the handler and output afterward. Core supports Standard Schema v1; the application chooses its schema library. Schemas remain available through `normalizeTask.contract`. Module discovery and authorization are explicit application choices.
 
-## Тот же инструмент в durable workflow
+## The same tool in a durable workflow
 
 ```ts
-import { normalizeProduct } from './tools';
+import { normalizeTask } from './tools';
 
-export async function normalizeProductStep(input: { sku: string; name: string }) {
+export async function normalizeTaskStep(input: { id: string; title: string }) {
   'use step';
-  return normalizeProduct(input);
+  return normalizeTask(input);
 }
-export async function onboarding(input: { sku: string; name: string }) {
+export async function prepareTask(input: { id: string; title: string }) {
   'use workflow';
-  const product = await normalizeProductStep(input);
-  return { product };
+  const task = await normalizeTaskStep(input);
+  return { task };
 }
-// Server endpoint: await start(onboarding, [input]) from workflow/api.
+// Server endpoint: await start(prepareTask, [input]) from workflow/api.
 ```
 
-Директивы остаются в именованных функциях: SDK компилирует и исполняет их. В полноценном примере ошибки контракта превращаются в `FatalError`, чтобы не повторять заведомо неверный шаг. Hooks, ожидания и отмена — тоже из SDK.
+Keep directives inside statically declared functions so the SDK can compile and execute them. The runnable example converts contract failures into `FatalError` to avoid retrying invalid input or output. Hooks, durable waits and cancellation also come from the SDK.
 
-**[Запускаемый пример](examples/workflows/README.md):** c4c-инструмент готовит отчёт об изменении API → workflow ждёт подтверждение человека → другой инструмент фиксирует решение для того же hash. Есть HTTP-вызов инструментов, JSON Schema-интроспекция, запуск, статус, hook и отмена. Никакого изменения SDK без отдельного `c4c update --expect`.
+**[Runnable example](examples/workflows/README.md):** a c4c tool prepares an API change review, a workflow waits for human approval, and another tool records the decision for the same candidate hash. It includes direct HTTP tool calls, JSON Schema introspection, start/status endpoints, a typed approval hook and cancellation. Apply an approved SDK update separately with `c4c update --expect`.
 
 ```sh
-# Node 22.18+. 0.2 пока не опубликована в npm; запускаем из checkout.
+# Node 22.18+. Version 0.2 is not published to npm; run from a checkout.
 npm ci
 npm run workflow:setup
 cp examples/workflows/.env.example examples/workflows/.env.local
-# Задайте в .env.local случайный C4C_ADMIN_TOKEN длиной минимум 32 символа.
+# Set a random C4C_ADMIN_TOKEN of at least 32 characters in .env.local.
 npm run workflow:dev
-# В другом терминале, после запуска приложения:
+# In another terminal, once the application is running:
 npm run workflow:smoke
 ```
 
-### Два режима production
+### Production deployment
 
-**Vercel:** `withWorkflow()` + автоматический Vercel World. PostgreSQL может оставаться БД бизнес-данных; собственный polling-worker не запускается.
+**Vercel:** use `withWorkflow()` and the automatically selected Vercel World. Tools can access PostgreSQL for application data.
 
-**Self-hosted PostgreSQL:** `@workflow/world-postgres`, bootstrap схем SDK, постоянный Node-сервер и `world.start()` при его запуске. Это не режим Vercel serverless. Инструкции и Compose — [в примере](examples/workflows/README.md).
+**Self-hosted PostgreSQL:** use `@workflow/world-postgres`, the official schema bootstrap, a persistent Node server and `world.start()` at startup. This mode requires a long-lived worker. Instructions and Compose configuration are [in the example](examples/workflows/README.md).
 
-Для просмотра исполнений используется `workflow inspect` / `workflow web`, а на Vercel — его dashboard. Старая самописная визуализация не нужна для нового журнала исполнений.
+Inspect executions with `workflow inspect` / `workflow web`, or the Vercel dashboard. See [workflow architecture](docs/workflows.md) for execution and deployment boundaries.
 
-## Интеграция — код, которым владеет приложение
+## Integrations are application-owned code
 
 ```sh
 npm run build
-npm run c4c -- integrate examples/tender/openapi.json --name tender-demo
-npm run c4c -- check integrations/tender-demo --json
+npm run c4c -- integrate examples/tasks/openapi.json --name tasks-demo
+npm run c4c -- check integrations/tasks-demo --json
 ```
 
-Пример OpenAPI — фикстура, не работающий API тендерной площадки.
+The sample OpenAPI document describes a synthetic tasks API for demonstrating code generation.
 
 ```text
-integrations/tender-demo/
-├── openapi.json       # snapshot, использованный при генерации
-├── c4c.lock.json      # source, hash спецификации/SDK, версия генератора
-└── sdk/              # Fetch-клиент, TypeScript, Zod, валидация
+integrations/tasks-demo/
+├── openapi.json       # Snapshot used for generation
+├── c4c.lock.json      # Source, specification/SDK hashes and generator version
+└── sdk/              # Fetch client, TypeScript types and Zod validation
 ```
 
-Генератор — закреплённый `@hey-api/openapi-ts`. Не разбираем его результат регулярками и не угадываем имена схем. `servers` и base path берутся из спецификации.
+Generation uses a pinned `@hey-api/openapi-ts` version. c4c consumes its output directly; server URLs and base paths come from the specification.
 
 ```ts
-import { getTender } from './integrations/tender-demo/sdk/sdk.gen';
-import { client } from './integrations/tender-demo/sdk/client.gen';
+import { getTask } from './integrations/tasks-demo/sdk/sdk.gen';
+import { client } from './integrations/tasks-demo/sdk/client.gen';
 client.setConfig({ baseUrl: 'https://YOUR_PROVIDER/api' });
-const { data } = await getTender({ path: { id: '123' }, throwOnError: true });
+const { data } = await getTask({ path: { id: '123' }, throwOnError: true });
 ```
 
-SDK требует Zod 4, но не c4c/codegen в production. Для нескольких компаний используйте разные клиентские экземпляры и авторизацию. Handwritten domain adapters остаются вне managed-директории и вызываются напрямую или из `use step`.
+The generated SDK requires Zod 4 but has no production dependency on c4c or the generator. Use separate client instances and authorization for separate accounts. Keep handwritten domain adapters outside the managed directory and invoke them directly or from a `use step` function.
 
-## Проверка и обновление
+## Check and update
 
 ```sh
-c4c check integrations/tender-demo --json
-c4c update integrations/tender-demo --expect <candidateHash>
+c4c check integrations/tasks-demo --json
+c4c update integrations/tasks-demo --expect <candidateHash>
 ```
 
-`check` только читает. Коды: `0` — без изменений; `2` — нужен review; `1` — невозможно проверить/источник недоступен. `--against ./candidate.json` проверяет подготовленный snapshot без смены upstream.
+`check` is read-only. Exit codes: `0` means unchanged, `2` means review required, and `1` means unavailable or failed. Use `--against ./candidate.json` to compare a prepared snapshot without changing the upstream source.
 
-Обновление генерируется во временной директории. При ошибке прежняя интеграция сохраняется; изменение upstream после review или ручное редактирование SDK блокирует замену. [Подробности и восстановление](docs/integrations.md).
+Updates are generated in a temporary directory. Failed generation preserves the previous integration. Upstream changes after review and handwritten SDK edits block replacement. See [the integration lifecycle and recovery guide](docs/integrations.md).
 
-**Drift не доказывает совместимость:** структурный diff не проверяет смысл ответа, авторизацию и пагинацию. Это задача контрактных фикстур и ограниченных read-only проверок провайдера. Одобрение в примере workflow также не означает успешный деплой.
+**A structural diff does not establish semantic compatibility.** Check response meaning, authorization and pagination with contract fixtures and limited read-only provider checks. Workflow approval records a decision about the supplied report; deployment has its own validation.
 
-## Проверки и ограничения
+## Validation and supported inputs
 
 ```sh
-npm run check          # лёгкие tests/types, включая логику review и выбор World
-npm run test:codegen   # настоящий генератор → TS → Fetch mock
-npm run workflow:typecheck # после workflow:setup
-npm run workflow:build     # компиляция нативных workflow/step; отдельно от лёгкого CI
+npm run check              # Lightweight tests/types, including review logic and World selection
+npm run test:codegen       # Real generator → TypeScript → injected Fetch mock
+npm run workflow:typecheck # After workflow:setup
+npm run workflow:build     # Native workflow/step compilation; separate from lightweight CI
 ```
 
-Automatic CI не ставит пример Next.js, не запускает БД, браузеры или модели. Полный native SDK smoke и проверка восстановления Postgres выполняются отдельно. Unit/mock-тест не доказывает живую доступность API или backend.
+Automatic CI runs lightweight checks. Native SDK smoke tests and PostgreSQL restart/recovery checks run separately and require the example application. Unit and mock tests establish local behavior; live API and backend checks establish deployment behavior.
 
-CLI поддерживает **OpenAPI 3.0/3.1 bundled JSON**. YAML/WSDL/SOAP не заявлены реализованными. Внешние `$ref` сначала bundle; dangling refs отклоняются. CLI — для доверенной машины, не публичный SSRF endpoint. HTTPS, без credentials/query/redirect, DNS проверяется при соединении. Private specs передавайте локальным файлом; секреты не коммитьте.
+CLI input is **bundled OpenAPI 3.0/3.1 JSON**. Bundle external `$ref` values first; unresolved references are rejected. YAML, WSDL and SOAP inputs are not implemented. The CLI runs on a trusted machine. Remote sources require public HTTPS without credentials, query parameters or redirects; DNS addresses are checked at connection time. Supply private specifications as local files and keep secrets out of commits.
 
-## Миграция
+## Migration
 
-Старый engine и визуализатор сохранены в [archive/v0.1](https://github.com/Pom4H/c4c/tree/archive/v0.1). Возвращать собственный scheduler или хранить второй журнал workflow рядом с SDK не нужно. Но удаление workflow-возможностей было ошибкой направления — они остаются частью c4c на новом runtime. [Миграция](docs/migration.md) · [Архитектура workflows](docs/workflows.md).
+The previous engine and visualizer are preserved in [archive/v0.1](https://github.com/Pom4H/c4c/tree/archive/v0.1). Move workflow execution to Workflow SDK while retaining tools, contracts and automation capabilities. [Migration guide](docs/migration.md) · [Workflow architecture](docs/workflows.md).
 
-MIT. Инструменты и предметная логика — ваши. Durable runtime — Workflow SDK.
+MIT.

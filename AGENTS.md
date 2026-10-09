@@ -2,6 +2,14 @@
 
 Read README.md, docs/workflows.md and docs/migration.md before changing architecture.
 
+## Scope and language
+
+Use English for repository documentation, code comments, examples and user-facing messages. Keep sample names and data neutral; the language of a conversation does not change the repository language.
+
+c4c is a general-purpose toolkit for typed tools, integrations and workflows. Shared entity-observation and subscription capabilities must remain domain-independent. Keep each consuming application's domain models, matching rules and business workflows in that application's repository. Discussing a consumer does not authorize implementing its product features here.
+
+## Architecture and validation
+
 **Preserve workflow capabilities around typed tools. Replace only our custom runtime.** The agreed runtime is Workflow SDK (workflow-sdk.dev): literal `use workflow` / `use step`, `start`, `getRun`, typed hooks, durable sleep and SDK observability. Do not narrow c4c to an SDK generator again, and do not restore our own scheduler, replay log, queue or workflow interpreter.
 
 Core stays independently usable, with zero runtime dependencies and callable contracts. CLI emits independent Fetch/Zod SDKs through the pinned upstream generator. Workflows call statically declared steps, which invoke the same tools; contract metadata remains available to HTTP/MCP/AI adapters. Do not hide directives inside higher-order functions or auto-run arbitrary modules discovered from untrusted content.

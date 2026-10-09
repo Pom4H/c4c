@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { prepare, conclude, approvalToken, ReviewMismatchError } from '../examples/workflows/lib/review.ts';
 import { worldMode } from '../examples/workflows/lib/world.ts';
 const hash = 'a'.repeat(64), candidateHash = 'b'.repeat(64);
-const input = { integration: 'tender', report: { previousHash: hash, candidateHash,
+const input = { integration: 'tasks-demo', report: { previousHash: hash, candidateHash,
   changes: [{ path: '/paths/x', kind: 'removed' }], truncated: false, generatorChanged: false } };
 test('a contract change requires a review; no claim about backward compatibility', () => {
   const review = prepare(input);

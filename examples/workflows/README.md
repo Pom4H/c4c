@@ -1,34 +1,34 @@
 # c4c + Workflow SDK: tools → durable review
 
-Это native Workflow SDK приложение, а не макет собственного runtime. Существующий c4c `define()` задаёт callable tools с input/output контрактами; явно объявленные steps вызывают их, workflow управляет последовательностью и typed approval hook. HTTP API демонстрирует прямой вызов тех же инструментов и интроспекцию.
+This application uses native Workflow SDK execution. c4c's `define()` creates callable tools with input/output contracts; explicitly declared steps call those tools, and the workflow controls the sequence and typed approval hook. The HTTP API exposes direct calls to the same tools and their contract metadata.
 
 ```text
 POST /api/reviews
     start(reviewChange)
        prepareReviewStep → c4c prepareReview tool
-       approvalHook + durable sleep (до 7 дней)
+       approvalHook + durable sleep (up to 7 days)
        recordDecisionStep → c4c recordDecision tool
     getRun(runId).status / returnValue
 ```
 
-Пример не запускает модель, не получает реальные тендеры и не переписывает SDK на Vercel. Он принимает отчёт `c4c check` от доверенного вызывающего, готовит review и сохраняет итог в SDK. Проверку реального upstream и применение `c4c update --expect <hash>` выполняет ваша CLI/CI-задача. Не выдавать переданный отчёт за самостоятельно проверенную совместимость API.
+The example accepts a `c4c check` report from a trusted caller, prepares a review, and stores the decision as the workflow result. Your CLI/CI job checks the actual upstream and applies `c4c update --expect <hash>`. Accepting a supplied report does not independently verify API compatibility or update generated source on Vercel.
 
-## 1. Запуск (Local World)
+## 1. Run locally with Local World
 
-Из корня репозитория, Node 22.18+:
+From the repository root, using Node 22.18+:
 
 ```sh
 npm ci
 npm run workflow:setup
 cp examples/workflows/.env.example examples/workflows/.env.local
-# Сгенерировать token (значение вставить только в локальный .env.local):
+# Generate a token and copy the value only into your local .env.local:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 npm run workflow:dev
 ```
 
-Задайте `C4C_ADMIN_TOKEN` длиной минимум 32 символа в `examples/workflows/.env.local`. Не добавляйте `.env.local` в git. Local World выбирается автоматически; .workflow-data также не коммитится.
+Set `C4C_ADMIN_TOKEN` to at least 32 characters in `examples/workflows/.env.local`. Keep `.env.local` out of Git. Local World is selected automatically; `.workflow-data` is also excluded from Git.
 
-Другой терминал:
+In another terminal:
 
 ```sh
 npm run workflow:typecheck
@@ -38,40 +38,40 @@ npm run inspect
 npm run web
 ```
 
-Smoke отправляет синтетический отчёт, проверяет отсутствие анонимного доступа, JSON Schema инструментов, запуск, typed-hook resume и итог `approved`. Это проверка скомпилированного/запущенного SDK, **не** прямой вызов функции workflow с проигнорированной директивой. Smoke требует уже запущенный сервер.
+The smoke test sends a synthetic report and checks that anonymous access is denied, tool JSON Schemas are available, a run starts, the typed hook resumes it, and the result is `approved`. It exercises the compiled, running SDK. Calling the workflow function directly while ignoring its directive would not test that execution path. The smoke test requires a running server.
 
-В root CI пример не устанавливается и Next.js не собирается: туда включены только лёгкие tests чистой логики/выбора World. Прямые зависимости примера закреплены по официальному postgres example (workflow/world-postgres 5.0.1); перед воспроизводимым production deploy сохраните сгенерированный `examples/workflows/package-lock.json` и используйте `npm ci` в каталоге примера.
+Root CI runs lightweight tests of pure logic and World selection. It does not install this example or build Next.js. The example's direct dependencies are pinned to versions from the official Postgres example (`workflow`/`world-postgres` 5.0.1). For reproducible production deployment, commit the generated `examples/workflows/package-lock.json` and use `npm ci` in the example directory.
 
 ## 2. Self-hosted Postgres World
 
 ```sh
 cd examples/workflows
 cp .env.postgres.example .env.local
-# Заполнить token, POSTGRES_PASSWORD и полный WORKFLOW_POSTGRES_URL.
-# Один и тот же пароль должен стоять в POSTGRES_PASSWORD и URL.
+# Set the token, POSTGRES_PASSWORD, and the full WORKFLOW_POSTGRES_URL.
+# Use the same password in POSTGRES_PASSWORD and the URL.
 docker compose --env-file .env.local up -d --wait
 npm run db:migrate
 npm run build
 npm run start
 ```
 
-`db:migrate` запускает **официальный** `bootstrap` из `@workflow/world-postgres`. Мы не создаём таблицы или runner сами. `instrumentation.ts` вызывает `world.start()` только для Postgres World, один раз при startup постоянного процесса.
+`db:migrate` runs the official `bootstrap` from `@workflow/world-postgres`. The SDK manages its runtime tables and worker. `instrumentation.ts` calls `world.start()` only for Postgres World, once when the persistent process starts.
 
-Postgres URL сохраняет connection string в server env; не передаётся в браузер. PostgreSQL контейнер опубликован лишь на 127.0.0.1. На реальном self-hosted хосте выполните backup и ограничьте внешний доступ к служебным SDK callback endpoints `/.well-known/workflow/*` через private ingress/reverse proxy. Не выставляйте Local World или workflow web публично.
+The PostgreSQL connection string stays in the server environment and is never sent to the browser. The PostgreSQL container is exposed only on `127.0.0.1`. On a production self-hosted server, back up the database and restrict external access to the SDK callback endpoints at `/.well-known/workflow/*` through private ingress or a reverse proxy. Keep Local World and `workflow web` private.
 
-Проверка устойчивости, отдельно от обычного smoke:
+Test restart recovery separately from the regular smoke test:
 
-1. Создать review, сохранить его runId и candidateHash.
-2. В `npm run web -- --backend @workflow/world-postgres` дождаться создания approval hook.
-3. Остановить только приложение, не PostgreSQL и не его volume.
-4. Запустить тот же build с прежним `WORKFLOW_POSTGRES_URL`.
-5. Возобновить тот же runId через approval API; проверить `completed` и предыдущие steps в SDK inspection.
+1. Create a review and save its `runId` and `candidateHash`.
+2. Run `npm run web -- --backend @workflow/world-postgres` and wait for the approval hook to be created.
+3. Stop only the application; leave PostgreSQL and its volume intact.
+4. Start the same build with the same `WORKFLOW_POSTGRES_URL`.
+5. Resume the same `runId` through the approval API; verify `completed` and the preceding steps in SDK inspection.
 
-Эту проверку нужно выполнить на вашей машине перед заявлением о restart/replay для выбранной версии. Наличие compose/config и unit-тесты её не заменяют.
+Run this check in your environment before claiming restart/replay support for the chosen version. Compose files, configuration, and unit tests alone do not establish recovery behavior.
 
 ## 3. Vercel World
 
-Vercel project root: `examples/workflows`, с доступом к файлам выше корня (локальный `@c4c/core`). Сборка core требуется до Next build. Например, из корня примера install/build команды:
+Set the Vercel project root to `examples/workflows` and allow access to files above that root for the local `@c4c/core` package. Build core before Next.js. For example, run these install/build commands from the example directory:
 
 ```sh
 npm --prefix ../.. ci
@@ -80,36 +80,36 @@ npm install
 npm run build
 ```
 
-После фиксации lock примера заменить `npm install` на `npm ci`. Задать server-side `C4C_ADMIN_TOKEN`, включить Fluid compute; **не задавать** `WORKFLOW_TARGET_WORLD=@workflow/world-postgres`. Vercel выбирает свой managed World автоматически. Инструменты по-прежнему могут работать с вашей PostgreSQL БД предметных данных внутри steps.
+After committing the example's lockfile, replace `npm install` with `npm ci`. Set the server-side `C4C_ADMIN_TOKEN` and enable Fluid compute. Leave `WORKFLOW_TARGET_WORLD=@workflow/world-postgres` unset: Vercel selects its managed World automatically. Tools can still access your application's PostgreSQL database inside steps.
 
-Служебные очереди, durable state и execution history в этом варианте принадлежат Vercel World; Postgres worker не запускается. Сам факт добавления кода не является подтверждённым Vercel deploy.
+Vercel World owns the queues, durable state, and execution history in this mode; no Postgres worker is started. The configuration in this repository does not establish that a Vercel deployment has been verified.
 
 ## API
 
-Все `/api/*` требуют `Authorization: Bearer <C4C_ADMIN_TOKEN>`.
+All `/api/*` routes require `Authorization: Bearer <C4C_ADMIN_TOKEN>`.
 
-| Метод | Назначение |
+| Method | Purpose |
 |---|---|
-| `GET /api/tools` | JSON Schema и описания явного списка инструментов |
-| `POST /api/tools` | `{name, input}`: прямой вызов `prepareReview` или `recordDecision`, без durable выполнения |
+| `GET /api/tools` | JSON Schemas and descriptions for the explicitly registered tools |
+| `POST /api/tools` | `{name, input}`: call `prepareReview` or `recordDecision` directly, without durable execution |
 | `POST /api/reviews` | `{integration, report}` → `202 {runId, statusUrl}` |
-| `GET /api/reviews/:runId` | SDK status; результат только после `completed` |
+| `GET /api/reviews/:runId` | SDK status; result available only after `completed` |
 | `POST /api/reviews/:runId/approval` | `{candidateHash, approved}` → native typed-hook resume |
 | `DELETE /api/reviews/:runId` | SDK cancellation |
 
-`report` содержит поля `previousHash`, `candidateHash`, `changes`, `truncated`, `generatorChanged` из `c4c check --json`. Дополнительные информационные поля отчёта игнорируются. Body ограничен 128 KiB. Ошибка схемы — 400; отсутствие ключа — 401; отсутствующий/закрытый hook — 409; недоступный backend — 503, а не успех.
+`report` contains the `previousHash`, `candidateHash`, `changes`, `truncated`, and `generatorChanged` fields from `c4c check --json`. Extra informational fields are ignored. The request body is limited to 128 KiB. Schema errors return 400; a missing token returns 401; an absent or closed hook returns 409; an unavailable backend returns 503.
 
-Hook может ещё не существовать сразу после 202 создания run. Клиент повторяет approval после 409; 202 означает принятие события, не завершение workflow. Token hook включает runId и hash; устаревшая версия не продолжает другой review. После terminal run повторное approval отклоняется.
+The hook may not exist immediately after run creation returns 202. The client retries approval after 409. A 202 response means the event was accepted; check the run status for workflow completion. The hook token includes the `runId` and hash, so approval for an outdated snapshot cannot resume another review. Approval is rejected once the run has reached a terminal state.
 
-**Границы:** shared service-token, без tenant/RBAC/SSO; `start` не дедуплицирован по бизнес-requestId; approval не выполняет deploy. Для настоящего приложения нужны собственные identity/scopes/run ownership, event idempotency и side-effect keys. SDK не превращает произвольную сетевую запись в exactly-once.
+**Scope:** the example uses a shared service token without tenant authorization, RBAC, or SSO. `start` is not deduplicated by a business request ID, and approval does not deploy code. Applications own identity, scopes, run ownership, event idempotency, and idempotency keys for side effects. The SDK does not guarantee exactly-once effects for arbitrary network writes.
 
-## Структура
+## Structure
 
-- `lib/tools.ts` — c4c callable tools и introspection; контракты в `contracts.ts`.
-- `workflows/steps.ts` — статические SDK steps; ошибки контракта → FatalError.
+- `lib/tools.ts` — callable c4c tools and introspection; contracts are in `contracts.ts`.
+- `workflows/steps.ts` — statically declared SDK steps; contract errors become `FatalError`.
 - `workflows/review-change.ts` — control flow, hooks, durable sleep.
-- `workflows/hooks.ts` — typed hook из SDK.
-- `instrumentation.ts` / `lib/world.ts` — startup/проверка режима, не executor.
-- `app/api` — авторизованные входы; никакого `eval`, сканирования exports или автоматического вызова неизвестных tools.
+- `workflows/hooks.ts` — a typed SDK hook.
+- `instrumentation.ts` / `lib/world.ts` — startup and World selection checks; execution belongs to the SDK.
+- `app/api` — authenticated entry points for explicitly declared tools, with no `eval`, export scanning, or automatic invocation of unknown tools.
 
-Документация: https://workflow-sdk.dev/docs/getting-started/next ; https://workflow-sdk.dev/worlds/postgres ; https://workflow-sdk.dev/worlds/vercel . Установленный пакет `workflow` также содержит документацию соответствующей версии.
+Documentation: [Next.js setup](https://workflow-sdk.dev/docs/getting-started/next), [Postgres World](https://workflow-sdk.dev/worlds/postgres), and [Vercel World](https://workflow-sdk.dev/worlds/vercel). The installed `workflow` package also contains documentation for its version.

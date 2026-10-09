@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { parseSpec, readSpec, canonical, hash, operations, publicAddress, LIMIT } from '../packages/cli/dist/spec.js';
 import { diff } from '../packages/cli/dist/drift.js';
-const base = JSON.parse(await readFile(new URL('../examples/tender/openapi.json', import.meta.url), 'utf8'));
+const base = JSON.parse(await readFile(new URL('../examples/tasks/openapi.json', import.meta.url), 'utf8'));
 const clone = () => structuredClone(base);
 
 test('bundled local refs and explicit server base path survive untouched', () => {
   const spec = parseSpec(JSON.stringify(base));
   assert.equal(spec.servers[0].url, 'https://sandbox.example.test/v2');
-  assert.deepEqual(operations(spec), ['GET /tenders', 'GET /tenders/{id}']);
+  assert.deepEqual(operations(spec), ['GET /tasks', 'GET /tasks/{id}']);
 });
 test('canonical hashing ignores object order, not array order', () => {
   assert.equal(hash({ b: 2, a: 1 }), hash({ a: 1, b: 2 }));
@@ -17,17 +17,17 @@ test('canonical hashing ignores object order, not array order', () => {
   assert.equal(canonical({ '__proto__': 'ignored', a: 1 }), '{"a":1}');
 });
 test('JSON-pointer changes expose fields without including private values', () => {
-  const changed = clone(); changed.components.schemas.Tender.properties.title.type = 'integer';
+  const changed = clone(); changed.components.schemas.Task.properties.title.type = 'integer';
   const report = diff(base, changed);
   assert.equal(report.status, 'changed');
   assert.equal(report.reviewRequired, true);
-  assert.ok(report.changes.some(c => c.path === '/components/schemas/Tender/properties/title/type'));
+  assert.ok(report.changes.some(c => c.path === '/components/schemas/Task/properties/title/type'));
   assert.equal(JSON.stringify(report).includes('integer'), false);
 });
 test('removed operations and auth drift need review', () => {
-  const changed = clone(); delete changed.paths['/tenders']; changed.security = [];
+  const changed = clone(); delete changed.paths['/tasks']; changed.security = [];
   const report = diff(base, changed);
-  assert.deepEqual(report.removedOperations, ['GET /tenders']);
+  assert.deepEqual(report.removedOperations, ['GET /tasks']);
   assert.ok(report.changes.some(c => c.path === '/security'));
 });
 test('even additive and documentation changes are not declared safe', () => {
@@ -37,23 +37,23 @@ test('even additive and documentation changes are not declared safe', () => {
 });
 test('bounded drift reports explicitly disclose truncation', () => {
   const changed = clone();
-  for (let i = 0; i < 250; i++) changed.components.schemas.Tender.properties['x' + i] = { type: 'string' };
+  for (let i = 0; i < 250; i++) changed.components.schemas.Task.properties['x' + i] = { type: 'string' };
   const report = diff(base, changed);
   assert.equal(report.changes.length, 200); assert.equal(report.truncated, true);
 });
 for (const reference of ['https://evil.test/spec', 'file:///etc/passwd', '../schema.json', '#/components/schemas/missing']) {
   test('reject untracked/unresolved ref ' + reference, () => {
-    const changed = clone(); changed.components.schemas.Tender.properties.title = { $ref: reference };
+    const changed = clone(); changed.components.schemas.Task.properties.title = { $ref: reference };
     assert.throws(() => parseSpec(JSON.stringify(changed)), /reference|bundled/);
   });
 }
 test('cyclic schema refs are allowed without unbounded dereferencing', () => {
-  const changed = clone(); changed.components.schemas.Tender.properties.child = { $ref: '#/components/schemas/Tender' };
+  const changed = clone(); changed.components.schemas.Task.properties.child = { $ref: '#/components/schemas/Task' };
   assert.ok(parseSpec(JSON.stringify(changed)));
 });
 test('malformed OpenAPI fails instead of partially generating silently', () => {
   for (const data of ['{}', '<html>login</html>', 'openapi: 3.1.0', JSON.stringify({ ...base, openapi: '2.0.0' })]) assert.throws(() => parseSpec(data));
-  const duplicate = clone(); duplicate.paths['/tenders/{id}'].get.operationId = 'listTenders';
+  const duplicate = clone(); duplicate.paths['/tasks/{id}'].get.operationId = 'listTasks';
   assert.throws(() => parseSpec(JSON.stringify(duplicate)), /duplicate/);
   assert.throws(() => parseSpec(' '.repeat(LIMIT + 1)), /10 MiB/);
 });

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { integrate, check, update, outputDirectory } from '../packages/cli/dist/project.js';
 import { hash } from '../packages/cli/dist/spec.js';
-const fixture = JSON.parse(await readFile(new URL('../examples/tender/openapi.json', import.meta.url), 'utf8'));
+const fixture = JSON.parse(await readFile(new URL('../examples/tasks/openapi.json', import.meta.url), 'utf8'));
 // Stub tests prove transaction/integrity behavior, NOT upstream codegen compatibility.
 // tests/codegen.test.mjs separately runs the real pinned compiler and SDK calls.
 async function compiler(input, output) {
@@ -81,5 +81,5 @@ test('CLI exit codes distinguish unavailable, unchanged and drift', async t => {
 });
 test('integration names cannot escape the project', () => {
   for (const name of ['../x','/tmp','x/y','','A B']) assert.throws(()=>outputDirectory(name));
-  assert.ok(outputDirectory('gosplan').endsWith('/integrations/gosplan'));
+  assert.ok(outputDirectory('tasks-demo').endsWith('/integrations/tasks-demo'));
 });
