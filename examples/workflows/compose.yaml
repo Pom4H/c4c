@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: c4c
+      POSTGRES_DB: c4c_workflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.local}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["workflow-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U c4c -d c4c_workflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  workflow-data:

@@ -1,35 +1,33 @@
-# 0.1 → 0.2
+# c4c: собственный runtime → Workflow SDK
 
-Это осознанная breaking-переработка, не обещание drop-in compatibility.
+## Исправление направления
 
-## Сохранена идея
+Задача — сохранить workflows вокруг контрактных инструментов и заменить наш engine на Workflow SDK. Промежуточное сужение c4c до «core + SDK generator, без workflows» не соответствовало этой задаче. Core/codegen остаются небольшими и независимыми, но не определяют пределы продукта.
 
-Контракт описывается один раз, функция типизирована и проверяет внешние границы. Внешний API превращается в код, которым владеет приложение. CLI остаётся главным инструментом разработки интеграций.
+Старая 0.1 сохранена в `archive/v0.1`; codegen snapshots и механизм review 0.2 не удаляются. Новый runnable sample находится в `examples/workflows`. Это нативная интеграция с SDK, не восстановление старого интерпретатора и не drop-in compatibility layer.
 
-## Удалено из активного дерева
+| Раньше | Теперь |
+|---|---|
+| Procedure contract + handler | Callable `define()` tool и `.contract` |
+| Самописный workflow runner | `use workflow` + `start()` из Workflow SDK |
+| Runtime node dispatch | Именованные `use step` вызывают те же инструменты |
+| Своя очередь, таймеры, replay | SDK runtime и выбранный World |
+| Свои hooks/resume | `defineHook`, schema, `.create()` / `.resume()` |
+| Самописный журнал/visualizer | `workflow inspect`, `workflow web`, Vercel observability |
+| Неявный registry | Явный набор инструментов и интроспекция контрактов |
 
-- Собственный workflow runtime, исполнение по строковым именам и обязательный registry.
-- Next.js visualizer, React hooks, хранение executions и связанных spans.
-- Универсальные HTTP/RPC/webhook серверы и автоматическое определение triggers по названиям.
-- Дублирующая генерация procedures поверх уже сгенерированного SDK, regex-разбор исходников, fallback на непроверенные схемы.
-- Глобальные retry/auth/rate-limit policies. Старый limiter был process-local; retry повторял любые ошибки; tracing мог копировать metadata в span. Теперь приложение явно владеет этими решениями.
-- Сайт документации со старым API, монорепозиторные примеры и ненужные зависимости UI. История и branch archive/v0.1 сохранены.
+## Последовательность переноса потребителя 0.1
 
-## Использование
+1. Сохранить доменные input/output контракты и права вызова; вынести handler в обычную функцию.
+2. Обернуть I/O в явную `use step` функцию, не в динамический closure.
+3. Перенести порядок, ветвление, параллелизм и ожидания в `use workflow`.
+4. Обработчики событий проверяют identity, scopes и подпись, затем возобновляют типизированный hook.
+5. Выбрать Vercel World либо long-lived Postgres World; схема runtime управляется официальным bootstrap.
+6. Проверить start/status/approval/cancel, restart и side-effect idempotency на выбранном backend.
+7. Старые runs завершить старым engine либо мигрировать через явно записанные бизнес-checkpoints. SDK не умеет читать журнал 0.1; не обещать автоматический replay старых процессов.
 
-Вместо `{ contract, handler }` + `engine.run('operation', input)`:
+Функциональный паритет конкретного приложения (старые триггеры, auth-policy, artifacts, UI) требует его тестов. Добавленный пример доказывает структуру нового пути, но сам по себе не является проверкой всех прежних приложений.
 
-```ts
-const operation = define({ input, output }, handler);
-await operation(value);
-```
+## Что не меняется в интеграциях
 
-Вместо глобального `ExecutionContext` передавайте зависимости через замыкание/factory. Для разных компаний создавайте изолированные экземпляры клиента с отдельной авторизацией. Для workflows — явные шаги выбранного durable runtime, не bridge из одного workflow DSL в другой.
-
-Для HTTP/MCP/AI tools используйте `operation.contract.input/output` и саму функцию. Экспонирование должно быть явным; наличие схемы не является авторизацией. Проверьте совместимость выбранного SDK со Standard Schema или используйте его официальный адаптер.
-
-Старый `c4c integrate` заменён командами `integrate`, `check`, `update`. Generated SDK использует Fetch/Zod напрямую, не @c4c/core.
-
-## Чего нельзя обещать
-
-c4c не получила полноценного WSDL/SOAP генератора и не чинит изменившееся API автоматически. Structural diff консервативен: изменения требуют просмотра, он не доказывает backward compatibility. Автоматический PR и расписание — задача GitHub/агента поверх read-only `check`, а не новый daemon внутри c4c.
+`c4c integrate/check/update`, snapshot и generator pin, запрет затирать hand edits, `--expect <candidateHash>` остаются. Generated SDK не обязан импортировать c4c. Задача workflow может подготовить review и ожидать решения, но фактическое изменение интеграции выполняется отдельной авторизованной CI-задачей/CLI-командой с той же проверкой hash. Не записывать generated source в файловую систему Vercel-функции.

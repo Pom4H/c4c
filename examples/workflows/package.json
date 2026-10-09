@@ -1,0 +1,32 @@
+{
+  "name": "c4c-workflow-sdk-example",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "node --env-file=.env.local scripts/bootstrap.mjs",
+    "inspect": "workflow inspect runs",
+    "web": "workflow web",
+    "test:smoke": "node --env-file=.env.local scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@c4c/core": "file:../../packages/core",
+    "workflow": "5.0.1",
+    "@workflow/world-postgres": "5.0.1",
+    "next": "16.2.4",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.30",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "5.8.3"
+  },
+  "engines": { "node": ">=22.18.0" }
+}

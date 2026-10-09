@@ -6,7 +6,11 @@ proof/
 .env
 .env.*
 !.env.example
+!.env.postgres.example
 *.tsbuildinfo
 *.c4c-backup/
 .*.c4c-stage-*/
 .*.c4c-lock
+.next/
+.workflow-data/
+next-env.d.ts

@@ -3,17 +3,23 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Typed functions and reviewable API integrations. No workflow runtime.",
+  "description": "Typed tools, reviewable API integrations and native Workflow SDK workflows.",
   "workspaces": ["packages/core", "packages/cli"],
   "scripts": {
     "build": "tsc -p packages/core && tsc -p packages/cli",
-    "typecheck": "tsc -p packages/core --noEmit && tsc -p packages/cli --noEmit && tsc -p tests/tsconfig.json",
+    "typecheck": "tsc -p packages/core --noEmit && tsc -p packages/cli --noEmit && tsc -p tests/tsconfig.json && tsc -p tests/workflow-tsconfig.json",
     "test": "npm run build && node --test tests/*.test.mjs",
     "test:codegen": "npm run build && C4C_CODEGEN_TEST=1 node --test tests/codegen.test.mjs",
     "check": "npm run typecheck && npm test",
-    "c4c": "node packages/cli/dist/bin.js"
+    "c4c": "node packages/cli/dist/bin.js",
+    "workflow:setup": "npm run build && npm --prefix examples/workflows install",
+    "workflow:dev": "npm --prefix examples/workflows run dev",
+    "workflow:build": "npm --prefix examples/workflows run build",
+    "workflow:start": "npm --prefix examples/workflows run start",
+    "workflow:typecheck": "npm --prefix examples/workflows run typecheck",
+    "workflow:smoke": "npm --prefix examples/workflows run test:smoke"
   },
-  "devDependencies": {"typescript": "5.8.3", "@types/node": "22.15.30", "zod": "4.1.12", "tsx": "4.20.6"},
-  "engines": {"node": ">=22.18.0"},
+  "devDependencies": { "typescript": "5.8.3", "@types/node": "22.15.30", "zod": "4.1.12", "tsx": "4.20.6" },
+  "engines": { "node": ">=22.18.0" },
   "license": "MIT"
 }
