@@ -1,30 +1,12 @@
 node_modules/
-dist/
-*.log
+**/dist/
+.tmp/
+proof/
+*.tgz
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.DS_Store
+.env.*
+!.env.example
 *.tsbuildinfo
-coverage/
-.vscode/
-.idea/
-
-# Next.js
-.next/
-out/
-
-# Build outputs
-build/
-
-.c4c
-
-# Generated files
-*.gen.ts
-
-# Lock files (keep package-lock.json, but ignore pnpm-lock.yaml duplicates if using both)
-# Uncomment if standardizing on one package manager:
-# package-lock.json
-# yarn.lock
+*.c4c-backup/
+.*.c4c-stage-*/
+.*.c4c-lock

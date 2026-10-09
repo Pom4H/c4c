@@ -1,0 +1,39 @@
+name: Lightweight contracts and SDK
+on:
+  push:
+    branches: [main, refactor/integration-first]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: c4c-check-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install tooling (no browsers or models)
+        run: |
+          if test -f package-lock.json; then
+            npm ci --ignore-scripts --no-audit --no-fund
+          else
+            npm install --ignore-scripts --no-audit --no-fund
+          fi
+      - run: npm run check
+      - run: npm run test:codegen
+      - name: Inspect publishable file lists; do not publish
+        run: |
+          npm pack --dry-run --workspace @c4c/core
+          npm pack --dry-run --workspace @c4c/cli
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-lock
+          path: package-lock.json
+          retention-days: 7
